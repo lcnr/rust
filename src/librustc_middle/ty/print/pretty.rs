@@ -2063,6 +2063,13 @@ define_print_and_forward_display! {
                    print_value_path(def_id, substs),
                    write("` can be evaluated"))
             }
+            ty::Predicate::ConstEquate(c1, c2) => {
+                p!(write("the constant `"),
+                   print(c1),
+                   write("` equals `"),
+                   print(c2),
+                   write("`"))
+            }
         }
     }
 
