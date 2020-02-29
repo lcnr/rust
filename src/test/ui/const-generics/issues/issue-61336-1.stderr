@@ -6,5 +6,13 @@ LL | #![feature(const_generics)]
    |
    = note: `#[warn(incomplete_features)]` on by default
 
+<<<<<<< HEAD
 warning: 1 warning emitted
 
+=======
+warning: the feature `lazy_normalization_consts` is incomplete and may cause the compiler to crash
+  --> $DIR/issue-61336-1.rs:3:12
+   |
+LL | #![feature(lazy_normalization_consts)]
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+>>>>>>> Added `lazy_normalization_consts` feature, and removed the -Z flag.
