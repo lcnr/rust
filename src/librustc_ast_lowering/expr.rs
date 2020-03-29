@@ -1322,7 +1322,7 @@ impl<'hir> LoweringContext<'_, 'hir> {
         )
     }
 
-    fn expr_unit(&mut self, sp: Span) -> &'hir hir::Expr<'hir> {
+    pub(super) fn expr_unit(&mut self, sp: Span) -> &'hir hir::Expr<'hir> {
         self.arena.alloc(self.expr(sp, hir::ExprKind::Tup(&[]), ThinVec::new()))
     }
 

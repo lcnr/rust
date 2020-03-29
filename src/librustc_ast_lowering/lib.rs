@@ -1098,47 +1098,91 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         match arg {
             ast::GenericArg::Lifetime(lt) => GenericArg::Lifetime(self.lower_lifetime(&lt)),
             ast::GenericArg::Type(ty) => {
-                // We parse const arguments as path types as we cannot distinguish them during
-                // parsing. We try to resolve that ambiguity by attempting resolution in both the
-                // type and value namespaces. If we resolved the path in the value namespace, we
-                // transform it into a generic const argument.
-                if let TyKind::Path(ref qself, ref path) = ty.kind {
-                    if let Some(partial_res) = self.resolver.get_partial_res(ty.id) {
-                        let res = partial_res.base_res();
-                        if !res.matches_ns(Namespace::TypeNS) {
-                            debug!(
-                                "lower_generic_arg: Lowering type argument as const argument: {:?}",
-                                ty,
-                            );
+                match ty.kind {
+                    // We parse const arguments as path types as we cannot distinguish them during
+                    // parsing. We try to resolve that ambiguity by attempting resolution in both the
+                    // type and value namespaces. If we resolved the path in the value namespace, we
+                    // transform it into a generic const argument.
+                    TyKind::Path(ref qself, ref path) => {
+                        if let Some(partial_res) = self.resolver.get_partial_res(ty.id) {
+                            let res = partial_res.base_res();
+                            if !res.matches_ns(Namespace::TypeNS) {
+                                debug!(
+                                    "lower_generic_arg: Lowering type argument as const argument: {:?}",
+                                    ty,
+                                );
 
-                            // Construct a AnonConst where the expr is the "ty"'s path.
+                                // Construct a AnonConst where the expr is the "ty"'s path.
 
-                            let parent_def_id = self.current_hir_id_owner.last().unwrap().0;
-                            let node_id = self.resolver.next_node_id();
+                                let parent_def_id = self.current_hir_id_owner.last().unwrap().0;
+                                let node_id = self.resolver.next_node_id();
 
-                            // Add a definition for the in-band const def.
-                            self.resolver.definitions().create_def_with_parent(
-                                parent_def_id,
-                                node_id,
-                                DefPathData::AnonConst,
-                                ExpnId::root(),
-                                ty.span,
-                            );
+                                // Add a definition for the in-band const def.
+                                self.resolver.definitions().create_def_with_parent(
+                                    parent_def_id,
+                                    node_id,
+                                    DefPathData::AnonConst,
+                                    ExpnId::root(),
+                                    ty.span,
+                                );
 
-                            let path_expr = Expr {
-                                id: ty.id,
-                                kind: ExprKind::Path(qself.clone(), path.clone()),
-                                span: ty.span,
-                                attrs: AttrVec::new(),
-                            };
+                                let path_expr = Expr {
+                                    id: ty.id,
+                                    kind: ExprKind::Path(qself.clone(), path.clone()),
+                                    span: ty.span,
+                                    attrs: AttrVec::new(),
+                                };
 
-                            let ct = self.with_new_scopes(|this| hir::AnonConst {
-                                hir_id: this.lower_node_id(node_id),
-                                body: this.lower_const_body(path_expr.span, Some(&path_expr)),
-                            });
-                            return GenericArg::Const(ConstArg { value: ct, span: ty.span });
+                                let ct = self.with_new_scopes(|this| hir::AnonConst {
+                                    hir_id: this.lower_node_id(node_id),
+                                    body: this.lower_const_body(path_expr.span, Some(&path_expr)),
+                                });
+                                return GenericArg::Const(ConstArg { value: ct, span: ty.span });
+                            }
                         }
                     }
+                    // Accept `()` both a type and as const parameter.
+                    TyKind::Tup(ref elems) if elems.is_empty() => {
+                        // add a custom `NodeId` for the expr and const,
+                        // as we still need the `NodeId` of the type.
+                        let node_id = self.resolver.next_node_id();
+                        let expr_id = self.resolver.next_node_id();
+                        let parent_def_id = self.current_hir_id_owner.last().unwrap().0;
+                        
+                        // Add a definition for the in-band const def.
+                        self.resolver.definitions().create_def_with_parent(
+                            parent_def_id,
+                            node_id,
+                            DefPathData::AnonConst,
+                            ExpnId::root(),
+                            ty.span,
+                        );
+                        self.resolver.definitions().create_def_with_parent(
+                            parent_def_id,
+                            expr_id,
+                            DefPathData::AnonConst,
+                            ExpnId::root(),
+                            ty.span,
+                        );
+                        
+
+                        let path_expr = Expr {
+                            id: expr_id,
+                            kind: ExprKind::Tup(Vec::new()),
+                            span: ty.span,
+                            attrs: AttrVec::new(),
+                        };
+
+                        let ct = self.with_new_scopes(|this| hir::AnonConst {
+                            hir_id: this.lower_node_id(node_id),
+                            body: this.lower_const_body(path_expr.span, Some(&path_expr)),
+                        });
+
+                        let maybe_const = ConstArg { value: ct, span: ty.span };
+                        let maybe_ty = self.lower_ty_direct(&ty, itctx);
+                        return GenericArg::Ambiguous(hir::AmbiguousArg { maybe_ty, maybe_const });
+                    }
+                    _ => (),
                 }
                 GenericArg::Type(self.lower_ty_direct(&ty, itctx))
             }

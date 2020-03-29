@@ -242,10 +242,16 @@ pub(super) fn type_of(tcx: TyCtxt<'_>, def_id: DefId) -> Ty<'_> {
                         .iter()
                         .filter_map(|seg| seg.args.as_ref().map(|args| (args.args, seg)))
                         .find_map(|(args, seg)| {
+                            // We iterate backwards to simplify accessing the corresponding
+                            // generic parameter later on.
+                            //
+                            // This allows us to not care about potential `Self` or default parameters.
                             args.iter()
-                                .filter(|arg| arg.is_const())
+                                .rev()
                                 .enumerate()
-                                .filter(|(_, arg)| arg.id() == hir_id)
+                                .filter(|(_, arg)| {
+                                    arg.const_hir_id().map_or(false, |id| id == hir_id)
+                                })
                                 .map(|(index, _)| (index, seg))
                                 .next()
                         })
@@ -276,28 +282,20 @@ pub(super) fn type_of(tcx: TyCtxt<'_>, def_id: DefId) -> Ty<'_> {
                     let ty = generics
                         .params
                         .iter()
-                        .filter(|param| {
-                            if let ty::GenericParamDefKind::Const = param.kind {
-                                true
-                            } else {
-                                false
-                            }
-                        })
+                        .rev()
                         .nth(arg_index)
+                        // Prevent ourselves from trying to get the type of a lifetime in
+                        // case there are too many generic args.
+                        .filter(|param| matches!(param.kind, ty::GenericParamDefKind::Const))
                         .map(|param| tcx.type_of(param.def_id));
 
                     if let Some(ty) = ty {
                         ty
                     } else {
-                        // This is no generic parameter associated with the arg. This is
-                        // probably from an extra arg where one is not needed.
-                        tcx.sess.delay_span_bug(
-                            DUMMY_SP,
-                            &format!(
-                                "missing generic parameter for `AnonConst`, parent: {:?}, res: {:?}",
-                                parent_node, res
-                            ),
-                        );
+                        // This is no generic parameter associated with the arg. This happens
+                        // for every ambiguous generic parameter.
+                        //
+                        // This may also happen in case an invalid number of generics arguments were supplied.
                         tcx.types.err
                     }
                 }

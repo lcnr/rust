@@ -36,6 +36,7 @@ use rustc_trait_selection::traits::error_reporting::report_object_safety_error;
 use rustc_trait_selection::traits::wf::object_region_bounds;
 
 use smallvec::SmallVec;
+use std::cmp;
 use std::collections::BTreeSet;
 use std::iter;
 use std::slice;
@@ -299,8 +300,9 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
         // that lifetimes will proceed types. So it suffices to check the number of each generic
         // arguments in order to validate them with respect to the generic parameters.
         let param_counts = def.own_counts();
-        let arg_counts = args.own_counts();
-        let infer_lifetimes = position != GenericArgPosition::Type && arg_counts.lifetimes == 0;
+        let mut arg_countsh = args.own_countsh();
+
+        let infer_lifetimes = position != GenericArgPosition::Type && arg_countsh.lifetimes == 0;
 
         let mut defaults: ty::GenericParamCount = Default::default();
         for param in &def.params {
@@ -328,7 +330,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                 let note = "the late bound lifetime parameter is introduced here";
                 let span = args.args[0].span();
                 if position == GenericArgPosition::Value
-                    && arg_counts.lifetimes != param_counts.lifetimes
+                    && arg_countsh.lifetimes != param_counts.lifetimes
                 {
                     explicit_lifetimes = Err(true);
                     let mut err = tcx.sess.struct_span_err(span, msg);
@@ -340,7 +342,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                     multispan.push_span_label(span_late, note.to_string());
                     tcx.struct_span_lint_hir(
                         LATE_BOUND_LIFETIME_ARGUMENTS,
-                        args.args[0].id(),
+                        args.args[0].lifetime_hir_id().unwrap(),
                         multispan,
                         |lint| lint.build(msg).emit(),
                     );
@@ -416,39 +418,51 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
         let mut unexpected_spans = vec![];
 
         if arg_count_correct.is_ok()
-            && (!infer_lifetimes || arg_counts.lifetimes > param_counts.lifetimes)
+            && (!infer_lifetimes || arg_countsh.lifetimes > param_counts.lifetimes)
         {
             arg_count_correct = check_kind_count(
                 "lifetime",
                 param_counts.lifetimes,
                 param_counts.lifetimes,
-                arg_counts.lifetimes,
+                arg_countsh.lifetimes,
                 0,
                 &mut unexpected_spans,
             )
             .and(arg_count_correct);
         }
+
         // FIXME(const_generics:defaults)
-        if !infer_args || arg_counts.consts > param_counts.consts {
+        let required_ambiguous_consts = param_counts.consts.saturating_sub(arg_countsh.consts);
+        let available_ambiguous_consts = cmp::min(arg_countsh.ambiguous, required_ambiguous_consts);
+        // L := lifetime, T := type, C := const, ? := ambiguous
+        // LLT???CC
+        // ~~>
+        // LLTTTCCC
+        arg_countsh.consts += available_ambiguous_consts;
+        arg_countsh.ambiguous -= available_ambiguous_consts;
+        arg_countsh.types += arg_countsh.ambiguous;
+        if !infer_args || arg_countsh.consts > param_counts.consts {
             arg_count_correct = check_kind_count(
                 "const",
                 param_counts.consts,
                 param_counts.consts,
-                arg_counts.consts,
-                arg_counts.lifetimes + arg_counts.types,
+                arg_countsh.consts,
+                arg_countsh.lifetimes + arg_countsh.types,
                 &mut unexpected_spans,
             )
             .and(arg_count_correct);
         }
+
         // Note that type errors are currently be emitted *after* const errors.
-        if !infer_args || arg_counts.types > param_counts.types - defaults.types - has_self as usize
+        if !infer_args
+            || arg_countsh.types > param_counts.types - defaults.types - has_self as usize
         {
             arg_count_correct = check_kind_count(
                 "type",
                 param_counts.types - defaults.types - has_self as usize,
                 param_counts.types - has_self as usize,
-                arg_counts.types,
-                arg_counts.lifetimes,
+                arg_countsh.types,
+                arg_countsh.lifetimes,
                 &mut unexpected_spans,
             )
             .and(arg_count_correct);
@@ -585,6 +599,17 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                 match (args.peek(), params.peek()) {
                     (Some(&arg), Some(&param)) => {
                         match (arg, &param.kind) {
+                            (GenericArg::Ambiguous(arg), GenericParamDefKind::Type { .. }) => {
+                                substs.push(provided_kind(param, &GenericArg::Type(arg.maybe_ty.clone())));
+                                args.next();
+                                params.next();
+                            }
+                            (GenericArg::Ambiguous(arg), GenericParamDefKind::Const) => {
+                                substs.push(provided_kind(param, &GenericArg::Const(arg.interpret_as_const().clone())));
+                                args.next();
+                                params.next();
+                            }
+
                             (GenericArg::Lifetime(_), GenericParamDefKind::Lifetime)
                             | (GenericArg::Type(_), GenericParamDefKind::Type { .. })
                             | (GenericArg::Const(_), GenericParamDefKind::Const) => {
@@ -592,8 +617,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                                 args.next();
                                 params.next();
                             }
-                            (GenericArg::Type(_), GenericParamDefKind::Lifetime)
-                            | (GenericArg::Const(_), GenericParamDefKind::Lifetime) => {
+                            (GenericArg::Type(_) | GenericArg::Const(_) | GenericArg::Ambiguous(_), GenericParamDefKind::Lifetime) => {
                                 // We expected a lifetime argument, but got a type or const
                                 // argument. That means we're inferring the lifetimes.
                                 substs.push(inferred_kind(None, param, infer_args));
@@ -2444,6 +2468,16 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                         err_for_ct = true;
                         has_err = true;
                         (ct.span, "const")
+                    }
+                    hir::GenericArg::Ambiguous(arg) => {
+                        if err_for_ty && err_for_ct {
+                            continue;
+                        }
+                        err_for_ty = true;
+                        err_for_ct = true;
+                        has_err = true;
+                        // we can't be more precise for ambiguous args
+                        (arg.span(), "generic")
                     }
                 };
                 let mut err = struct_span_err!(

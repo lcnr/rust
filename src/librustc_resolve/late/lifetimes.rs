@@ -1992,7 +1992,12 @@ impl<'a, 'tcx> LifetimeContext<'a, 'tcx> {
         for arg in generic_args.args {
             match arg {
                 GenericArg::Lifetime(_) => {}
-                GenericArg::Type(ty) => {
+                // In case the arg is ambiguous, we pretend that the arg is a type.
+                //
+                // FIXME(const_generics): This is only correct if the generic types are ordered correctly,
+                // as we would otherwise increment `i` without actually checking a type.
+                GenericArg::Type(ty)
+                | GenericArg::Ambiguous(hir::AmbiguousArg { maybe_ty: ty, .. }) => {
                     if let Some(&lt) = object_lifetime_defaults.get(i) {
                         let scope = Scope::ObjectLifetimeDefault { lifetime: lt, s: self.scope };
                         self.with(scope, |_, this| this.visit_ty(ty));

@@ -240,10 +240,37 @@ impl<'hir> PathSegment<'hir> {
     }
 }
 
-#[derive(RustcEncodable, RustcDecodable, Debug, HashStable_Generic)]
+#[derive(RustcEncodable, RustcDecodable, Debug, Clone, HashStable_Generic)]
 pub struct ConstArg {
     pub value: AnonConst,
     pub span: Span,
+}
+
+/// A generic arg which could either be a type or a constant.
+///
+/// We currently pretend that the arg is both a const and a type
+/// until we know what is actually expected.
+#[derive(RustcEncodable, RustcDecodable, Debug, HashStable_Generic)]
+pub struct AmbiguousArg<'hir> {
+    pub maybe_ty: Ty<'hir>,
+    pub maybe_const: ConstArg,
+}
+
+impl AmbiguousArg<'hir> {
+    pub fn span(&self) -> Span {
+        // `maybe_ty` and `maybe_const` have the same `Span`
+        self.maybe_ty.span
+    }
+
+    /// Pretend this generic arg is a type.
+    pub fn interpret_as_ty(&self) -> &Ty<'hir> {
+        &self.maybe_ty
+    }
+
+    /// Pretend this generic arg is a constant.
+    pub fn interpret_as_const(&self) -> &ConstArg {
+        &self.maybe_const
+    }
 }
 
 #[derive(RustcEncodable, RustcDecodable, Debug, HashStable_Generic)]
@@ -251,6 +278,7 @@ pub enum GenericArg<'hir> {
     Lifetime(Lifetime),
     Type(Ty<'hir>),
     Const(ConstArg),
+    Ambiguous(AmbiguousArg<'hir>),
 }
 
 impl GenericArg<'_> {
@@ -259,21 +287,7 @@ impl GenericArg<'_> {
             GenericArg::Lifetime(l) => l.span,
             GenericArg::Type(t) => t.span,
             GenericArg::Const(c) => c.span,
-        }
-    }
-
-    pub fn id(&self) -> HirId {
-        match self {
-            GenericArg::Lifetime(l) => l.hir_id,
-            GenericArg::Type(t) => t.hir_id,
-            GenericArg::Const(c) => c.value.hir_id,
-        }
-    }
-
-    pub fn is_const(&self) -> bool {
-        match self {
-            GenericArg::Const(_) => true,
-            _ => false,
+            GenericArg::Ambiguous(arg) => arg.span(),
         }
     }
 
@@ -282,6 +296,23 @@ impl GenericArg<'_> {
             GenericArg::Lifetime(_) => "lifetime",
             GenericArg::Type(_) => "type",
             GenericArg::Const(_) => "constant",
+            GenericArg::Ambiguous(_) => "ambiguous",
+        }
+    }
+
+    pub fn is_lifetime(&self) -> bool {
+        matches!(self, GenericArg::Lifetime(_))
+    }
+
+    pub fn lifetime_hir_id(&self) -> Option<HirId> {
+        if let GenericArg::Lifetime(l) = self { Some(l.hir_id) } else { None }
+    }
+
+    pub fn const_hir_id(&self) -> Option<HirId> {
+        match self {
+            GenericArg::Const(c) => Some(c.value.hir_id),
+            GenericArg::Ambiguous(arg) => Some(arg.maybe_const.value.hir_id),
+            _ => None,
         }
     }
 }
@@ -308,6 +339,7 @@ impl GenericArgs<'_> {
         self.args.is_empty() && self.bindings.is_empty() && !self.parenthesized
     }
 
+    /// Expects `self` to be a function and returns the types of its arguments.
     pub fn inputs(&self) -> &[Ty<'_>] {
         if self.parenthesized {
             for arg in self.args {
@@ -319,6 +351,14 @@ impl GenericArgs<'_> {
                         }
                         break;
                     }
+                    // FIXME(lazy_generic_args): This is only required because of
+                    // `()` which is ambiguous and may be used as function inputs.
+                    GenericArg::Ambiguous(arg) => {
+                        if let TyKind::Tup(ref tys) = &arg.interpret_as_ty().kind {
+                            return tys;
+                        }
+                        break;
+                    }
                     GenericArg::Const(_) => {}
                 }
             }
@@ -326,17 +366,19 @@ impl GenericArgs<'_> {
         panic!("GenericArgs::inputs: not a `Fn(T) -> U`");
     }
 
-    pub fn own_counts(&self) -> GenericParamCount {
+    /// Returns the amount of lifetimes, types, const and ambiguous arguments.
+    pub fn own_countsh(&self) -> GenericArgCount {
         // We could cache this as a property of `GenericParamCount`, but
         // the aim is to refactor this away entirely eventually and the
         // presence of this method will be a constant reminder.
-        let mut own_counts: GenericParamCount = Default::default();
+        let mut own_counts: GenericArgCount = Default::default();
 
         for arg in self.args {
             match arg {
                 GenericArg::Lifetime(_) => own_counts.lifetimes += 1,
                 GenericArg::Type(_) => own_counts.types += 1,
                 GenericArg::Const(_) => own_counts.consts += 1,
+                GenericArg::Ambiguous(_) => own_counts.ambiguous += 1,
             };
         }
 
@@ -442,6 +484,14 @@ pub struct GenericParamCount {
     pub lifetimes: usize,
     pub types: usize,
     pub consts: usize,
+}
+
+#[derive(Default)]
+pub struct GenericArgCount {
+    pub lifetimes: usize,
+    pub types: usize,
+    pub consts: usize,
+    pub ambiguous: usize,
 }
 
 /// Represents lifetimes and type parameters attached to a declaration
@@ -1602,7 +1652,7 @@ pub enum ExprKind<'hir> {
 /// To resolve the path to a `DefId`, call [`qpath_res`].
 ///
 /// [`qpath_res`]: ../ty/struct.TypeckTables.html#method.qpath_res
-#[derive(RustcEncodable, RustcDecodable, Debug, HashStable_Generic)]
+#[derive(RustcEncodable, RustcDecodable, Debug, Clone, HashStable_Generic)]
 pub enum QPath<'hir> {
     /// Path to a definition, optionally "fully-qualified" with a `Self`
     /// type, if the path points to an associated item in a trait.
@@ -1762,7 +1812,7 @@ impl From<GeneratorKind> for YieldSource {
 
 // N.B., if you change this, you'll probably want to change the corresponding
 // type structure in middle/ty.rs as well.
-#[derive(RustcEncodable, RustcDecodable, Debug, HashStable_Generic)]
+#[derive(RustcEncodable, RustcDecodable, Clone, Debug, HashStable_Generic)]
 pub struct MutTy<'hir> {
     pub ty: &'hir Ty<'hir>,
     pub mutbl: Mutability,
@@ -1882,7 +1932,7 @@ pub const FN_OUTPUT_NAME: Symbol = sym::Output;
 ///    Binding(...),
 /// }
 /// ```
-#[derive(RustcEncodable, RustcDecodable, Debug, HashStable_Generic)]
+#[derive(RustcEncodable, RustcDecodable, Clone, Debug, HashStable_Generic)]
 pub struct TypeBinding<'hir> {
     pub hir_id: HirId,
     #[stable_hasher(project(name))]
@@ -1892,7 +1942,7 @@ pub struct TypeBinding<'hir> {
 }
 
 // Represents the two kinds of type bindings.
-#[derive(RustcEncodable, RustcDecodable, Debug, HashStable_Generic)]
+#[derive(RustcEncodable, RustcDecodable, Clone, Debug, HashStable_Generic)]
 pub enum TypeBindingKind<'hir> {
     /// E.g., `Foo<Bar: Send>`.
     Constraint { bounds: &'hir [GenericBound<'hir>] },
@@ -1909,7 +1959,7 @@ impl TypeBinding<'_> {
     }
 }
 
-#[derive(Debug, RustcEncodable, RustcDecodable)]
+#[derive(RustcEncodable, RustcDecodable, Clone, Debug)]
 pub struct Ty<'hir> {
     pub hir_id: HirId,
     pub kind: TyKind<'hir>,
@@ -1959,7 +2009,7 @@ pub enum OpaqueTyOrigin {
 }
 
 /// The various kinds of types recognized by the compiler.
-#[derive(RustcEncodable, RustcDecodable, Debug, HashStable_Generic)]
+#[derive(RustcEncodable, RustcDecodable, Debug, Clone, HashStable_Generic)]
 pub enum TyKind<'hir> {
     /// A variable length slice (i.e., `[T]`).
     Slice(&'hir Ty<'hir>),

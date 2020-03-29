@@ -1979,6 +1979,10 @@ impl Clean<GenericArgs> for hir::GenericArgs<'_> {
                         hir::GenericArg::Lifetime(_) => None,
                         hir::GenericArg::Type(ty) => Some(GenericArg::Type(ty.clean(cx))),
                         hir::GenericArg::Const(ct) => Some(GenericArg::Const(ct.clean(cx))),
+                        // FIXME(lazy_generic_args)
+                        hir::GenericArg::Ambiguous(arg) => {
+                            Some(GenericArg::Const(arg.interpret_as_const().clean(cx)))
+                        }
                     })
                     .collect(),
                 bindings: self.bindings.clean(cx),

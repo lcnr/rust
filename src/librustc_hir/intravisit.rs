@@ -425,6 +425,10 @@ pub trait Visitor<'v>: Sized {
             GenericArg::Lifetime(lt) => self.visit_lifetime(lt),
             GenericArg::Type(ty) => self.visit_ty(ty),
             GenericArg::Const(ct) => self.visit_anon_const(&ct.value),
+            GenericArg::Ambiguous(arg) => {
+                self.visit_ty(arg.interpret_as_ty());
+                self.visit_anon_const(&arg.interpret_as_const().value);
+            }
         }
     }
     fn visit_lifetime(&mut self, lifetime: &'v Lifetime) {
