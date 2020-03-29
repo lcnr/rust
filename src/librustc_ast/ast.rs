@@ -194,6 +194,12 @@ pub enum GenericArg {
     /// `'a` in `Foo<'a>`
     Lifetime(Lifetime),
     /// `Bar` in `Foo<Bar>`
+    ///
+    /// This is also used for const parameters that are either `()` or a path,
+    /// since we can't tell until type-checking (or sometimes name
+    /// resolution), whether they refer to types or consts. This will be
+    /// converted to consts later if we find out that's what they should have
+    /// been all along.
     Type(P<Ty>),
     /// `1` in `Foo<1>`
     Const(AnonConst),
