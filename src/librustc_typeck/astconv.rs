@@ -600,12 +600,18 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                     (Some(&arg), Some(&param)) => {
                         match (arg, &param.kind) {
                             (GenericArg::Ambiguous(arg), GenericParamDefKind::Type { .. }) => {
-                                substs.push(provided_kind(param, &GenericArg::Type(arg.maybe_ty.clone())));
+                                substs.push(provided_kind(
+                                    param,
+                                    &GenericArg::Type(arg.maybe_ty.clone()),
+                                ));
                                 args.next();
                                 params.next();
                             }
                             (GenericArg::Ambiguous(arg), GenericParamDefKind::Const) => {
-                                substs.push(provided_kind(param, &GenericArg::Const(arg.interpret_as_const().clone())));
+                                substs.push(provided_kind(
+                                    param,
+                                    &GenericArg::Const(arg.interpret_as_const().clone()),
+                                ));
                                 args.next();
                                 params.next();
                             }
@@ -617,7 +623,12 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                                 args.next();
                                 params.next();
                             }
-                            (GenericArg::Type(_) | GenericArg::Const(_) | GenericArg::Ambiguous(_), GenericParamDefKind::Lifetime) => {
+                            (
+                                GenericArg::Type(_)
+                                | GenericArg::Const(_)
+                                | GenericArg::Ambiguous(_),
+                                GenericParamDefKind::Lifetime,
+                            ) => {
                                 // We expected a lifetime argument, but got a type or const
                                 // argument. That means we're inferring the lifetimes.
                                 substs.push(inferred_kind(None, param, infer_args));

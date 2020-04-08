@@ -1632,9 +1632,7 @@ impl<'a> State<'a> {
                         GenericArg::Type(ty) => s.print_type(ty),
                         GenericArg::Const(ct) => s.print_anon_const(&ct.value),
                         // FIXME(lazy_generic_arg): we may want to print the ty as well
-                        GenericArg::Ambiguous(arg) => {
-                            s.print_type(&arg.maybe_ty)
-                        }
+                        GenericArg::Ambiguous(arg) => s.print_type(&arg.maybe_ty),
                     },
                 );
             }

@@ -1148,7 +1148,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                         let node_id = self.resolver.next_node_id();
                         let expr_id = self.resolver.next_node_id();
                         let parent_def_id = self.current_hir_id_owner.last().unwrap().0;
-                        
+
                         // Add a definition for the in-band const def.
                         self.resolver.definitions().create_def_with_parent(
                             parent_def_id,
@@ -1164,7 +1164,6 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                             ExpnId::root(),
                             ty.span,
                         );
-                        
 
                         let path_expr = Expr {
                             id: expr_id,
