@@ -23,7 +23,6 @@
 // * The `raw` and `bytes` submodules.
 // * Boilerplate trait implementations.
 
-use crate::borrow::Borrow;
 use crate::cmp;
 use crate::cmp::Ordering::{self, Equal, Greater, Less};
 use crate::fmt;
@@ -2154,16 +2153,14 @@ impl<T> [T] {
     /// #![feature(slice_fill)]
     ///
     /// let mut buf = vec![0; 10];
-    /// buf.fill(1);
+    /// buf.fill(&1);
     /// assert_eq!(buf, vec![1; 10]);
     /// ```
     #[unstable(feature = "slice_fill", issue = "70758")]
-    pub fn fill<V>(&mut self, value: V)
+    pub fn fill<V>(&mut self, value: &T)
     where
-        V: Borrow<T>,
         T: Clone,
     {
-        let value = value.borrow();
         for el in self {
             el.clone_from(value)
         }
