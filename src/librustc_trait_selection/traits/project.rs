@@ -390,6 +390,7 @@ impl<'a, 'b, 'tcx> TypeFolder<'tcx> for AssocTypeNormalizer<'a, 'b, 'tcx> {
         if self.selcx.tcx().features().lazy_normalization_consts {
             constant
         } else {
+            let constant = constant.super_fold_with(self);
             constant.eval(self.selcx.tcx(), self.param_env)
         }
     }
