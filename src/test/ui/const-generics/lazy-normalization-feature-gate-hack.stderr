@@ -1,0 +1,8 @@
+error: expected identifier, found `<eof>`
+  --> $DIR/lazy-normalization-feature-gate-hack.rs:8:1
+   |
+LL | fn
+   | ^^ expected identifier
+
+error: aborting due to previous error
+
