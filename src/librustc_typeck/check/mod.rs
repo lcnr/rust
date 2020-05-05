@@ -1658,7 +1658,7 @@ fn check_opaque_for_inheriting_lifetimes(tcx: TyCtxt<'tcx>, def_id: LocalDefId, 
 
         fn visit_const(&mut self, c: &'tcx ty::Const<'tcx>) -> bool {
             if let ty::ConstKind::Unevaluated(..) = c.val {
-                // FIXME This check detect lifetimes within substs which violates this check even
+                // FIXME This check detects lifetimes within substs which violates this check even
                 //       though the particular substitution is not used within the const.
                 return false;
             }
