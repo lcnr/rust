@@ -149,6 +149,9 @@ pub fn suggest_constraining_type_param(
             //          |
             //          replace with: `T: Bar +`
             suggest_restrict(bounds_span.shrink_to_hi());
+
+            // TODO(#22750): Probably check this after calling this method
+            // instead.
         } else {
             // If user hasn't provided any bounds, suggest adding a new one:
             //

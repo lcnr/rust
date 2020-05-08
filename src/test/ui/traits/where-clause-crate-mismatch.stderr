@@ -1,0 +1,31 @@
+error[E0277]: the trait bound `T: hack::a::Bar` is not satisfied
+  --> $DIR/where-clause-crate-mismatch.rs:26:25
+   |
+LL |     pub struct B<T: a::Bar>(T);
+   |                     ------ required by this bound in `inner::B`
+...
+LL | pub struct C<T: a::Bar>(inner::B<T>);
+   |                         ^^^^^^^^^^^ the trait `hack::a::Bar` is not implemented for `T`
+   |
+help: consider further restricting this bound
+   |
+LL | pub struct C<T: a::Bar + hack::a::Bar>(inner::B<T>);
+   |                        ^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `T: hack::a::Bar` is not satisfied
+  --> $DIR/where-clause-crate-mismatch.rs:36:22
+   |
+LL |     pub struct B<T: a::Bar>(T);
+   |                     ------ required by this bound in `inner::B`
+...
+LL | pub struct D<T: Bar>(inner::B<T>);
+   |                      ^^^^^^^^^^^ the trait `hack::a::Bar` is not implemented for `T`
+   |
+help: consider further restricting this bound
+   |
+LL | pub struct D<T: Bar + hack::a::Bar>(inner::B<T>);
+   |                     ^^^^^^^^^^^^^^
+
+error: aborting due to 2 previous errors
+
+For more information about this error, try `rustc --explain E0277`.
