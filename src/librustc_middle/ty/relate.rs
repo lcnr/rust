@@ -433,7 +433,7 @@ pub fn super_relate_tys<R: TypeRelation<'tcx>>(
                 Ok(sz) => Ok(tcx.mk_ty(ty::Array(t, sz))),
                 // FIXME(lazy_normalization_consts) Implement improved diagnostics for mismatched array
                 // length?
-                Err(err) if relation.tcx().features().lazy_normalization_consts => Err(err),
+                Err(err) if relation.tcx().features().const_generics => Err(err),
                 Err(err) => {
                     // Check whether the lengths are both concrete/known values,
                     // but are unequal, for better diagnostics.
