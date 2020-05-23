@@ -457,7 +457,7 @@ impl<'a, 'tcx> InferCtxtExt<'tcx> for InferCtxt<'a, 'tcx> {
                         // implemented, and fallback has occurred, then it could be due to a
                         // variable that used to fallback to `()` now falling back to `!`. Issue a
                         // note informing about the change in behaviour.
-                        if trait_predicate.skip_binder().self_ty().is_never()
+                        if trait_predicate.self_ty().is_never()
                             && fallback_has_occurred
                         {
                             let predicate = trait_predicate.map_bound(|mut trait_pred| {

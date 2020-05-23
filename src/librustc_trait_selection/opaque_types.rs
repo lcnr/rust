@@ -1169,7 +1169,7 @@ impl<'a, 'tcx> Instantiator<'a, 'tcx> {
 
         for predicate in &bounds.predicates {
             if let ty::PredicateKind::Projection(projection) = predicate.kind() {
-                if projection.skip_binder().ty.references_error() {
+                if projection.ty.references_error() {
                     // No point on adding these obligations since there's a type error involved.
                     return ty_var;
                 }
@@ -1279,7 +1279,7 @@ crate fn required_region_bounds(
                 | ty::PredicateKind::RegionOutlives(..)
                 | ty::PredicateKind::ConstEvaluatable(..)
                 | ty::PredicateKind::ConstEquate(..) => None,
-                ty::PredicateKind::TypeOutlives(predicate) => {
+                &ty::PredicateKind::TypeOutlives(predicate) => {
                     // Search for a bound of the form `erased_self_ty
                     // : 'a`, but be wary of something like `for<'a>
                     // erased_self_ty : 'a` (we interpret a
@@ -1289,9 +1289,9 @@ crate fn required_region_bounds(
                     // it's kind of a moot point since you could never
                     // construct such an object, but this seems
                     // correct even if that code changes).
-                    let ty::OutlivesPredicate(ref t, ref r) = predicate.skip_binder();
-                    if t == &erased_self_ty && !r.has_escaping_bound_vars() {
-                        Some(*r)
+                    let ty::OutlivesPredicate(t, r) = predicate;
+                    if t == erased_self_ty && !r.has_escaping_bound_vars() {
+                        Some(r)
                     } else {
                         None
                     }

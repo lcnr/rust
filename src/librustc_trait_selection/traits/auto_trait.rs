@@ -635,7 +635,7 @@ impl AutoTraitFinder<'tcx> {
             // from the various possible predicates
             match predicate.kind() {
                 &ty::PredicateKind::Trait(p, _) => {
-                    if self.is_param_no_infer(p.skip_binder().trait_ref.substs)
+                    if self.is_param_no_infer(p.trait_ref.substs)
                         && !only_projections
                         && is_new_pred
                     {
@@ -740,7 +740,7 @@ impl AutoTraitFinder<'tcx> {
                             // when we started out trying to unify
                             // some inference variables. See the comment above
                             // for more infomration
-                            if p.ty().skip_binder().has_infer_types() {
+                            if p.ty.has_infer_types() {
                                 if !self.evaluate_nested_obligations(
                                     ty,
                                     v.into_iter(),
@@ -762,7 +762,7 @@ impl AutoTraitFinder<'tcx> {
                             // However, we should always make progress (either by generating
                             // subobligations or getting an error) when we started off with
                             // inference variables
-                            if p.ty().skip_binder().has_infer_types() {
+                            if p.ty.has_infer_types() {
                                 panic!("Unexpected result when selecting {:?} {:?}", ty, obligation)
                             }
                         }

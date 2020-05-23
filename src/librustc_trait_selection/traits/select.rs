@@ -465,7 +465,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
             ty::PredicateKind::Projection(data) => {
                 let project_obligation = obligation.with(*data);
-                match project::poly_project_and_unify_type(self, &project_obligation) {
+                match project::poly_project_and_unify_type(self, project_obligation) {
                     Ok(Some(mut subobligations)) => {
                         self.add_depth(subobligations.iter_mut(), obligation.recursion_depth);
                         let result = self.evaluate_predicates_recursively(
@@ -473,7 +473,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                             subobligations.into_iter(),
                         );
                         if let Some(key) =
-                            ProjectionCacheKey::from_poly_projection_predicate(self, data)
+                            ProjectionCacheKey::from_poly_projection_predicate(self, data.to_poly_projection_predicate())
                         {
                             self.infcx.inner.borrow_mut().projection_cache().complete(key);
                         }

@@ -435,7 +435,7 @@ impl<'a, 'b, 'tcx> ObligationProcessor for FulfillProcessor<'a, 'b, 'tcx> {
                     Ok(None) => {
                         let tcx = self.selcx.tcx();
                         pending_obligation.stalled_on =
-                            trait_ref_type_vars(self.selcx, data.to_poly_trait_ref(tcx));
+                            trait_ref_type_vars(self.selcx, data.trait_ref.to_poly_trait_ref(tcx));
                         ProcessResult::Unchanged
                     }
                     Ok(Some(os)) => ProcessResult::Changed(mk_pending(infcx, os)),
@@ -490,17 +490,17 @@ impl<'a, 'b, 'tcx> ObligationProcessor for FulfillProcessor<'a, 'b, 'tcx> {
                     None => {
                         // None means that both are unresolved.
                         pending_obligation.stalled_on = vec![
-                            TyOrConstInferVar::maybe_from_ty(subtype.skip_binder().a).unwrap(),
-                            TyOrConstInferVar::maybe_from_ty(subtype.skip_binder().b).unwrap(),
+                            TyOrConstInferVar::maybe_from_ty(subtype.a).unwrap(),
+                            TyOrConstInferVar::maybe_from_ty(subtype.b).unwrap(),
                         ];
                         ProcessResult::Unchanged
                     }
                     Some(Ok(ok)) => ProcessResult::Changed(mk_pending(infcx, ok.obligations)),
                     Some(Err(err)) => {
                         let expected_found = ExpectedFound::new(
-                            subtype.skip_binder().a_is_expected,
-                            subtype.skip_binder().a,
-                            subtype.skip_binder().b,
+                            subtype.a_is_expected,
+                            subtype.a,
+                            subtype.b,
                         );
                         ProcessResult::Error(FulfillmentErrorCode::CodeSubtypeError(
                             expected_found,

@@ -249,6 +249,7 @@ impl fmt::Debug for ty::PredicateKind<'tcx> {
                 write!(f, "ConstEvaluatable({:?}, {:?})", def_id, substs)
             }
             ty::PredicateKind::ConstEquate(c1, c2) => write!(f, "ConstEquate({:?}, {:?})", c1, c2),
+            ty::PredicateKind::ForAll(inner) => write!(f, "ForAll({:?})", inner),
         }
     }
 }
@@ -479,20 +480,18 @@ impl<'a, 'tcx> Lift<'tcx> for ty::PredicateKind<'a> {
     type Lifted = ty::PredicateKind<'tcx>;
     fn lift_to_tcx(&self, tcx: TyCtxt<'tcx>) -> Option<Self::Lifted> {
         match *self {
-            ty::PredicateKind::Trait(ref binder, constness) => {
-                tcx.lift(binder).map(|binder| ty::PredicateKind::Trait(binder, constness))
+            ty::PredicateKind::Trait(ref data, constness) => {
+                tcx.lift(data).map(|data| ty::PredicateKind::Trait(data, constness))
             }
-            ty::PredicateKind::Subtype(ref binder) => {
-                tcx.lift(binder).map(ty::PredicateKind::Subtype)
+            ty::PredicateKind::Subtype(ref data) => tcx.lift(data).map(ty::PredicateKind::Subtype),
+            ty::PredicateKind::RegionOutlives(ref data) => {
+                tcx.lift(data).map(ty::PredicateKind::RegionOutlives)
             }
-            ty::PredicateKind::RegionOutlives(ref binder) => {
-                tcx.lift(binder).map(ty::PredicateKind::RegionOutlives)
+            ty::PredicateKind::TypeOutlives(ref data) => {
+                tcx.lift(data).map(ty::PredicateKind::TypeOutlives)
             }
-            ty::PredicateKind::TypeOutlives(ref binder) => {
-                tcx.lift(binder).map(ty::PredicateKind::TypeOutlives)
-            }
-            ty::PredicateKind::Projection(ref binder) => {
-                tcx.lift(binder).map(ty::PredicateKind::Projection)
+            ty::PredicateKind::Projection(ref data) => {
+                tcx.lift(data).map(ty::PredicateKind::Projection)
             }
             ty::PredicateKind::WellFormed(ty) => tcx.lift(&ty).map(ty::PredicateKind::WellFormed),
             ty::PredicateKind::ClosureKind(closure_def_id, closure_substs, kind) => {
@@ -508,6 +507,9 @@ impl<'a, 'tcx> Lift<'tcx> for ty::PredicateKind<'a> {
             }
             ty::PredicateKind::ConstEquate(c1, c2) => {
                 tcx.lift(&(c1, c2)).map(|(c1, c2)| ty::PredicateKind::ConstEquate(c1, c2))
+            }
+            ty::PredicateKind::ForAll(ref binder) => {
+                tcx.lift(binder).map(|binder| ty::PredicateKind::ForAll(binder))
             }
         }
     }
