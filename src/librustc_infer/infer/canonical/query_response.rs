@@ -532,14 +532,14 @@ impl<'cx, 'tcx> InferCtxt<'cx, 'tcx> {
                 cause.clone(),
                 param_env,
                 match k1.unpack() {
-                    GenericArgKind::Lifetime(r1) => ty::PredicateKind::RegionOutlives(
-                        ty::Binder::bind(ty::OutlivesPredicate(r1, r2)),
-                    )
-                    .to_predicate(self.tcx),
-                    GenericArgKind::Type(t1) => ty::PredicateKind::TypeOutlives(ty::Binder::bind(
-                        ty::OutlivesPredicate(t1, r2),
-                    ))
-                    .to_predicate(self.tcx),
+                    GenericArgKind::Lifetime(r1) => {
+                        ty::PredicateKind::RegionOutlives(ty::OutlivesPredicate(r1, r2))
+                            .to_predicate(self.tcx)
+                    }
+                    GenericArgKind::Type(t1) => {
+                        ty::PredicateKind::TypeOutlives(ty::OutlivesPredicate(t1, r2))
+                            .to_predicate(self.tcx)
+                    }
                     GenericArgKind::Const(..) => {
                         // Consts cannot outlive one another, so we don't expect to
                         // ecounter this branch.
@@ -666,10 +666,8 @@ impl<'tcx> TypeRelatingDelegate<'tcx> for QueryTypeRelatingDelegate<'_, 'tcx> {
         self.obligations.push(Obligation {
             cause: self.cause.clone(),
             param_env: self.param_env,
-            predicate: ty::PredicateKind::RegionOutlives(ty::Binder::dummy(ty::OutlivesPredicate(
-                sup, sub,
-            )))
-            .to_predicate(self.infcx.tcx),
+            predicate: ty::PredicateKind::RegionOutlives(ty::OutlivesPredicate(sup, sub))
+                .to_predicate(self.infcx.tcx),
             recursion_depth: 0,
         });
     }

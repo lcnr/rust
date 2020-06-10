@@ -573,9 +573,10 @@ pub trait PrettyPrinter<'tcx>:
                     let mut is_sized = false;
                     p!(write("impl"));
                     for predicate in bounds.predicates {
-                        if let Some(trait_ref) = predicate.to_opt_poly_trait_ref() {
+                        // TODO: do we care about `ForAll` here?
+                        if let Some(trait_ref) = predicate.to_opt_trait_ref() {
                             // Don't print +Sized, but rather +?Sized if absent.
-                            if Some(trait_ref.def_id()) == self.tcx().lang_items().sized_trait() {
+                            if Some(trait_ref.def_id) == self.tcx().lang_items().sized_trait() {
                                 is_sized = true;
                                 continue;
                             }
@@ -2054,6 +2055,9 @@ define_print_and_forward_display! {
                    print(c2),
                    write("`"))
             }
+            // TODO Can we simply skip the binder during printing or do we have to use erase
+            // late bound regions?
+            ty::PredicateKind::ForAll(binder) => p!(write("forall: "), print(binder.skip_binder())),
         }
     }
 

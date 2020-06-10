@@ -6,7 +6,7 @@ use crate::mir::interpret;
 use crate::mir::ProjectionKind;
 use crate::ty::fold::{TypeFoldable, TypeFolder, TypeVisitor};
 use crate::ty::print::{FmtPrinter, Printer};
-use crate::ty::{self, InferConst, Lift, Ty, TyCtxt};
+use crate::ty::{self, Binder, InferConst, Lift, Ty, TyCtxt};
 use rustc_hir as hir;
 use rustc_hir::def::Namespace;
 use rustc_hir::def_id::CRATE_DEF_INDEX;
@@ -247,6 +247,7 @@ impl fmt::Debug for ty::PredicateKind<'tcx> {
                 write!(f, "ConstEvaluatable({:?}, {:?})", def_id, substs)
             }
             ty::PredicateKind::ConstEquate(c1, c2) => write!(f, "ConstEquate({:?}, {:?})", c1, c2),
+            ty::PredicateKind::ForAll(binder) => write!(f, "Forall({:?})", binder),
         }
     }
 }
@@ -507,6 +508,9 @@ impl<'a, 'tcx> Lift<'tcx> for ty::PredicateKind<'a> {
             ty::PredicateKind::ConstEquate(c1, c2) => {
                 tcx.lift(&(c1, c2)).map(|(c1, c2)| ty::PredicateKind::ConstEquate(c1, c2))
             }
+            ty::PredicateKind::ForAll(binder) => tcx
+                .lift(binder.skip_binder())
+                .map(|data| ty::PredicateKind::ForAll(Binder::bind(data))),
         }
     }
 }

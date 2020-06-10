@@ -1167,8 +1167,9 @@ impl<'a, 'tcx> Instantiator<'a, 'tcx> {
         debug!("instantiate_opaque_types: ty_var={:?}", ty_var);
 
         for predicate in &bounds.predicates {
+            // TODO: consider forall
             if let ty::PredicateKind::Projection(projection) = predicate.kind() {
-                if projection.skip_binder().ty.references_error() {
+                if projection.ty.references_error() {
                     // No point on adding these obligations since there's a type error involved.
                     return ty_var;
                 }
@@ -1265,37 +1266,41 @@ crate fn required_region_bounds(
 
     assert!(!erased_self_ty.has_escaping_bound_vars());
 
+    fn filter_map_fn(erased_self_ty: Ty<'tcx>, predicate: ty::Predicate<'tcx>) -> Option<ty::Region<'tcx>> {
+        match predicate.kind() {
+            ty::PredicateKind::Projection(..)
+            | ty::PredicateKind::Trait(..)
+            | ty::PredicateKind::Subtype(..)
+            | ty::PredicateKind::WellFormed(..)
+            | ty::PredicateKind::ObjectSafe(..)
+            | ty::PredicateKind::ClosureKind(..)
+            | ty::PredicateKind::RegionOutlives(..)
+            | ty::PredicateKind::ConstEvaluatable(..)
+            | ty::PredicateKind::ConstEquate(..) => None,
+            &ty::PredicateKind::TypeOutlives(ty::OutlivesPredicate(t, r)) => {
+                // Search for a bound of the form `erased_self_ty
+                // : 'a`, but be wary of something like `for<'a>
+                // erased_self_ty : 'a` (we interpret a
+                // higher-ranked bound like that as 'static,
+                // though at present the code in `fulfill.rs`
+                // considers such bounds to be unsatisfiable, so
+                // it's kind of a moot point since you could never
+                // construct such an object, but this seems
+                // correct even if that code changes).
+                if t == erased_self_ty && !r.has_escaping_bound_vars() {
+                    Some(r)
+                } else {
+                    None
+                }
+            }
+            ty::PredicateKind::ForAll(binder) => filter_map_fn(erased_self_ty, *binder.skip_binder()),
+        }
+    }
+
     traits::elaborate_predicates(tcx, predicates)
         .filter_map(|obligation| {
             debug!("required_region_bounds(obligation={:?})", obligation);
-            match obligation.predicate.kind() {
-                ty::PredicateKind::Projection(..)
-                | ty::PredicateKind::Trait(..)
-                | ty::PredicateKind::Subtype(..)
-                | ty::PredicateKind::WellFormed(..)
-                | ty::PredicateKind::ObjectSafe(..)
-                | ty::PredicateKind::ClosureKind(..)
-                | ty::PredicateKind::RegionOutlives(..)
-                | ty::PredicateKind::ConstEvaluatable(..)
-                | ty::PredicateKind::ConstEquate(..) => None,
-                ty::PredicateKind::TypeOutlives(predicate) => {
-                    // Search for a bound of the form `erased_self_ty
-                    // : 'a`, but be wary of something like `for<'a>
-                    // erased_self_ty : 'a` (we interpret a
-                    // higher-ranked bound like that as 'static,
-                    // though at present the code in `fulfill.rs`
-                    // considers such bounds to be unsatisfiable, so
-                    // it's kind of a moot point since you could never
-                    // construct such an object, but this seems
-                    // correct even if that code changes).
-                    let ty::OutlivesPredicate(ref t, ref r) = predicate.skip_binder();
-                    if t == &erased_self_ty && !r.has_escaping_bound_vars() {
-                        Some(*r)
-                    } else {
-                        None
-                    }
-                }
-            }
+            filter_map_fn(erased_self_ty, obligation.predicate)
         })
         .collect()
 }
