@@ -6,7 +6,7 @@
 //!
 //! [rustc dev guide]:https://rustc-dev-guide.rust-lang.org/traits/resolution.html#candidate-assembly
 use rustc_hir as hir;
-use rustc_infer::traits::{Obligation, PolyTraitObligation, SelectionError};
+use rustc_infer::traits::{Obligation, PolyTraitObligation, SelectionError, TraitObligation};
 use rustc_middle::ty::{self, TypeFoldable};
 use rustc_target::spec::abi::Abi;
 
@@ -210,7 +210,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn assemble_generator_candidates(
         &mut self,
-        obligation: &PolyTraitObligation<'tcx>,
+        obligation: &TraitObligation<'tcx>,
         candidates: &mut SelectionCandidateSet<'tcx>,
     ) -> Result<(), SelectionError<'tcx>> {
         if self.tcx().lang_items().gen_trait() != Some(obligation.predicate.def_id()) {
@@ -220,7 +220,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         // Okay to skip binder because the substs on generator types never
         // touch bound regions, they just capture the in-scope
         // type/region parameters.
-        let self_ty = *obligation.self_ty().skip_binder();
+        let self_ty = *obligation.self_ty();
         match self_ty.kind {
             ty::Generator(..) => {
                 debug!(
@@ -248,7 +248,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
     /// unified during the confirmation step.
     fn assemble_closure_candidates(
         &mut self,
-        obligation: &PolyTraitObligation<'tcx>,
+        obligation: &TraitObligation<'tcx>,
         candidates: &mut SelectionCandidateSet<'tcx>,
     ) -> Result<(), SelectionError<'tcx>> {
         let kind = match self.tcx().fn_trait_kind_from_lang_item(obligation.predicate.def_id()) {
@@ -261,7 +261,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         // Okay to skip binder because the substs on closure types never
         // touch bound regions, they just capture the in-scope
         // type/region parameters
-        match obligation.self_ty().skip_binder().kind {
+        match obligation.self_ty().kind {
             ty::Closure(_, closure_substs) => {
                 debug!("assemble_unboxed_candidates: kind={:?} obligation={:?}", kind, obligation);
                 match self.infcx.closure_kind(closure_substs) {

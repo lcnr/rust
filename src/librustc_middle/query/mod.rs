@@ -734,12 +734,12 @@ rustc_queries! {
 
     Codegen {
         query codegen_fulfill_obligation(
-            key: (ty::ParamEnv<'tcx>, ty::PolyTraitRef<'tcx>)
+            key: (ty::ParamEnv<'tcx>, ty::TraitRef<'tcx>)
         ) -> Result<ImplSource<'tcx, ()>, ErrorReported> {
             cache_on_disk_if { true }
             desc { |tcx|
                 "checking if `{}` fulfills its obligations",
-                tcx.def_path_str(key.1.def_id())
+                tcx.def_path_str(key.1.def_id)
             }
         }
     }

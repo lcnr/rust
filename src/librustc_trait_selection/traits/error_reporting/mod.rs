@@ -508,7 +508,7 @@ impl<'a, 'tcx> InferCtxtExt<'tcx> for InferCtxt<'a, 'tcx> {
                     ty::PredicateKind::RegionOutlives(ref predicate) => {
                         let predicate = self.resolve_vars_if_possible(predicate);
                         let err = self
-                            .region_outlives_predicate(&obligation.cause, predicate)
+                            .poly_region_outlives_predicate(&obligation.cause, predicate)
                             .err()
                             .unwrap();
                         struct_span_err!(

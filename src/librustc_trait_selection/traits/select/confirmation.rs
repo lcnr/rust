@@ -34,7 +34,9 @@ use crate::traits::{
     ImplSourceDiscriminantKindData, ImplSourceFnPointerData, ImplSourceGeneratorData,
     ImplSourceObjectData, ImplSourceTraitAliasData, ImplSourceUserDefinedData,
 };
-use crate::traits::{ObjectCastObligation, PolyTraitObligation, PredicateObligation};
+use crate::traits::{
+    ObjectCastObligation, PolyTraitObligation, PredicateObligation, TraitObligation,
+};
 use crate::traits::{Obligation, ObligationCause};
 use crate::traits::{SelectionError, Unimplemented};
 
@@ -47,7 +49,7 @@ use std::iter;
 impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
     pub(super) fn confirm_candidate(
         &mut self,
-        obligation: &PolyTraitObligation<'tcx>,
+        obligation: &TraitObligation<'tcx>,
         candidate: SelectionCandidate<'tcx>,
     ) -> Result<Selection<'tcx>, SelectionError<'tcx>> {
         debug!("confirm_candidate({:?}, {:?})", obligation, candidate);
@@ -120,7 +122,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         }
     }
 
-    fn confirm_projection_candidate(&mut self, obligation: &PolyTraitObligation<'tcx>) {
+    fn confirm_projection_candidate(&mut self, obligation: &TraitObligation<'tcx>) {
         self.infcx.commit_unconditionally(|snapshot| {
             let result =
                 self.match_projection_obligation_against_definition_bounds(obligation, snapshot);
@@ -130,7 +132,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn confirm_param_candidate(
         &mut self,
-        obligation: &PolyTraitObligation<'tcx>,
+        obligation: &TraitObligation<'tcx>,
         param: ty::PolyTraitRef<'tcx>,
     ) -> Vec<PredicateObligation<'tcx>> {
         debug!("confirm_param_candidate({:?},{:?})", obligation, param);
@@ -153,7 +155,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn confirm_builtin_candidate(
         &mut self,
-        obligation: &PolyTraitObligation<'tcx>,
+        obligation: &TraitObligation<'tcx>,
         has_nested: bool,
     ) -> ImplSourceBuiltinData<PredicateObligation<'tcx>> {
         debug!("confirm_builtin_candidate({:?}, {:?})", obligation, has_nested);
@@ -216,7 +218,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
     /// See `confirm_auto_impl_candidate`.
     fn vtable_auto_impl(
         &mut self,
-        obligation: &PolyTraitObligation<'tcx>,
+        obligation: &TraitObligation<'tcx>,
         trait_def_id: DefId,
         nested: ty::Binder<Vec<Ty<'tcx>>>,
     ) -> ImplSourceAutoImplData<PredicateObligation<'tcx>> {
@@ -258,7 +260,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn confirm_impl_candidate(
         &mut self,
-        obligation: &PolyTraitObligation<'tcx>,
+        obligation: &TraitObligation<'tcx>,
         impl_def_id: DefId,
     ) -> ImplSourceUserDefinedData<'tcx, PredicateObligation<'tcx>> {
         debug!("confirm_impl_candidate({:?},{:?})", obligation, impl_def_id);
@@ -319,15 +321,11 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn confirm_object_candidate(
         &mut self,
-        obligation: &PolyTraitObligation<'tcx>,
+        obligation: &TraitObligation<'tcx>,
     ) -> ImplSourceObjectData<'tcx, PredicateObligation<'tcx>> {
         debug!("confirm_object_candidate({:?})", obligation);
 
-        // FIXME(nmatsakis) skipping binder here seems wrong -- we should
-        // probably flatten the binder from the obligation and the binder
-        // from the object. Have to try to make a broken test case that
-        // results.
-        let self_ty = self.infcx.shallow_resolve(*obligation.self_ty().skip_binder());
+        let self_ty = self.infcx.shallow_resolve(*obligation);
         let poly_trait_ref = match self_ty.kind {
             ty::Dynamic(ref data, ..) => data
                 .principal()
@@ -486,7 +484,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn confirm_closure_candidate(
         &mut self,
-        obligation: &PolyTraitObligation<'tcx>,
+        obligation: &TraitObligation<'tcx>,
     ) -> Result<ImplSourceClosureData<'tcx, PredicateObligation<'tcx>>, SelectionError<'tcx>> {
         debug!("confirm_closure_candidate({:?})", obligation);
 
@@ -498,7 +496,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         // Okay to skip binder because the substs on closure types never
         // touch bound regions, they just capture the in-scope
         // type/region parameters.
-        let self_ty = self.infcx.shallow_resolve(*obligation.self_ty().skip_binder());
+        let self_ty = self.infcx.shallow_resolve(*obligation.self_ty());
         let (closure_def_id, substs) = match self_ty.kind {
             ty::Closure(id, substs) => (id, substs),
             _ => bug!("closure candidate for non-closure {:?}", obligation),
@@ -520,10 +518,10 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             closure_def_id, trait_ref, obligations
         );
 
-        obligations.extend(self.confirm_poly_trait_refs(
+        obligations.extend(self.confirm_trait_refs(
             obligation.cause.clone(),
             obligation.param_env,
-            obligation.predicate.to_poly_trait_ref(),
+            obligation.predicate,
             trait_ref,
         )?);
 
@@ -582,13 +580,13 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn confirm_builtin_unsize_candidate(
         &mut self,
-        obligation: &PolyTraitObligation<'tcx>,
+        obligation: &TraitObligation<'tcx>,
     ) -> Result<ImplSourceBuiltinData<PredicateObligation<'tcx>>, SelectionError<'tcx>> {
         let tcx = self.tcx();
 
         // `assemble_candidates_for_unsizing` should ensure there are no late-bound
         // regions here. See the comment there for more details.
-        let source = self.infcx.shallow_resolve(obligation.self_ty().no_bound_vars().unwrap());
+        let source = self.infcx.shallow_resolve(obligation.self_ty());
         let target = obligation.predicate.skip_binder().trait_ref.substs.type_at(1);
         let target = self.infcx.shallow_resolve(target);
 

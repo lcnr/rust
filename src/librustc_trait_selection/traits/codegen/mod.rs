@@ -19,7 +19,7 @@ use rustc_middle::ty::{self, TyCtxt};
 /// Assumes that this is run after the entire crate has been successfully type-checked.
 pub fn codegen_fulfill_obligation<'tcx>(
     ty: TyCtxt<'tcx>,
-    (param_env, trait_ref): (ty::ParamEnv<'tcx>, ty::PolyTraitRef<'tcx>),
+    (param_env, trait_ref): (ty::ParamEnv<'tcx>, ty::TraitRef<'tcx>),
 ) -> Result<ImplSource<'tcx, ()>, ErrorReported> {
     // Remove any references to regions; this helps improve caching.
     let trait_ref = ty.erase_regions(&trait_ref);
@@ -27,7 +27,7 @@ pub fn codegen_fulfill_obligation<'tcx>(
     debug!(
         "codegen_fulfill_obligation(trait_ref={:?}, def_id={:?})",
         (param_env, trait_ref),
-        trait_ref.def_id()
+        trait_ref.def_id
     );
 
     // Do the initial selection for the obligation. This yields the
@@ -37,7 +37,7 @@ pub fn codegen_fulfill_obligation<'tcx>(
 
         let obligation_cause = ObligationCause::dummy();
         let obligation =
-            Obligation::new(obligation_cause, param_env, trait_ref.to_poly_trait_predicate());
+            Obligation::new(obligation_cause, param_env, ty::TraitPredicate { trait_ref });
 
         let selection = match selcx.select(&obligation) {
             Ok(Some(selection)) => selection,

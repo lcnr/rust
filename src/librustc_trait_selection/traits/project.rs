@@ -166,7 +166,7 @@ pub fn poly_project_and_unify_type<'cx, 'tcx>(
 ///     <T as Trait>::U == V
 ///
 /// If successful, this may result in additional obligations.
-fn project_and_unify_type<'cx, 'tcx>(
+pub fn project_and_unify_type<'cx, 'tcx>(
     selcx: &mut SelectionContext<'cx, 'tcx>,
     obligation: &ProjectionObligation<'tcx>,
 ) -> Result<Option<Vec<PredicateObligation<'tcx>>>, MismatchedProjectionTypes<'tcx>> {
@@ -819,7 +819,7 @@ fn project_type<'cx, 'tcx>(
         return Err(ProjectionTyError::TraitSelectionError(SelectionError::Overflow));
     }
 
-    let obligation_trait_ref = &obligation.predicate.trait_ref(selcx.tcx());
+    let obligation_trait_ref = obligation.predicate.trait_ref(selcx.tcx());
 
     debug!("project: obligation_trait_ref={:?}", obligation_trait_ref);
 
@@ -836,7 +836,7 @@ fn project_type<'cx, 'tcx>(
 
     assemble_candidates_from_trait_def(selcx, obligation, &obligation_trait_ref, &mut candidates);
 
-    assemble_candidates_from_impls(selcx, obligation, &obligation_trait_ref, &mut candidates);
+    assemble_candidates_from_impls(selcx, obligation, obligation_trait_ref, &mut candidates);
 
     match candidates {
         ProjectionTyCandidateSet::Single(candidate) => Ok(ProjectedTy::Progress(
@@ -966,13 +966,12 @@ fn assemble_candidates_from_predicates<'cx, 'tcx>(
 fn assemble_candidates_from_impls<'cx, 'tcx>(
     selcx: &mut SelectionContext<'cx, 'tcx>,
     obligation: &ProjectionTyObligation<'tcx>,
-    obligation_trait_ref: &ty::TraitRef<'tcx>,
+    trait_ref: ty::TraitRef<'tcx>,
     candidate_set: &mut ProjectionTyCandidateSet<'tcx>,
 ) {
     // If we are resolving `<T as TraitRef<...>>::Item == Type`,
     // start out by selecting the predicate `T as TraitRef<...>`:
-    let poly_trait_ref = obligation_trait_ref.to_poly_trait_ref();
-    let trait_obligation = obligation.with(poly_trait_ref.to_poly_trait_predicate());
+    let trait_obligation = obligation.with(ty::TraitPredicate { trait_ref });
     let _ = selcx.infcx().commit_if_ok(|_| {
         let impl_source = match selcx.select(&trait_obligation) {
             Ok(Some(impl_source)) => impl_source,
@@ -1033,10 +1032,9 @@ fn assemble_candidates_from_impls<'cx, 'tcx>(
                     // get a result which isn't correct for all monomorphizations.
                     if obligation.param_env.reveal == Reveal::All {
                         // NOTE(eddyb) inference variables can resolve to parameters, so
-                        // assume `poly_trait_ref` isn't monomorphic, if it contains any.
-                        let poly_trait_ref =
-                            selcx.infcx().resolve_vars_if_possible(&poly_trait_ref);
-                        !poly_trait_ref.still_further_specializable()
+                        // assume `trait_ref` isn't monomorphic, if it contains any.
+                        let trait_ref = selcx.infcx().resolve_vars_if_possible(&trait_ref);
+                        !trait_ref.still_further_specializable()
                     } else {
                         debug!(
                             "assemble_candidates_from_impls: not eligible due to default: \
@@ -1541,6 +1539,11 @@ fn assoc_ty_def(
 }
 
 crate trait ProjectionCacheKeyExt<'tcx>: Sized {
+    fn from_projection_predicate(
+        selcx: &mut SelectionContext<'cx, 'tcx>,
+        predicate: ty::ProjectionPredicate<'tcx>,
+    ) -> Self;
+
     fn from_poly_projection_predicate(
         selcx: &mut SelectionContext<'cx, 'tcx>,
         predicate: ty::PolyProjectionPredicate<'tcx>,
@@ -1548,6 +1551,20 @@ crate trait ProjectionCacheKeyExt<'tcx>: Sized {
 }
 
 impl<'tcx> ProjectionCacheKeyExt<'tcx> for ProjectionCacheKey<'tcx> {
+    fn from_projection_predicate(
+        selcx: &mut SelectionContext<'cx, 'tcx>,
+        predicate: ty::ProjectionPredicate<'tcx>,
+    ) -> Self {
+        let infcx = selcx.infcx();
+        ProjectionCacheKey::new(
+            // We don't attempt to match up with a specific type-variable state
+            // from a specific call to `opt_normalize_projection_type` - if
+            // there's no precise match, the original cache entry is "stranded"
+            // anyway.
+            infcx.resolve_vars_if_possible(&predicate.projection_ty),
+        )
+    }
+
     fn from_poly_projection_predicate(
         selcx: &mut SelectionContext<'cx, 'tcx>,
         predicate: ty::PolyProjectionPredicate<'tcx>,

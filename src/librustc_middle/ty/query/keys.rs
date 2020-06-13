@@ -171,14 +171,14 @@ impl<'tcx> Key for (DefId, SubstsRef<'tcx>) {
     }
 }
 
-impl<'tcx> Key for (ty::ParamEnv<'tcx>, ty::PolyTraitRef<'tcx>) {
+impl<'tcx> Key for (ty::ParamEnv<'tcx>, ty::TraitRef<'tcx>) {
     type CacheSelector = DefaultCacheSelector;
 
     fn query_crate(&self) -> CrateNum {
-        self.1.def_id().krate
+        self.1.def_id.krate
     }
     fn default_span(&self, tcx: TyCtxt<'_>) -> Span {
-        tcx.def_span(self.1.def_id())
+        tcx.def_span(self.1.def_id)
     }
 }
 

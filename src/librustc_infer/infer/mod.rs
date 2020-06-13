@@ -970,6 +970,34 @@ impl<'a, 'tcx> InferCtxt<'a, 'tcx> {
         &self,
         cause: &ObligationCause<'tcx>,
         param_env: ty::ParamEnv<'tcx>,
+        ty::SubtypePredicate { a_is_expected, a, b }: ty::SubtypePredicate<'tcx>,
+    ) -> Option<InferResult<'tcx, ()>> {
+        // Subtle: it's ok to skip the binder here and resolve because
+        // `shallow_resolve` just ignores anything that is not a type
+        // variable, and because type variable's can't (at present, at
+        // least) capture any of the things bound by this binder.
+        //
+        // NOTE(nmatsakis): really, there is no *particular* reason to do this
+        // `shallow_resolve` here except as a micro-optimization.
+        // Naturally I could not resist.
+        let two_unbound_type_vars = {
+            let a = self.shallow_resolve(a);
+            let b = self.shallow_resolve(b);
+            a.is_ty_var() && b.is_ty_var()
+        };
+
+        if two_unbound_type_vars {
+            // Two unbound type variables? Can't make progress.
+            return None;
+        }
+
+        Some(self.at(cause, param_env).sub_exp(a_is_expected, a, b))
+    }
+
+    pub fn poly_subtype_predicate(
+        &self,
+        cause: &ObligationCause<'tcx>,
+        param_env: ty::ParamEnv<'tcx>,
         predicate: ty::PolySubtypePredicate<'tcx>,
     ) -> Option<InferResult<'tcx, ()>> {
         // Subtle: it's ok to skip the binder here and resolve because
@@ -1004,6 +1032,16 @@ impl<'a, 'tcx> InferCtxt<'a, 'tcx> {
     }
 
     pub fn region_outlives_predicate(
+        &self,
+        cause: &traits::ObligationCause<'tcx>,
+        ty::OutlivesPredicate(r_a, r_b): ty::RegionOutlivesPredicate<'tcx>,
+    ) {
+        let origin =
+            SubregionOrigin::from_obligation_cause(cause, || RelateRegionParamBound(cause.span));
+        self.sub_regions(origin, r_b, r_a); // `b : a` ==> `a <= b`
+    }
+
+    pub fn poly_region_outlives_predicate(
         &self,
         cause: &traits::ObligationCause<'tcx>,
         predicate: ty::PolyRegionOutlivesPredicate<'tcx>,
