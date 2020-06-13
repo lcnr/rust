@@ -18,7 +18,7 @@ use super::Selection;
 use super::SelectionResult;
 use super::TraitQueryMode;
 use super::{Normalized, ProjectionCacheKey};
-use super::{ObligationCause, PredicateObligation, TraitObligation};
+use super::{ObligationCause, PolyTraitObligation, PredicateObligation};
 use super::{Overflow, SelectionError, Unimplemented};
 
 use crate::infer::{CombinedSnapshot, InferCtxt, InferOk, PlaceholderMap, TypeFreshener};
@@ -90,7 +90,7 @@ pub struct SelectionContext<'cx, 'tcx> {
 
 // A stack that walks back up the stack frame.
 struct TraitObligationStack<'prev, 'tcx> {
-    obligation: &'prev TraitObligation<'tcx>,
+    obligation: &'prev PolyTraitObligation<'tcx>,
 
     /// The trait ref from `obligation` but "freshened" with the
     /// selection-context's freshener. Used to check for recursion.
@@ -269,7 +269,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
     /// type environment by performing unification.
     pub fn select(
         &mut self,
-        obligation: &TraitObligation<'tcx>,
+        obligation: &PolyTraitObligation<'tcx>,
     ) -> SelectionResult<'tcx, Selection<'tcx>> {
         debug!("select({:?})", obligation);
         debug_assert!(!obligation.predicate.has_escaping_bound_vars());
@@ -540,7 +540,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
     fn evaluate_trait_predicate_recursively<'o>(
         &mut self,
         previous_stack: TraitObligationStackList<'o, 'tcx>,
-        mut obligation: TraitObligation<'tcx>,
+        mut obligation: PolyTraitObligation<'tcx>,
     ) -> Result<EvaluationResult, OverflowError> {
         debug!("evaluate_trait_predicate_recursively({:?})", obligation);
 
@@ -1253,7 +1253,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn match_projection_obligation_against_definition_bounds(
         &mut self,
-        obligation: &TraitObligation<'tcx>,
+        obligation: &PolyTraitObligation<'tcx>,
         snapshot: &CombinedSnapshot<'_, 'tcx>,
     ) -> bool {
         let poly_trait_predicate = self.infcx().resolve_vars_if_possible(&obligation.predicate);
@@ -1330,7 +1330,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn match_projection(
         &mut self,
-        obligation: &TraitObligation<'tcx>,
+        obligation: &PolyTraitObligation<'tcx>,
         trait_bound: ty::PolyTraitRef<'tcx>,
         placeholder_trait_ref: ty::TraitRef<'tcx>,
         placeholder_map: &PlaceholderMap<'tcx>,
@@ -1538,7 +1538,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn sized_conditions(
         &mut self,
-        obligation: &TraitObligation<'tcx>,
+        obligation: &PolyTraitObligation<'tcx>,
     ) -> BuiltinImplConditions<'tcx> {
         use self::BuiltinImplConditions::{Ambiguous, None, Where};
 
@@ -1593,7 +1593,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn copy_clone_conditions(
         &mut self,
-        obligation: &TraitObligation<'tcx>,
+        obligation: &PolyTraitObligation<'tcx>,
     ) -> BuiltinImplConditions<'tcx> {
         // NOTE: binder moved to (*)
         let self_ty = self.infcx.shallow_resolve(obligation.predicate.skip_binder().self_ty());
@@ -1806,7 +1806,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
     fn rematch_impl(
         &mut self,
         impl_def_id: DefId,
-        obligation: &TraitObligation<'tcx>,
+        obligation: &PolyTraitObligation<'tcx>,
         snapshot: &CombinedSnapshot<'_, 'tcx>,
     ) -> Normalized<'tcx, SubstsRef<'tcx>> {
         match self.match_impl(impl_def_id, obligation, snapshot) {
@@ -1824,7 +1824,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
     fn match_impl(
         &mut self,
         impl_def_id: DefId,
-        obligation: &TraitObligation<'tcx>,
+        obligation: &PolyTraitObligation<'tcx>,
         snapshot: &CombinedSnapshot<'_, 'tcx>,
     ) -> Result<Normalized<'tcx, SubstsRef<'tcx>>, ()> {
         let impl_trait_ref = self.tcx().impl_trait_ref(impl_def_id).unwrap();
@@ -1886,7 +1886,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn fast_reject_trait_refs(
         &mut self,
-        obligation: &TraitObligation<'_>,
+        obligation: &PolyTraitObligation<'_>,
         impl_trait_ref: &ty::TraitRef<'_>,
     ) -> bool {
         // We can avoid creating type variables and doing the full
@@ -1929,7 +1929,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
     /// unnormalized.
     fn match_where_clause_trait_ref(
         &mut self,
-        obligation: &TraitObligation<'tcx>,
+        obligation: &PolyTraitObligation<'tcx>,
         where_clause_trait_ref: ty::PolyTraitRef<'tcx>,
     ) -> Result<Vec<PredicateObligation<'tcx>>, ()> {
         self.match_poly_trait_ref(obligation, where_clause_trait_ref)
@@ -1939,7 +1939,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
     /// obligation is satisfied.
     fn match_poly_trait_ref(
         &mut self,
-        obligation: &TraitObligation<'tcx>,
+        obligation: &PolyTraitObligation<'tcx>,
         poly_trait_ref: ty::PolyTraitRef<'tcx>,
     ) -> Result<Vec<PredicateObligation<'tcx>>, ()> {
         debug!(
@@ -1970,7 +1970,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
     fn push_stack<'o>(
         &mut self,
         previous_stack: TraitObligationStackList<'o, 'tcx>,
-        obligation: &'o TraitObligation<'tcx>,
+        obligation: &'o PolyTraitObligation<'tcx>,
     ) -> TraitObligationStack<'o, 'tcx> {
         let fresh_trait_ref =
             obligation.predicate.to_poly_trait_ref().fold_with(&mut self.freshener);
@@ -1989,7 +1989,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn closure_trait_ref_unnormalized(
         &mut self,
-        obligation: &TraitObligation<'tcx>,
+        obligation: &PolyTraitObligation<'tcx>,
         substs: SubstsRef<'tcx>,
     ) -> ty::PolyTraitRef<'tcx> {
         debug!("closure_trait_ref_unnormalized(obligation={:?}, substs={:?})", obligation, substs);
@@ -2014,7 +2014,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     fn generator_trait_ref_unnormalized(
         &mut self,
-        obligation: &TraitObligation<'tcx>,
+        obligation: &PolyTraitObligation<'tcx>,
         substs: SubstsRef<'tcx>,
     ) -> ty::PolyTraitRef<'tcx> {
         let gen_sig = substs.as_generator().poly_sig();
@@ -2116,7 +2116,7 @@ trait TraitObligationExt<'tcx> {
     ) -> ObligationCause<'tcx>;
 }
 
-impl<'tcx> TraitObligationExt<'tcx> for TraitObligation<'tcx> {
+impl<'tcx> TraitObligationExt<'tcx> for PolyTraitObligation<'tcx> {
     #[allow(unused_comparisons)]
     fn derived_cause(
         &self,
