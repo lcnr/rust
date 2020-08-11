@@ -236,7 +236,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                         match (arg, &param.kind, arg_count.explicit_late_bound) {
                             (GenericArg::Lifetime(_), GenericParamDefKind::Lifetime, _)
                             | (GenericArg::Type(_), GenericParamDefKind::Type { .. }, _)
-                            | (GenericArg::Const(_), GenericParamDefKind::Const, _) => {
+                            | (GenericArg::Const(_), GenericParamDefKind::Const { .. }, _) => {
                                 substs.push(ctx.provided_kind(param, arg));
                                 args.next();
                                 params.next();
@@ -282,7 +282,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                                                     GenericParamDefKind::Type { .. } => {
                                                         ParamKindOrd::Type
                                                     }
-                                                    GenericParamDefKind::Const => {
+                                                    GenericParamDefKind::Const { .. } => {
                                                         ParamKindOrd::Const {
                                                             unordered: tcx
                                                                 .features()

@@ -406,6 +406,10 @@ pub fn eq_use_tree(l: &UseTree, r: &UseTree) -> bool {
     eq_path(&l.prefix, &r.prefix) && eq_use_tree_kind(&l.kind, &r.kind)
 }
 
+pub fn eq_anon_const(l: &AnonConst, r: &AnonConst) -> bool {
+  eq_expr(&l.value, &r.value)
+}
+
 pub fn eq_use_tree_kind(l: &UseTreeKind, r: &UseTreeKind) -> bool {
     use UseTreeKind::*;
     match (l, r) {

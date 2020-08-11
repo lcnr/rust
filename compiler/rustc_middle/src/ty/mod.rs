@@ -784,7 +784,9 @@ pub enum GenericParamDefKind {
         object_lifetime_default: ObjectLifetimeDefault,
         synthetic: Option<hir::SyntheticTyParamKind>,
     },
-    Const,
+    Const {
+        has_default: bool,
+    },
 }
 
 impl GenericParamDefKind {
@@ -792,14 +794,14 @@ impl GenericParamDefKind {
         match self {
             GenericParamDefKind::Lifetime => "lifetime",
             GenericParamDefKind::Type { .. } => "type",
-            GenericParamDefKind::Const => "constant",
+            GenericParamDefKind::Const { .. } => "constant",
         }
     }
     pub fn to_ord(&self, tcx: TyCtxt<'_>) -> ast::ParamKindOrd {
         match self {
             GenericParamDefKind::Lifetime => ast::ParamKindOrd::Lifetime,
             GenericParamDefKind::Type { .. } => ast::ParamKindOrd::Type,
-            GenericParamDefKind::Const => {
+            GenericParamDefKind::Const { .. } => {
                 ast::ParamKindOrd::Const { unordered: tcx.features().const_generics }
             }
         }
@@ -871,7 +873,7 @@ impl<'tcx> Generics {
             match param.kind {
                 GenericParamDefKind::Lifetime => own_counts.lifetimes += 1,
                 GenericParamDefKind::Type { .. } => own_counts.types += 1,
-                GenericParamDefKind::Const => own_counts.consts += 1,
+                GenericParamDefKind::Const { .. } => own_counts.consts += 1,
             }
         }
 
@@ -887,8 +889,8 @@ impl<'tcx> Generics {
                 GenericParamDefKind::Type { has_default, .. } => {
                     own_defaults.types += has_default as usize;
                 }
-                GenericParamDefKind::Const => {
-                    // FIXME(const_generics:defaults)
+                GenericParamDefKind::Const { has_default } => {
+                    own_defaults.consts += has_default as usize;
                 }
             }
         }
@@ -912,7 +914,9 @@ impl<'tcx> Generics {
     pub fn own_requires_monomorphization(&self) -> bool {
         for param in &self.params {
             match param.kind {
-                GenericParamDefKind::Type { .. } | GenericParamDefKind::Const => return true,
+                GenericParamDefKind::Type { .. } | GenericParamDefKind::Const { .. } => {
+                    return true;
+                }
                 GenericParamDefKind::Lifetime => {}
             }
         }
@@ -955,7 +959,7 @@ impl<'tcx> Generics {
     pub fn const_param(&'tcx self, param: &ParamConst, tcx: TyCtxt<'tcx>) -> &GenericParamDef {
         let param = self.param_at(param.index as usize, tcx);
         match param.kind {
-            GenericParamDefKind::Const => param,
+            GenericParamDefKind::Const { .. } => param,
             _ => bug!("expected const parameter, but found another generic parameter"),
         }
     }
