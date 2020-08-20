@@ -10,7 +10,8 @@ use super::super::{Chain, Cloned, Copied, Cycle, Enumerate, Filter, FilterMap, F
 use super::super::{FlatMap, Flatten};
 use super::super::{FromIterator, Product, Sum, Zip};
 use super::super::{
-    Inspect, Map, MapWhile, Peekable, Rev, Scan, Skip, SkipWhile, StepBy, Take, TakeWhile,
+    Inspect, Intersperse, Map, MapWhile, Peekable, Rev, Scan, Skip, SkipWhile, StepBy, Take,
+    TakeWhile,
 };
 
 fn _assert_is_object_safe(_: &dyn Iterator<Item = ()>) {}
@@ -1270,6 +1271,29 @@ pub trait Iterator {
         F: FnMut(Self::Item) -> U,
     {
         FlatMap::new(self, f)
+    }
+
+    /// Creates a new iterator which returns a separator between each item of `self`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// #![feature(iterator_intersperse)]
+    ///
+    /// let origin = vec!["hello", "world", "!"].into_iter();
+    ///
+    /// let s: String = origin.intersperse(" ").flat_map(str::chars).collect();
+    ///
+    /// assert_eq!("hello world !", s);
+    /// ```
+    #[inline]
+    #[unstable(feature = "iterator_intersperse", issue = "none")]
+    fn intersperse(self, sep: Self::Item) -> Intersperse<Self>
+    where
+        Self: Sized,
+        Self::Item: Clone,
+    {
+        Intersperse::new(self, sep)
     }
 
     /// Creates an iterator that flattens nested structure.

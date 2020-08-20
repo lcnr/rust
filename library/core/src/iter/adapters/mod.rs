@@ -9,12 +9,15 @@ use super::{DoubleEndedIterator, ExactSizeIterator, FusedIterator, Iterator, Tru
 mod chain;
 mod flatten;
 mod fuse;
+mod intersperse;
 mod zip;
 
 pub use self::chain::Chain;
 #[stable(feature = "rust1", since = "1.0.0")]
 pub use self::flatten::{FlatMap, Flatten};
 pub use self::fuse::Fuse;
+#[unstable(feature = "iterator_intersperse", issue = "none")]
+pub use self::intersperse::Intersperse;
 pub(crate) use self::zip::TrustedRandomAccess;
 pub use self::zip::Zip;
 

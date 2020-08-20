@@ -11,6 +11,7 @@
 #![feature(test)]
 #![feature(ptr_offset_from)]
 #![feature(crate_visibility_modifier)]
+#![feature(iterator_intersperse)]
 #![feature(never_type)]
 #![feature(once_cell)]
 #![recursion_limit = "256"]
