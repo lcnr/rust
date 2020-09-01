@@ -1,4 +1,3 @@
-use core::array::FixedSizeArray;
 use core::clone::Clone;
 use core::mem;
 use core::ops::DerefMut;
@@ -318,7 +317,7 @@ fn test_option_as_deref() {
     assert_eq!(ref_option.as_deref(), Some("a result"));
 
     let ref_option = &Some(vec![1, 2, 3, 4, 5]);
-    assert_eq!(ref_option.as_deref(), Some([1, 2, 3, 4, 5].as_slice()));
+    assert_eq!(ref_option.as_deref(), Some(&[1, 2, 3, 4, 5][..]));
 
     // None: &Option<T: Deref>>::None -> None
     let ref_option: &Option<&i32> = &None;
@@ -336,7 +335,7 @@ fn test_option_as_deref_mut() {
     assert_eq!(ref_option.as_deref_mut(), Some(String::from("a result").deref_mut()));
 
     let ref_option = &mut Some(vec![1, 2, 3, 4, 5]);
-    assert_eq!(ref_option.as_deref_mut(), Some([1, 2, 3, 4, 5].as_mut_slice()));
+    assert_eq!(ref_option.as_deref_mut(), Some(&mut [1, 2, 3, 4, 5][..]));
 
     // None: &mut Option<T: Deref>>::None -> None
     let ref_option: &mut Option<&mut i32> = &mut None;

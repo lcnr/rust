@@ -1,4 +1,3 @@
-use core::array::FixedSizeArray;
 use core::ops::DerefMut;
 use core::option::*;
 
@@ -247,7 +246,7 @@ fn test_result_as_deref() {
     assert_eq!(ref_ok.as_deref(), expected_result);
 
     let ref_ok = &Result::Ok::<Vec<i32>, u32>(vec![1, 2, 3, 4, 5]);
-    let expected_result = Result::Ok::<&[i32], &u32>([1, 2, 3, 4, 5].as_slice());
+    let expected_result = Result::Ok::<&[i32], &u32>(&[1, 2, 3, 4, 5][..]);
     assert_eq!(ref_ok.as_deref(), expected_result);
 
     // &Result<T: Deref, E>::Err(T).as_deref() ->

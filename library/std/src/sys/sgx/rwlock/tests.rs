@@ -1,6 +1,5 @@
 use super::*;
 use crate::mem::{self, MaybeUninit};
-use core::array::FixedSizeArray;
 
 // Verify that the bytes of initialized RWLock are the same as in
 // libunwind. If they change, `src/UnwindRustSgx.h` in libunwind needs to

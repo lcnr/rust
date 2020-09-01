@@ -11,48 +11,12 @@ use crate::cmp::Ordering;
 use crate::convert::{Infallible, TryFrom};
 use crate::fmt;
 use crate::hash::{self, Hash};
-use crate::marker::Unsize;
 use crate::slice::{Iter, IterMut};
 
 mod iter;
 
 #[unstable(feature = "array_value_iter", issue = "65798")]
 pub use iter::IntoIter;
-
-/// Utility trait implemented only on arrays of fixed size
-///
-/// This trait can be used to implement other traits on fixed-size arrays
-/// without causing much metadata bloat.
-///
-/// The trait is marked unsafe in order to restrict implementors to fixed-size
-/// arrays. User of this trait can assume that implementors have the exact
-/// layout in memory of a fixed size array (for example, for unsafe
-/// initialization).
-///
-/// Note that the traits [`AsRef`] and [`AsMut`] provide similar methods for types that
-/// may not be fixed-size arrays. Implementors should prefer those traits
-/// instead.
-#[unstable(feature = "fixed_size_array", issue = "27778")]
-pub unsafe trait FixedSizeArray<T> {
-    /// Converts the array to immutable slice
-    #[unstable(feature = "fixed_size_array", issue = "27778")]
-    fn as_slice(&self) -> &[T];
-    /// Converts the array to mutable slice
-    #[unstable(feature = "fixed_size_array", issue = "27778")]
-    fn as_mut_slice(&mut self) -> &mut [T];
-}
-
-#[unstable(feature = "fixed_size_array", issue = "27778")]
-unsafe impl<T, A: Unsize<[T]>> FixedSizeArray<T> for A {
-    #[inline]
-    fn as_slice(&self) -> &[T] {
-        self
-    }
-    #[inline]
-    fn as_mut_slice(&mut self) -> &mut [T] {
-        self
-    }
-}
 
 /// The error type returned when a conversion from a slice to an array fails.
 #[stable(feature = "try_from", since = "1.34.0")]
