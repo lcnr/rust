@@ -1,6 +1,6 @@
 //! Validates the MIR to ensure that invariants are upheld.
 
-use super::{MirPass, MirSource};
+use super::MirPass;
 use rustc_middle::mir::visit::Visitor;
 use rustc_middle::{
     mir::{
@@ -32,10 +32,10 @@ pub struct Validator {
 }
 
 impl<'tcx> MirPass<'tcx> for Validator {
-    fn run_pass(&self, tcx: TyCtxt<'tcx>, source: MirSource<'tcx>, body: &mut Body<'tcx>) {
-        let param_env = tcx.param_env(source.def_id());
+    fn run_pass(&self, tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>) {
+        let param_env = tcx.param_env(body.source.def_id());
         let mir_phase = self.mir_phase;
-        TypeChecker { when: &self.when, source, body, tcx, param_env, mir_phase }.visit_body(body);
+        TypeChecker { when: &self.when, body, tcx, param_env, mir_phase }.visit_body(body);
     }
 }
 
@@ -133,7 +133,6 @@ pub fn equal_up_to_regions(
 
 struct TypeChecker<'a, 'tcx> {
     when: &'a str,
-    source: MirSource<'tcx>,
     body: &'a Body<'tcx>,
     tcx: TyCtxt<'tcx>,
     param_env: ParamEnv<'tcx>,
@@ -149,7 +148,7 @@ impl<'a, 'tcx> TypeChecker<'a, 'tcx> {
             span,
             &format!(
                 "broken MIR in {:?} ({}) at {:?}:\n{}",
-                self.source.instance,
+                self.body.source.instance,
                 self.when,
                 location,
                 msg.as_ref()
