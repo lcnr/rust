@@ -29,11 +29,7 @@ crate fn mir_built<'tcx>(
         return tcx.mir_built(def);
     }
 
-    let mut body = mir_build(tcx, def);
-    if def.const_param_did.is_some() {
-        assert!(matches!(body.source.instance, ty::InstanceDef::Item(_)));
-        body.source = MirSource::from_instance(ty::InstanceDef::Item(def.to_global()));
-    }
+    let body = mir_build(tcx, def);
 
     tcx.alloc_steal_mir(body)
 }
@@ -302,7 +298,7 @@ struct Builder<'a, 'tcx> {
     hir: Cx<'a, 'tcx>,
     cfg: CFG<'tcx>,
 
-    def_id: DefId,
+    def: ty::WithOptConstParam<DefId>,
     fn_span: Span,
     arg_count: usize,
     generator_kind: Option<GeneratorKind>,
@@ -604,7 +600,7 @@ where
 
     let mut builder = Builder::new(
         hir,
-        fn_def_id.to_def_id(),
+        ty::WithOptConstParam::unknown(fn_def_id.to_def_id()),
         span_with_body,
         arguments.len(),
         safety,
@@ -685,7 +681,16 @@ fn construct_const<'a, 'tcx>(
     let owner_id = tcx.hir().body_owner(body_id);
     let def_id = tcx.hir().local_def_id(owner_id);
     let span = tcx.hir().span(owner_id);
-    let mut builder = Builder::new(hir, def_id.to_def_id(), span, 0, Safety::Safe, const_ty, const_ty_span, None);
+    let mut builder = Builder::new(
+        hir,
+        ty::WithOptConstParam::unknown(def_id.to_def_id()),
+        span,
+        0,
+        Safety::Safe,
+        const_ty,
+        const_ty_span,
+        None
+    );
 
     let mut block = START_BLOCK;
     let ast_expr = &tcx.hir().body(body_id).value;
@@ -732,7 +737,16 @@ fn construct_error<'a, 'tcx>(hir: Cx<'a, 'tcx>, body_id: hir::BodyId) -> Body<'t
         hir::BodyOwnerKind::Const => 0,
         hir::BodyOwnerKind::Static(_) => 0,
     };
-    let mut builder = Builder::new(hir, def_id.to_def_id(), span, num_params, Safety::Safe, ty, span, None);
+    let mut builder = Builder::new(
+        hir,
+        ty::WithOptConstParam::unknown(def_id.to_def_id()),
+        span,
+        num_params,
+        Safety::Safe,
+        ty,
+        span,
+        None
+    );
     let source_info = builder.source_info(span);
     // Some MIR passes will expect the number of parameters to match the
     // function declaration.
@@ -750,7 +764,7 @@ fn construct_error<'a, 'tcx>(hir: Cx<'a, 'tcx>, body_id: hir::BodyId) -> Body<'t
 impl<'a, 'tcx> Builder<'a, 'tcx> {
     fn new(
         hir: Cx<'a, 'tcx>,
-        def_id: DefId,
+        def: ty::WithOptConstParam<DefId>,
         span: Span,
         arg_count: usize,
         safety: Safety,
@@ -761,7 +775,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
         let lint_level = LintLevel::Explicit(hir.root_lint_level);
         let mut builder = Builder {
             hir,
-            def_id,
+            def,
             cfg: CFG { basic_blocks: IndexVec::new() },
             fn_span: span,
             arg_count,
@@ -802,7 +816,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
         }
 
         Body::new(
-            MirSource::item(self.def_id),
+            MirSource::from_instance(ty::InstanceDef::Item(self.def)),
             self.cfg.basic_blocks,
             self.source_scopes,
             self.local_decls,
