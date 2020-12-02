@@ -224,7 +224,7 @@ fn do_normalize_predicates<'tcx>(
         // we move over to lazy normalization *anyway*.
         let fulfill_cx = FulfillmentContext::new_ignoring_regions();
         let predicates =
-            match fully_normalize(&infcx, fulfill_cx, cause, elaborated_env, predicates) {
+            match fully_normalize(&infcx, fulfill_cx, true, cause, elaborated_env, predicates) {
                 Ok(predicates) => predicates,
                 Err(errors) => {
                     infcx.report_fulfillment_errors(&errors, None, false);
@@ -383,6 +383,7 @@ pub fn normalize_param_env_or_error<'tcx>(
 pub fn fully_normalize<'a, 'tcx, T>(
     infcx: &InferCtxt<'a, 'tcx>,
     mut fulfill_cx: FulfillmentContext<'tcx>,
+    lazy_normalization_consts: bool,
     cause: ObligationCause<'tcx>,
     param_env: ty::ParamEnv<'tcx>,
     value: T,
@@ -391,7 +392,7 @@ where
     T: TypeFoldable<'tcx>,
 {
     debug!("fully_normalize_with_fulfillcx(value={:?})", value);
-    let selcx = &mut SelectionContext::new(infcx);
+    let selcx = &mut SelectionContext::with_lazy_normalization_consts(infcx, lazy_normalization_consts);
     let Normalized { value: normalized_value, obligations } =
         project::normalize(selcx, param_env, cause, value);
     debug!(

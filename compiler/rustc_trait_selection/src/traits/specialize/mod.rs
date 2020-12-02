@@ -156,6 +156,7 @@ pub(super) fn specializes(tcx: TyCtxt<'_>, (impl1_def_id, impl2_def_id): (DefId,
         let impl1_trait_ref = match traits::fully_normalize(
             &infcx,
             FulfillmentContext::new(),
+            false,
             ObligationCause::dummy(),
             penv,
             impl1_trait_ref,

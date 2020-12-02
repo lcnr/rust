@@ -120,6 +120,11 @@ pub struct SelectionContext<'cx, 'tcx> {
     /// would satisfy it. This avoids crippling inference, basically.
     intercrate: bool,
 
+    /// Whether we should lazily normalize constants, this is only true
+    /// while normalizing the predicates as evaluating constants would
+    /// cause a cycle error there.
+    lazy_normalization_consts: bool,
+
     intercrate_ambiguity_causes: Option<Vec<IntercrateAmbiguityCause>>,
 
     /// Controls whether or not to filter out negative impls when selecting.
@@ -216,6 +221,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             infcx,
             freshener: infcx.freshener(),
             intercrate: false,
+            lazy_normalization_consts: false,
             intercrate_ambiguity_causes: None,
             allow_negative_impls: false,
             query_mode: TraitQueryMode::Standard,
@@ -227,6 +233,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             infcx,
             freshener: infcx.freshener(),
             intercrate: true,
+            lazy_normalization_consts: false,
             intercrate_ambiguity_causes: None,
             allow_negative_impls: false,
             query_mode: TraitQueryMode::Standard,
@@ -242,6 +249,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             infcx,
             freshener: infcx.freshener(),
             intercrate: false,
+            lazy_normalization_consts: false,
             intercrate_ambiguity_causes: None,
             allow_negative_impls,
             query_mode: TraitQueryMode::Standard,
@@ -257,11 +265,31 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             infcx,
             freshener: infcx.freshener(),
             intercrate: false,
+            lazy_normalization_consts: false,
             intercrate_ambiguity_causes: None,
             allow_negative_impls: false,
             query_mode,
         }
     }
+
+    pub fn with_lazy_normalization_consts(
+        infcx: &'cx InferCtxt<'cx, 'tcx>,
+        lazy_normalization_consts: bool,
+    ) -> SelectionContext<'cx, 'tcx> {
+        SelectionContext {
+            infcx,
+            freshener: infcx.freshener(),
+            intercrate: false,
+            lazy_normalization_consts,
+            intercrate_ambiguity_causes: None,
+            allow_negative_impls: false,
+            query_mode: TraitQueryMode::Standard,
+        }
+    }
+
+    pub fn lazy_normalization_consts(&self) -> bool {
+        self.lazy_normalization_consts
+    } 
 
     /// Enables tracking of intercrate ambiguity causes. These are
     /// used in coherence to give improved diagnostics. We don't do
