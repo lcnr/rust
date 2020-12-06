@@ -428,6 +428,9 @@ impl<'a, 'tcx> WfPredicates<'a, 'tcx> {
 
                 GenericArgKind::Const(constant) => {
                     match constant.val {
+                        ty::ConstKind::Unnormalized(_, _) => {
+                            bug!("unexpected const in wf: {:?}", arg)
+                        }
                         ty::ConstKind::Unevaluated(def, substs, promoted) => {
                             assert!(promoted.is_none());
 

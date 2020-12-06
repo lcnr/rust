@@ -25,6 +25,12 @@ pub enum ConstKind<'tcx> {
     /// A placeholder const - universally quantified higher-ranked const.
     Placeholder(ty::PlaceholderConst<'tcx>),
 
+    /// An unnormalized unevaluated constant.
+    ///
+    /// Converted into an unevaluated one as eagerly as possible.
+    /// The big exception being `type_of` and `predicates_of` where
+    /// typechecking a constant would cause a cycle error.
+    Unnormalized(ty::WithOptConstParam<DefId>, SubstsRef<'tcx>),
     /// Used in the HIR by using `Unevaluated` everywhere and later normalizing to one of the other
     /// variants when the code is monomorphic enough for that.
     Unevaluated(ty::WithOptConstParam<DefId>, SubstsRef<'tcx>, Option<Promoted>),

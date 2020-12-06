@@ -554,7 +554,7 @@ bitflags! {
         const HAS_TY_PROJECTION           = 1 << 10;
         /// Does this have [Opaque]?
         const HAS_TY_OPAQUE               = 1 << 11;
-        /// Does this have [ConstKind::Unevaluated]?
+        /// Does this have [ConstKind::Unevaluated] or [ConstKind::Unnormalized]?
         const HAS_CT_PROJECTION           = 1 << 12;
 
         /// Could this type be normalized further?
@@ -562,23 +562,26 @@ bitflags! {
                                           | TypeFlags::HAS_TY_OPAQUE.bits
                                           | TypeFlags::HAS_CT_PROJECTION.bits;
 
+        // Does this have [ConstKind::Unnormalized]?
+        const HAS_CT_UNNORMALIZED         = 1 << 13;
+
         /// Is an error type/const reachable?
-        const HAS_ERROR                   = 1 << 13;
+        const HAS_ERROR                   = 1 << 14;
 
         /// Does this have any region that "appears free" in the type?
         /// Basically anything but [ReLateBound] and [ReErased].
-        const HAS_FREE_REGIONS            = 1 << 14;
+        const HAS_FREE_REGIONS            = 1 << 15;
 
         /// Does this have any [ReLateBound] regions? Used to check
         /// if a global bound is safe to evaluate.
-        const HAS_RE_LATE_BOUND           = 1 << 15;
+        const HAS_RE_LATE_BOUND           = 1 << 16;
 
         /// Does this have any [ReErased] regions?
-        const HAS_RE_ERASED               = 1 << 16;
+        const HAS_RE_ERASED               = 1 << 17;
 
         /// Does this value have parameters/placeholders/inference variables which could be
         /// replaced later, in a way that would change the results of `impl` specialization?
-        const STILL_FURTHER_SPECIALIZABLE = 1 << 17;
+        const STILL_FURTHER_SPECIALIZABLE = 1 << 18;
     }
 }
 

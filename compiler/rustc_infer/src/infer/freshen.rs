@@ -243,7 +243,9 @@ impl<'a, 'tcx> TypeFolder<'tcx> for TypeFreshener<'a, 'tcx> {
                 return ct;
             }
 
-            ty::ConstKind::Bound(..) | ty::ConstKind::Placeholder(_) => {
+            ty::ConstKind::Bound(..)
+            | ty::ConstKind::Placeholder(_)
+            | ty::ConstKind::Unnormalized(_, _) => {
                 bug!("unexpected const {:?}", ct)
             }
 

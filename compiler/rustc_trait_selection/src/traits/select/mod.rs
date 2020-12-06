@@ -289,7 +289,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
     pub fn lazy_normalization_consts(&self) -> bool {
         self.lazy_normalization_consts
-    } 
+    }
 
     /// Enables tracking of intercrate ambiguity causes. These are
     /// used in coherence to give improved diagnostics. We don't do

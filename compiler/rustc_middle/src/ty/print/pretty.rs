@@ -899,6 +899,19 @@ pub trait PrettyPrinter<'tcx>:
         }
 
         match ct.val {
+            ty::ConstKind::Unnormalized(def, _) => {
+                assert_eq!(self.tcx().def_kind(def.did), DefKind::AnonConst);
+                if def.is_local() {
+                    let span = self.tcx().def_span(def.did);
+                    if let Ok(snip) = self.tcx().sess.source_map().span_to_snippet(span) {
+                        p!(write("{}", snip))
+                    } else {
+                        print_underscore!()
+                    }
+                } else {
+                    print_underscore!()
+                }
+            }
             ty::ConstKind::Unevaluated(def, substs, promoted) => {
                 if let Some(promoted) = promoted {
                     p!(print_value_path(def.did, substs));

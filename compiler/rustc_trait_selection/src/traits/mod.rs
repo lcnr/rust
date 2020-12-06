@@ -392,7 +392,8 @@ where
     T: TypeFoldable<'tcx>,
 {
     debug!("fully_normalize_with_fulfillcx(value={:?})", value);
-    let selcx = &mut SelectionContext::with_lazy_normalization_consts(infcx, lazy_normalization_consts);
+    let selcx =
+        &mut SelectionContext::with_lazy_normalization_consts(infcx, lazy_normalization_consts);
     let Normalized { value: normalized_value, obligations } =
         project::normalize(selcx, param_env, cause, value);
     debug!(

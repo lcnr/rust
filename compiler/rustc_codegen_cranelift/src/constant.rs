@@ -66,7 +66,8 @@ pub(crate) fn check_constants(fx: &mut FunctionCx<'_, '_, impl Module>) {
             | ConstKind::Infer(_)
             | ConstKind::Bound(_, _)
             | ConstKind::Placeholder(_)
-            | ConstKind::Error(_) => unreachable!("{:?}", const_),
+            | ConstKind::Error(_)
+            | ConstKind::Unnormalized(_, _) => unreachable!("{:?}", const_),
         }
     }
 }
@@ -148,7 +149,8 @@ pub(crate) fn codegen_constant<'tcx>(
         | ConstKind::Infer(_)
         | ConstKind::Bound(_, _)
         | ConstKind::Placeholder(_)
-        | ConstKind::Error(_) => unreachable!("{:?}", const_),
+        | ConstKind::Error(_)
+        | ConstKind::Unnormalized(_, _) => unreachable!("{:?}", const_),
     };
 
     codegen_const_value(fx, const_val, const_.ty)

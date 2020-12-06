@@ -549,7 +549,9 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 let instance = self.resolve(def, substs)?;
                 return Ok(self.eval_to_allocation(GlobalId { instance, promoted })?.into());
             }
-            ty::ConstKind::Infer(..) | ty::ConstKind::Placeholder(..) => {
+            ty::ConstKind::Infer(..)
+            | ty::ConstKind::Placeholder(..)
+            | ty::ConstKind::Unnormalized(..) => {
                 span_bug!(self.cur_span(), "const_to_op: Unexpected ConstKind {:?}", val)
             }
             ty::ConstKind::Value(val_val) => val_val,

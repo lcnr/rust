@@ -1,7 +1,7 @@
 use crate::mir::interpret::ConstValue;
 use crate::mir::interpret::{LitToConstInput, Scalar};
 use crate::ty::subst::InternalSubsts;
-use crate::ty::{self, Ty, TyCtxt};
+use crate::ty::{self, Ty, TyCtxt, TypeFolder, TypeFoldable};
 use crate::ty::{ParamEnv, ParamEnvAnd};
 use rustc_errors::ErrorReported;
 use rustc_hir as hir;
@@ -97,10 +97,9 @@ impl<'tcx> Const<'tcx> {
                 let name = tcx.hir().name(hir_id);
                 ty::ConstKind::Param(ty::ParamConst::new(index, name))
             }
-            _ => ty::ConstKind::Unevaluated(
+            _ => ty::ConstKind::Unnormalized(
                 def.to_global(),
                 InternalSubsts::identity_for_item(tcx, def.did.to_def_id()),
-                None,
             ),
         };
 
@@ -199,5 +198,63 @@ impl<'tcx> Const<'tcx> {
     pub fn eval_usize(&self, tcx: TyCtxt<'tcx>, param_env: ParamEnv<'tcx>) -> u64 {
         self.try_eval_usize(tcx, param_env)
             .unwrap_or_else(|| bug!("expected usize, got {:#?}", self))
+    }
+}
+
+impl<'tcx> TyCtxt<'tcx> {
+    pub fn normalize_consts<T: TypeFoldable<'tcx>>(self, value: T) -> T {
+        value.fold_with(&mut ConstNormalizer::new(self))
+    }
+}
+
+pub struct ConstNormalizer<'tcx> {
+    tcx: TyCtxt<'tcx>
+}
+
+impl ConstNormalizer<'_> {
+    pub fn new(tcx: TyCtxt<'_>) -> ConstNormalizer<'_> {
+        ConstNormalizer { tcx }
+    }
+}
+
+impl<'tcx> TypeFolder<'tcx> for ConstNormalizer<'tcx> {
+    fn tcx<'a>(&'a self) -> TyCtxt<'tcx> {
+        self.tcx
+    }
+
+    fn fold_ty(&mut self, t: Ty<'tcx>) -> Ty<'tcx> {
+        if t.flags().intersects(ty::TypeFlags::HAS_CT_UNNORMALIZED) {
+            t.super_fold_with(self)
+        } else {
+            t
+        }
+    }
+
+    fn fold_const(&mut self, ct: &'tcx Const<'tcx>) -> &'tcx Const<'tcx> {
+        match ct.val {
+            ConstKind::Unnormalized(def, substs) => {
+                match self.tcx.mir_abstract_const_opt_const_arg(def) {
+                    // FIXME(const_evaluatable_checked): Replace the arguments not used
+                    // in the abstract const with dummy ones while keeping everything that is
+                    // used.
+                    Ok(Some(_abstr_ct)) => self.tcx.mk_const(Const {
+                        ty: ct.ty,
+                        val: ConstKind::Unevaluated(def, substs, None)
+                    }),
+                    Ok(None) => {
+                        let dummy_substs = InternalSubsts::for_item(self.tcx, def.did, |param, _| {
+                            match param.kind {
+                                ty::GenericParamDefKind::Lifetime => self.tcx.lifetimes.re_static.into(),
+                                ty::GenericParamDefKind::Type { .. } => self.tcx.types.unit.into(),
+                                ty::GenericParamDefKind::Const => self.tcx.consts.unit.into(), // TODO
+                            }
+                        });
+                        self.tcx.mk_const(Const { ty: ct.ty, val: ConstKind::Unevaluated(def, dummy_substs, None) })
+                    }
+                    Err(_) => self.tcx.const_error(ct.ty),
+                }
+            }
+            _ => ct.super_fold_with(self),
+        }
     }
 }
