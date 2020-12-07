@@ -230,13 +230,14 @@ pub(super) fn trait_impls_of_provider(tcx: TyCtxt<'_>, trait_id: DefId) -> Trait
     }
 
     for &hir_id in tcx.hir().trait_impls(trait_id) {
-        let impl_def_id = tcx.hir().local_def_id(hir_id).to_def_id();
+        let impl_def_id = tcx.hir().local_def_id(hir_id);
 
-        let impl_self_ty = tcx.type_of(impl_def_id);
+        let impl_self_ty = tcx.unnormalized_type_of(impl_def_id);
         if impl_self_ty.references_error() {
             continue;
         }
 
+        let impl_def_id = impl_def_id.to_def_id();
         if let Some(simplified_self_ty) = fast_reject::simplify_type(tcx, impl_self_ty, false) {
             impls.non_blanket_impls.entry(simplified_self_ty).or_default().push(impl_def_id);
         } else {

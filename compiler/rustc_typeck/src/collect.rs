@@ -677,7 +677,7 @@ fn convert_item(tcx: TyCtxt<'_>, item_id: hir::HirId) {
         }
         hir::ItemKind::Impl { .. } => {
             tcx.ensure().generics_of(def_id);
-            tcx.ensure().type_of(def_id);
+            tcx.ensure().unnormalized_type_of(def_id);
             tcx.ensure().impl_trait_ref(def_id);
             tcx.ensure().predicates_of(def_id);
         }
@@ -694,13 +694,13 @@ fn convert_item(tcx: TyCtxt<'_>, item_id: hir::HirId) {
         }
         hir::ItemKind::Struct(ref struct_def, _) | hir::ItemKind::Union(ref struct_def, _) => {
             tcx.ensure().generics_of(def_id);
-            tcx.ensure().type_of(def_id);
+            tcx.ensure().unnormalized_type_of(def_id);
             tcx.ensure().predicates_of(def_id);
 
             for f in struct_def.fields() {
                 let def_id = tcx.hir().local_def_id(f.hir_id);
                 tcx.ensure().generics_of(def_id);
-                tcx.ensure().type_of(def_id);
+                tcx.ensure().unnormalized_type_of(def_id);
                 tcx.ensure().predicates_of(def_id);
             }
 
