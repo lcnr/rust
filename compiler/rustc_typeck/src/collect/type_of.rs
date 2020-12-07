@@ -145,12 +145,32 @@ pub(super) fn opt_const_param_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> Option<
 }
 
 pub(super) fn type_of(tcx: TyCtxt<'_>, def_id: DefId) -> Ty<'_> {
+    use rustc_infer::infer::TyCtxtInferExt;
+    use rustc_infer::traits::Normalized;
+    use rustc_middle::traits::ObligationCause;
+    use rustc_trait_selection::traits::query::normalize::AtExt;
+
     let def_id = def_id.expect_local();
+    let unnormalized_ty = tcx.unnormalized_type_of(def_id);
+    let param_env = tcx.param_env(def_id);
+    let span = tcx.def_span(def_id);
+    let cause = ObligationCause::misc(span, tcx.hir().local_def_id_to_hir_id(def_id));
+
+    tcx.infer_ctxt().enter(|infcx| match infcx.at(&cause, param_env).normalize(unnormalized_ty) {
+        Ok(Normalized { value, obligations }) => {
+            assert!(obligations.is_empty());
+            value
+        }
+        Err(_) => tcx.ty_error(),
+    })
+}
+
+pub(super) fn unnormalized_type_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> Ty<'_> {
     use rustc_hir::*;
 
     let hir_id = tcx.hir().local_def_id_to_hir_id(def_id);
 
-    let icx = ItemCtxt::new(tcx, def_id.to_def_id());
+    let icx = ItemCtxt::new(tcx, def_id.to_def_id()).without_normalization();
 
     match tcx.hir().get(hir_id) {
         Node::TraitItem(item) => match item.kind {
@@ -283,7 +303,7 @@ pub(super) fn type_of(tcx: TyCtxt<'_>, def_id: DefId) -> Ty<'_> {
 
         Node::Ctor(&ref def) | Node::Variant(Variant { data: ref def, .. }) => match *def {
             VariantData::Unit(..) | VariantData::Struct(..) => {
-                tcx.type_of(tcx.hir().get_parent_did(hir_id).to_def_id())
+                tcx.unnormalized_type_of(tcx.hir().get_parent_did(hir_id))
             }
             VariantData::Tuple(..) => {
                 let substs = InternalSubsts::identity_for_item(tcx, def_id.to_def_id());

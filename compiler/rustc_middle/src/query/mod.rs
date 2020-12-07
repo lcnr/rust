@@ -112,6 +112,11 @@ rustc_queries! {
             desc { |tcx| "computing the optional const parameter of `{}`", tcx.def_path_str(key.to_def_id()) }
         }
 
+        query unnormalized_type_of(key: LocalDefId) -> Ty<'tcx> {
+            desc { |tcx| "computing unnormalized type of `{}`", tcx.def_path_str(key.to_def_id()) }
+            cache_on_disk_if { true }
+        }
+
         /// Records the type of every item.
         query type_of(key: DefId) -> Ty<'tcx> {
             desc { |tcx| "computing type of `{}`", tcx.def_path_str(key) }

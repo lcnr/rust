@@ -49,6 +49,8 @@ pub trait AstConv<'tcx> {
 
     fn default_constness_for_trait_bounds(&self) -> Constness;
 
+    fn normalize_types(&self) -> bool;
+
     /// Returns predicates in scope of the form `X: Foo`, where `X` is
     /// a type parameter `X` with the given id `def_id`. This is a
     /// subset of the full set of predicates.
@@ -183,6 +185,15 @@ pub trait CreateSubstsForGenericArgsCtxt<'a, 'tcx> {
 }
 
 impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
+    pub fn type_of(&self, span: Span, def_id: DefId) -> Ty<'tcx> {
+        match def_id.as_local() {
+            Some(local) if !self.normalize_types() => {
+                self.tcx().at(span).unnormalized_type_of(local)
+            }
+            _ => self.tcx().at(span).type_of(def_id),
+        }
+    }
+
     pub fn ast_region_to_region(
         &self,
         lifetime: &hir::Lifetime,
@@ -363,7 +374,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                 let tcx = self.astconv.tcx();
                 if let GenericParamDefKind::Type { has_default, .. } = param.kind {
                     if self.is_object && has_default {
-                        let default_ty = tcx.at(self.span).type_of(param.def_id);
+                        let default_ty = self.astconv.type_of(self.span, param.def_id);
                         let self_param = tcx.types.self_param;
                         if default_ty.walk().any(|arg| arg == self_param.into()) {
                             // There is no suitable inference default for a type parameter
@@ -461,7 +472,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                                 self.astconv
                                     .normalize_ty(
                                         self.span,
-                                        tcx.at(self.span).type_of(param.def_id).subst_spanned(
+                                        self.astconv.type_of(self.span, param.def_id).subst_spanned(
                                             tcx,
                                             substs.unwrap(),
                                             Some(self.span),
@@ -483,7 +494,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                         }
                     }
                     GenericParamDefKind::Const => {
-                        let ty = tcx.at(self.span).type_of(param.def_id);
+                        let ty = self.astconv.type_of(self.span, param.def_id);
                         // FIXME(const_generics:defaults)
                         if infer_args {
                             // No const parameters were provided, we can infer all.
@@ -1048,7 +1059,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
         item_segment: &hir::PathSegment<'_>,
     ) -> Ty<'tcx> {
         let substs = self.ast_path_substs_for_ty(span, did, item_segment);
-        self.normalize_ty(span, self.tcx().at(span).type_of(did).subst(self.tcx(), substs))
+        self.normalize_ty(span, self.type_of(span, did).subst(self.tcx(), substs))
     }
 
     fn conv_object_ty_poly_trait_ref(
@@ -2004,7 +2015,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                 assert_eq!(opt_self_ty, None);
                 self.prohibit_generics(path.segments);
                 // Try to evaluate any array length constants.
-                let normalized_ty = self.normalize_ty(span, tcx.at(span).type_of(def_id));
+                let normalized_ty = self.normalize_ty(span, self.type_of(span, def_id));
                 if forbid_generic && normalized_ty.needs_subst() {
                     let mut err = tcx.sess.struct_span_err(
                         path.span,
@@ -2134,7 +2145,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                     true,
                     None,
                 );
-                self.normalize_ty(span, tcx.at(span).type_of(def_id).subst(tcx, substs))
+                self.normalize_ty(span, self.type_of(span, def_id).subst(tcx, substs))
             }
             hir::TyKind::Array(ref ty, ref length) => {
                 let length_def_id = tcx.hir().local_def_id(length.hir_id);

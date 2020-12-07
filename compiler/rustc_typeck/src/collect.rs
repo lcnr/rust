@@ -70,6 +70,7 @@ fn collect_mod_item_types(tcx: TyCtxt<'_>, module_def_id: LocalDefId) {
 pub fn provide(providers: &mut Providers) {
     *providers = Providers {
         opt_const_param_of: type_of::opt_const_param_of,
+        unnormalized_type_of: type_of::unnormalized_type_of,
         type_of: type_of::type_of,
         item_bounds: item_bounds::item_bounds,
         explicit_item_bounds: item_bounds::explicit_item_bounds,
@@ -109,6 +110,7 @@ pub fn provide(providers: &mut Providers) {
 pub struct ItemCtxt<'tcx> {
     tcx: TyCtxt<'tcx>,
     item_def_id: DefId,
+    normalize_types: bool,
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -277,7 +279,12 @@ fn bad_placeholder_type(
 
 impl ItemCtxt<'tcx> {
     pub fn new(tcx: TyCtxt<'tcx>, item_def_id: DefId) -> ItemCtxt<'tcx> {
-        ItemCtxt { tcx, item_def_id }
+        ItemCtxt { tcx, item_def_id, normalize_types: true }
+    }
+
+    pub fn without_normalization(mut self) -> ItemCtxt<'tcx> {
+        self.normalize_types = false;
+        self
     }
 
     pub fn to_ty(&self, ast_ty: &'tcx hir::Ty<'tcx>) -> Ty<'tcx> {
@@ -308,6 +315,10 @@ impl AstConv<'tcx> for ItemCtxt<'tcx> {
         } else {
             hir::Constness::NotConst
         }
+    }
+
+    fn normalize_types(&self) -> bool {
+        self.normalize_types
     }
 
     fn get_type_parameter_bounds(&self, span: Span, def_id: DefId) -> ty::GenericPredicates<'tcx> {
@@ -1615,12 +1626,12 @@ fn fn_sig(tcx: TyCtxt<'_>, def_id: DefId) -> ty::PolyFnSig<'_> {
 }
 
 fn impl_trait_ref(tcx: TyCtxt<'_>, def_id: DefId) -> Option<ty::TraitRef<'_>> {
-    let icx = ItemCtxt::new(tcx, def_id);
+    let icx = ItemCtxt::new(tcx, def_id).without_normalization();
 
     let hir_id = tcx.hir().local_def_id_to_hir_id(def_id.expect_local());
     match tcx.hir().expect_item(hir_id).kind {
         hir::ItemKind::Impl { ref of_trait, .. } => of_trait.as_ref().map(|ast_trait_ref| {
-            let selfty = tcx.type_of(def_id);
+            let selfty = tcx.unnormalized_type_of(def_id.expect_local());
             AstConv::instantiate_mono_trait_ref(&icx, ast_trait_ref, selfty)
         }),
         _ => bug!(),
@@ -2007,7 +2018,7 @@ fn gather_explicit_predicates_of(tcx: TyCtxt<'_>, def_id: DefId) -> ty::GenericP
     // in trait checking. See `setup_constraining_predicates`
     // for details.
     if let Node::Item(&Item { kind: ItemKind::Impl { .. }, .. }) = node {
-        let self_ty = tcx.type_of(def_id);
+        let self_ty = tcx.unnormalized_type_of(def_id.expect_local());
         let trait_ref = tcx.impl_trait_ref(def_id);
         cgp::setup_constraining_predicates(
             tcx,
