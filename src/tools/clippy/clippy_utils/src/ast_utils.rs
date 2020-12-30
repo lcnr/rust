@@ -420,10 +420,6 @@ pub fn eq_use_tree_kind(l: &UseTreeKind, r: &UseTreeKind) -> bool {
     }
 }
 
-pub fn eq_anon_const(l: &AnonConst, r: &AnonConst) -> bool {
-    eq_expr(&l.value, &r.value)
-}
-
 pub fn eq_defaultness(l: Defaultness, r: Defaultness) -> bool {
     matches!(
         (l, r),

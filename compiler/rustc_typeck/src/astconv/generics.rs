@@ -64,7 +64,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                     kind: hir::TyKind::Path(rustc_hir::QPath::Resolved(_, path)),
                     ..
                 }),
-                GenericParamDefKind::Const,
+                GenericParamDefKind::Const { .. },
             ) => match path.res {
                 Res::Err => {
                     add_braces_suggestion(arg, &mut err);
@@ -93,7 +93,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
             },
             (
                 GenericArg::Type(hir::Ty { kind: hir::TyKind::Path(_), .. }),
-                GenericParamDefKind::Const,
+                GenericParamDefKind::Const { .. },
             ) => add_braces_suggestion(arg, &mut err),
             (
                 GenericArg::Type(hir::Ty { kind: hir::TyKind::Array(_, len), .. }),
