@@ -843,14 +843,8 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 // by putting it in a query; it would only need the `DefId` as it
                 // looks at declared field types, not anything substituted.
                 for field in prefix_fields {
-                    let ty = normalize_with_depth_to(
-                        self,
-                        obligation.param_env,
-                        obligation.cause.clone(),
-                        obligation.recursion_depth + 1,
-                        tcx.type_of(field.did),
-                        &mut nested,
-                    );
+                    let ty = tcx.normalize_consts(tcx.type_of(field.did));
+
                     for arg in ty.walk() {
                         if let Some(i) = maybe_unsizing_param_idx(arg) {
                             if unsizing_params.contains(i) {

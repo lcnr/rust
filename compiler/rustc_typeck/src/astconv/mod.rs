@@ -592,8 +592,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
     /// bound to a valid trait type. Returns the `DefId` of the defining trait.
     /// The type _cannot_ be a type other than a trait type.
     ///
-    /// If the `projections` argument is `None`, then assoc type bindings like `Foo<T = X>`
-    /// are disallowed. Otherwise, they are pushed onto the vector given.
+    /// Assoc type bindings like `Foo<T = X>` are disallowed.
     pub fn instantiate_mono_trait_ref(
         &self,
         trait_ref: &hir::TraitRef<'_>,

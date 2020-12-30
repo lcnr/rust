@@ -552,6 +552,7 @@ pub(super) fn mir_abstract_const<'tcx>(
     }
 }
 
+#[instrument(skip(tcx))]
 pub(super) fn try_unify_abstract_consts<'tcx>(
     tcx: TyCtxt<'tcx>,
     ((a, a_substs), (b, b_substs)): (
@@ -559,7 +560,7 @@ pub(super) fn try_unify_abstract_consts<'tcx>(
         (ty::WithOptConstParam<DefId>, SubstsRef<'tcx>),
     ),
 ) -> bool {
-    (|| {
+    let result = (|| {
         if let Some(a) = AbstractConst::new(tcx, a, a_substs)? {
             if let Some(b) = AbstractConst::new(tcx, b, b_substs)? {
                 return Ok(try_unify(tcx, a, b));
@@ -568,7 +569,9 @@ pub(super) fn try_unify_abstract_consts<'tcx>(
 
         Ok(false)
     })()
-    .unwrap_or_else(|ErrorReported| true)
+    .unwrap_or_else(|ErrorReported| true);
+    debug!(?result);
+    result
     // FIXME(const_evaluatable_checked): We should instead have this
     // method return the resulting `ty::Const` and return `ConstKind::Error`
     // on `ErrorReported`.
@@ -616,6 +619,7 @@ pub(super) fn try_unify<'tcx>(
         (Node::Leaf(a_ct), Node::Leaf(b_ct)) => {
             let a_ct = a_ct.subst(tcx, a.substs);
             let b_ct = b_ct.subst(tcx, b.substs);
+            debug!(?a_ct, ?b_ct);
             if a_ct.ty != b_ct.ty {
                 return false;
             }
