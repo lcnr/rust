@@ -35,6 +35,10 @@ pub fn is_const_evaluatable<'cx, 'tcx>(
     span: Span,
 ) -> Result<(), ErrorHandled> {
     debug!("is_const_evaluatable({:?}, {:?})", def, substs);
+    if def.const_param_did.needs_infer() {
+        return Err(ErrorHandled::TooGeneric);
+    }
+
     if infcx.tcx.features().const_evaluatable_checked {
         let tcx = infcx.tcx;
         match AbstractConst::new(tcx, def, substs)? {

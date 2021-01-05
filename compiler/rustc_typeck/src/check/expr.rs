@@ -287,7 +287,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             }
             ExprKind::DropTemps(ref e) => self.check_expr_with_expectation(e, expected),
             ExprKind::Array(ref args) => self.check_expr_array(args, expected, expr),
-            ExprKind::ConstBlock(ref anon_const) => self.to_const(anon_const).ty,
+            ExprKind::ConstBlock(ref anon_const) => self.check_expr_const_block(expected, anon_const),
             ExprKind::Repeat(ref element, ref count) => {
                 self.check_expr_repeat(element, count, expected, expr)
             }
@@ -1058,6 +1058,30 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         }
 
         tcx.mk_ty(ty::Array(t, count))
+    }
+
+    fn check_expr_const_block(
+        &self,
+        expected: Expectation<'tcx>,
+        ct: &'tcx hir::AnonConst,
+    ) -> Ty<'tcx> {
+        let ty = if let Some(exp_ty) = expected.only_has_type(self) {
+            exp_ty
+        } else {
+            self.next_ty_var(TypeVariableOrigin {
+                kind: TypeVariableOriginKind::MiscVariable,
+                span: element.span,
+            })
+        };
+        // WARNING: We must not leak this constant as it's const param type
+        // may contain inference variables.
+        // 
+        let c = ty::Const::from_opt_const_arg_anon_const(self.tcx, ty::WithOptConstParam { did: ct.did, const_param_did: Some(ty) });
+        self.register_wf_obligation(
+            c.into(),
+            self.tcx.hir().span(ct.hir_id),
+            ObligationCauseCode::MiscObligation,
+        );
     }
 
     fn check_expr_tuple(
