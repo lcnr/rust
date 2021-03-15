@@ -927,7 +927,9 @@ pub trait PrettyPrinter<'tcx>:
         }
 
         match ct.val {
-            ty::ConstKind::Unevaluated(ty::Unevaluated { def, substs, promoted }) => {
+            ty::ConstKind::Unevaluated(ty::Unevaluated { def, substs_, promoted }) => {
+                // TODO
+                let substs = substs_.unwrap();
                 if let Some(promoted) = promoted {
                     p!(print_value_path(def.did, substs));
                     p!(write("::{:?}", promoted));

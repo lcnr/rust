@@ -475,7 +475,7 @@ impl Visitor<'tcx> for ExtraComments<'tcx> {
                 ty::ConstKind::Unevaluated(uv) => format!(
                     "Unevaluated({}, {:?}, {:?})",
                     self.tcx.def_path_str(uv.def.did),
-                    uv.substs,
+                    uv.substs(self.tcx),
                     uv.promoted
                 ),
                 ty::ConstKind::Value(val) => format!("Value({:?})", val),
