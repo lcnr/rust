@@ -33,7 +33,7 @@ error[E0747]: type provided when a constant was expected
 LL | impl<N> Foo for B<N> {}
    |                   ^
    |
-help: consider changing this type parameter to be a `const` generic
+help: consider using a const parameter instead
    |
 LL | impl<const N: u8> Foo for B<N> {}
    |      ^^^^^^^^^^^
