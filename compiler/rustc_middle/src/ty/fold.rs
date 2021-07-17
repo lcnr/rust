@@ -134,9 +134,8 @@ pub trait TypeFoldable<'tcx>: fmt::Debug + Clone {
     }
     /// "Free" regions in this context means that it has any region
     /// that is not (a) erased or (b) late-bound.
-    fn has_free_regions(&self) -> bool {
-        // TODO
-        self.has_type_flags(TypeFlags::HAS_KNOWN_FREE_REGIONS)
+    fn has_free_regions(&self, tcx: TyCtxt<'tcx>) -> bool {
+        self.definitely_has_type_flags(tcx, TypeFlags::HAS_KNOWN_FREE_REGIONS)
     }
 
     fn has_erased_regions(&self) -> bool {
