@@ -26,7 +26,7 @@ where
         }
 
         fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
-            if ty.potentially_needs_subst() {
+            if !ty.potentially_needs_subst() {
                 return ControlFlow::CONTINUE;
             }
 
