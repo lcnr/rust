@@ -72,6 +72,9 @@ bitflags! {
                                                 | TypeFlags::HAS_CT_FRESH.bits
                                                 | TypeFlags::HAS_KNOWN_FREE_LOCAL_REGIONS.bits;
 
+        const HAS_POTENTIAL_FREE_LOCAL_NAMES    = TypeFlags::HAS_KNOWN_FREE_LOCAL_NAMES.bits
+                                                | TypeFlags::HAS_UNKNOWN_DEFAULT_CONST_SUBSTS.bits;
+
         /// Does this have `Projection`?
         const HAS_TY_PROJECTION                 = 1 << 10;
         /// Does this have `Opaque`?

@@ -493,7 +493,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 },
 
                 ty::PredicateKind::TypeOutlives(pred) => {
-                    if pred.0.is_global() {
+                    if pred.0.is_known_global() {
                         Ok(EvaluatedToOk)
                     } else {
                         Ok(EvaluatedToOkModuloRegions)
@@ -644,7 +644,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         debug!(?obligation, "evaluate_trait_predicate_recursively");
 
         if !self.intercrate
-            && obligation.is_global()
+            && obligation.is_known_global()
             && obligation.param_env.caller_bounds().iter().all(|bound| bound.needs_subst())
         {
             // If a param env has no global bounds, global obligations do not
@@ -1359,7 +1359,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         // the param_env so that it can be given the lowest priority. See
         // #50825 for the motivation for this.
         let is_global =
-            |cand: &ty::PolyTraitRef<'_>| cand.is_global() && !cand.has_late_bound_regions();
+            |cand: &ty::PolyTraitRef<'_>| cand.is_known_global() && !cand.has_late_bound_regions();
 
         // (*) Prefer `BuiltinCandidate { has_nested: false }`, `PointeeCandidate`,
         // and `DiscriminantKindCandidate` to anything else.

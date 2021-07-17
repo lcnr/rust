@@ -74,6 +74,11 @@ pub trait TypeFoldable<'tcx>: fmt::Debug + Clone {
         self.has_vars_bound_at_or_above(ty::INNERMOST)
     }
 
+    fn definitely_has_type_flags(&self, tcx: TyCtxt<'tcx>, flags: TypeFlags) -> bool {
+        self.visit_with(&mut HasTypeFlagsVisitor { tcx: Some(tcx), flags }).break_value()
+            == Some(FoundFlags)
+    }
+
     fn has_type_flags(&self, flags: TypeFlags) -> bool {
         self.visit_with(&mut HasTypeFlagsVisitor { tcx: None, flags }).break_value()
             == Some(FoundFlags)
@@ -131,12 +136,21 @@ pub trait TypeFoldable<'tcx>: fmt::Debug + Clone {
         self.has_type_flags(TypeFlags::HAS_KNOWN_FREE_REGIONS)
     }
 
+    /// Indicates whether this value definitely references only 'global'
+    /// generic parameters that are the same regardless of what fn we are
+    /// in. This is used for caching.
+    ///
+    /// Note that this function is pessimistic and may incorrectly return
+    /// `false`.
+    fn is_known_global(&self) -> bool {
+        !self.has_type_flags(TypeFlags::HAS_POTENTIAL_FREE_LOCAL_NAMES)
+    }
+
     /// Indicates whether this value references only 'global'
     /// generic parameters that are the same regardless of what fn we are
     /// in. This is used for caching.
-    fn is_global(&self) -> bool {
-        // TODO
-        !self.has_type_flags(TypeFlags::HAS_KNOWN_FREE_LOCAL_NAMES)
+    fn is_global(&self, tcx: TyCtxt<'tcx>) -> bool {
+        !self.definitely_has_type_flags(tcx, TypeFlags::HAS_KNOWN_FREE_LOCAL_NAMES)
     }
 
     /// True if there are any late-bound regions

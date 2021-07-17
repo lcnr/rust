@@ -1330,7 +1330,7 @@ fn check_false_global_bounds(fcx: &FnCtxt<'_, '_>, span: Span, id: hir::HirId) {
     for obligation in implied_obligations {
         let pred = obligation.predicate;
         // Match the existing behavior.
-        if pred.is_global() && !pred.has_late_bound_regions() {
+        if pred.is_global(fcx.tcx) && !pred.has_late_bound_regions() {
             let pred = fcx.normalize_associated_types_in(span, pred);
             let obligation = traits::Obligation::new(
                 traits::ObligationCause::new(span, id, traits::TrivialBound),
