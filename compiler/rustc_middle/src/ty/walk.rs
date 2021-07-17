@@ -120,9 +120,6 @@ impl<'tcx> super::TyS<'tcx> {
 /// known to be significant to any code, but it seems like the
 /// natural order one would expect (basically, the order of the
 /// types as they are written).
-///
-/// If `tcx` is `None` we do not look into the anon const default
-/// substs, which might cause bugs if they unexpectedly matter.
 fn push_inner<'tcx>(
     tcx: TyCtxt<'tcx>,
     stack: &mut TypeWalkerStack<'tcx>,
