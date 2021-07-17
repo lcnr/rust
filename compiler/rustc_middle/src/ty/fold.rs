@@ -143,9 +143,8 @@ pub trait TypeFoldable<'tcx>: fmt::Debug + Clone {
     }
 
     /// True if there are any un-erased free regions.
-    fn has_erasable_regions(&self) -> bool {
-        // TODO
-        self.has_type_flags(TypeFlags::HAS_KNOWN_FREE_REGIONS)
+    fn has_erasable_regions(&self, tcx: TyCtxt<'tcx>) -> bool {
+        self.definitely_has_type_flags(tcx, TypeFlags::HAS_KNOWN_FREE_REGIONS)
     }
 
     /// Indicates whether this value definitely references only 'global'
