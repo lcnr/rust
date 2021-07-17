@@ -812,6 +812,7 @@ fn construct_error<'a, 'tcx>(
     cfg.terminate(START_BLOCK, source_info, TerminatorKind::Unreachable);
 
     let mut body = Body::new(
+        tcx,
         MirSource::item(def.did.to_def_id()),
         cfg.basic_blocks,
         source_scopes,
@@ -900,6 +901,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
         }
 
         Body::new(
+            self.tcx,
             MirSource::item(self.def_id),
             self.cfg.basic_blocks,
             self.source_scopes,

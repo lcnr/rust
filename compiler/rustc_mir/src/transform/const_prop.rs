@@ -133,6 +133,7 @@ impl<'tcx> MirPass<'tcx> for ConstProp {
         trace!("ConstProp starting for {:?}", def_id);
 
         let dummy_body = &Body::new(
+            tcx,
             body.source,
             body.basic_blocks().clone(),
             body.source_scopes.clone(),
@@ -473,7 +474,7 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
     /// Returns the value, if any, of evaluating `c`.
     fn eval_constant(&mut self, c: &Constant<'tcx>, source_info: SourceInfo) -> Option<OpTy<'tcx>> {
         // FIXME we need to revisit this for #67176
-        if c.needs_subst() {
+        if c.needs_subst(self.tcx) {
             return None;
         }
 
@@ -493,9 +494,9 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
                             }) => true,
                             // Out of backwards compatibility we cannot report hard errors in unused
                             // generic functions using associated constants of the generic parameters.
-                            _ => c.literal.needs_subst(),
+                            _ => c.literal.needs_subst(*tcx),
                         },
-                        ConstantKind::Val(_, ty) => ty.needs_subst(),
+                        ConstantKind::Val(_, ty) => ty.needs_subst(*tcx),
                     };
                     if lint_only {
                         // Out of backwards compatibility we cannot report hard errors in unused
@@ -726,7 +727,7 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
         }
 
         // FIXME we need to revisit this for #67176
-        if rvalue.needs_subst() {
+        if rvalue.needs_subst(self.tcx) {
             return None;
         }
 

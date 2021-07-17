@@ -731,7 +731,7 @@ fn check_where_clauses<'tcx, 'fcx>(
                     // Ignore dependent defaults -- that is, where the default of one type
                     // parameter includes another (e.g., `<T, U = T>`). In those cases, we can't
                     // be sure if it will error or not as user might always specify the other.
-                    if !ty.needs_subst() {
+                    if !ty.needs_subst(tcx) {
                         fcx.register_wf_obligation(
                             ty.into(),
                             tcx.def_span(param.def_id),
@@ -747,7 +747,7 @@ fn check_where_clauses<'tcx, 'fcx>(
                     // for `struct Foo<const N: usize, const M: usize = { 1 - 2 }>`
                     // we should eagerly error.
                     let default_ct = tcx.const_param_default(param.def_id);
-                    if !default_ct.needs_subst() {
+                    if !default_ct.needs_subst(tcx) {
                         fcx.register_wf_obligation(
                             default_ct.into(),
                             tcx.def_span(param.def_id),
@@ -781,7 +781,7 @@ fn check_where_clauses<'tcx, 'fcx>(
                 if is_our_default(param) {
                     let default_ty = tcx.type_of(param.def_id);
                     // ... and it's not a dependent default, ...
-                    if !default_ty.needs_subst() {
+                    if !default_ty.needs_subst(tcx) {
                         // ... then substitute it with the default.
                         return default_ty.into();
                     }
@@ -794,7 +794,7 @@ fn check_where_clauses<'tcx, 'fcx>(
                 if is_our_default(param) {
                     let default_ct = tcx.const_param_default(param.def_id);
                     // ... and it's not a dependent default, ...
-                    if !default_ct.needs_subst() {
+                    if !default_ct.needs_subst(tcx) {
                         // ... then substitute it with the default.
                         return default_ct.into();
                     }
@@ -843,7 +843,7 @@ fn check_where_clauses<'tcx, 'fcx>(
             let substituted_pred = pred.subst(tcx, substs);
             // Don't check non-defaulted params, dependent defaults (including lifetimes)
             // or preds with multiple params.
-            if substituted_pred.has_param_types_or_consts()
+            if substituted_pred.has_param_types_or_consts(tcx)
                 || param_count.params.len() > 1
                 || has_region
             {

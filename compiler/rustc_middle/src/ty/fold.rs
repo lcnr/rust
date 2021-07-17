@@ -92,9 +92,18 @@ pub trait TypeFoldable<'tcx>: fmt::Debug + Clone {
     fn references_error(&self) -> bool {
         self.has_type_flags(TypeFlags::HAS_ERROR)
     }
-    fn has_param_types_or_consts(&self) -> bool {
-        // TODO
-        self.has_type_flags(TypeFlags::HAS_KNOWN_TY_PARAM | TypeFlags::HAS_KNOWN_CT_PARAM)
+    fn has_potential_param_types_or_consts(&self) -> bool {
+        self.has_type_flags(
+            TypeFlags::HAS_KNOWN_TY_PARAM
+                | TypeFlags::HAS_KNOWN_CT_PARAM
+                | TypeFlags::HAS_UNKNOWN_DEFAULT_CONST_SUBSTS,
+        )
+    }
+    fn has_param_types_or_consts(&self, tcx: TyCtxt<'tcx>) -> bool {
+        self.definitely_has_type_flags(
+            tcx,
+            TypeFlags::HAS_KNOWN_TY_PARAM | TypeFlags::HAS_KNOWN_CT_PARAM,
+        )
     }
     fn has_infer_regions(&self) -> bool {
         self.has_type_flags(TypeFlags::HAS_RE_INFER)
@@ -115,9 +124,13 @@ pub trait TypeFoldable<'tcx>: fmt::Debug + Clone {
                 | TypeFlags::HAS_CT_PLACEHOLDER,
         )
     }
-    fn needs_subst(&self) -> bool {
-        // TODO
-        self.has_type_flags(TypeFlags::KNOWN_NEEDS_SUBST)
+    fn potentially_needs_subst(&self) -> bool {
+        self.has_type_flags(
+            TypeFlags::KNOWN_NEEDS_SUBST | TypeFlags::HAS_UNKNOWN_DEFAULT_CONST_SUBSTS,
+        )
+    }
+    fn needs_subst(&self, tcx: TyCtxt<'tcx>) -> bool {
+        self.definitely_has_type_flags(tcx, TypeFlags::KNOWN_NEEDS_SUBST)
     }
     /// "Free" regions in this context means that it has any region
     /// that is not (a) erased or (b) late-bound.
