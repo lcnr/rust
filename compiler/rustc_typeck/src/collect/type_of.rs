@@ -273,12 +273,12 @@ pub(super) fn default_anon_const_substs(tcx: TyCtxt<'_>, def_id: DefId) -> Subst
     // We only expect the following lifetimes, types and constants as default substs.
     //
     // Getting this wrong can lead to ICE and unsoundness, so we assert it here.
-    for arg in substs.iter().flat_map(|s| s.walk(tcx)) {
+    for arg in substs.iter() {
         match arg.unpack() {
             GenericArgKind::Lifetime(ty::ReEarlyBound(_)) => {}
             GenericArgKind::Type(ty) if matches!(ty.kind(), ty::Param(_)) => {}
             GenericArgKind::Const(ct) if matches!(ct.val, ty::ConstKind::Param(_)) => {}
-            _ => bug!("unexpected default anon const subst: {:?}", arg),
+            _ => bug!("unexpected default anon const subst for {:?}: {:?}", def_id, substs),
         }
     }
     substs
