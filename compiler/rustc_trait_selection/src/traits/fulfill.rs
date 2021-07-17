@@ -517,7 +517,8 @@ impl<'a, 'b, 'tcx> FulfillProcessor<'a, 'b, 'tcx> {
 
                 ty::PredicateKind::ConstEquate(c1, c2) => {
                     debug!(?c1, ?c2, "equating consts");
-                    if self.selcx.tcx().features().const_evaluatable_checked {
+                    let tcx = self.selcx.tcx();
+                    if tcx.features().const_evaluatable_checked {
                         // FIXME: we probably should only try to unify abstract constants
                         // if the constants depend on generic parameters.
                         //
@@ -525,11 +526,10 @@ impl<'a, 'b, 'tcx> FulfillProcessor<'a, 'b, 'tcx> {
                         if let (ty::ConstKind::Unevaluated(a), ty::ConstKind::Unevaluated(b)) =
                             (c1.val, c2.val)
                         {
-                            if self
-                                .selcx
-                                .tcx()
-                                .try_unify_abstract_consts(((a.def, a.substs), (b.def, b.substs)))
-                            {
+                            if tcx.try_unify_abstract_consts((
+                                (a.def, a.substs(tcx)),
+                                (b.def, b.substs(tcx)),
+                            )) {
                                 return ProcessResult::Changed(vec![]);
                             }
                         }
@@ -548,7 +548,7 @@ impl<'a, 'b, 'tcx> FulfillProcessor<'a, 'b, 'tcx> {
                                 Err(ErrorHandled::TooGeneric) => {
                                     stalled_on.extend(
                                         unevaluated
-                                            .substs
+                                            .substs(tcx)
                                             .iter()
                                             .filter_map(TyOrConstInferVar::maybe_from_generic_arg),
                                     );
@@ -619,7 +619,7 @@ impl<'a, 'b, 'tcx> FulfillProcessor<'a, 'b, 'tcx> {
         stalled_on: &mut Vec<TyOrConstInferVar<'tcx>>,
     ) -> ProcessResult<PendingPredicateObligation<'tcx>, FulfillmentErrorCode<'tcx>> {
         let infcx = self.selcx.infcx();
-        if obligation.predicate.is_global() {
+        if obligation.predicate.is_known_global() {
             // no type variables present, can use evaluation for better caching.
             // FIXME: consider caching errors too.
             if infcx.predicate_must_hold_considering_regions(obligation) {
@@ -695,14 +695,15 @@ fn substs_infer_vars<'a, 'tcx>(
     selcx: &mut SelectionContext<'a, 'tcx>,
     substs: ty::Binder<'tcx, SubstsRef<'tcx>>,
 ) -> impl Iterator<Item = TyOrConstInferVar<'tcx>> {
+    let tcx = selcx.tcx();
     selcx
         .infcx()
         .resolve_vars_if_possible(substs)
         .skip_binder() // ok because this check doesn't care about regions
         .iter()
         .filter(|arg| arg.has_infer_types_or_consts())
-        .flat_map(|arg| {
-            let mut walker = arg.walk();
+        .flat_map(move |arg| {
+            let mut walker = arg.walk(tcx);
             while let Some(c) = walker.next() {
                 if !c.has_infer_types_or_consts() {
                     walker.visited.remove(&c);

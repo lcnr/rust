@@ -7,7 +7,7 @@ use rustc_hir::intravisit;
 use rustc_hir::intravisit::Visitor;
 use rustc_hir::{HirId, Node};
 use rustc_middle::hir::map::Map;
-use rustc_middle::ty::subst::{GenericArgKind, InternalSubsts};
+use rustc_middle::ty::subst::{GenericArgKind, InternalSubsts, SubstsRef};
 use rustc_middle::ty::util::IntTypeExt;
 use rustc_middle::ty::{self, DefIdTree, Ty, TyCtxt, TypeFoldable, TypeFolder};
 use rustc_span::symbol::Ident;
@@ -266,6 +266,22 @@ fn get_path_containing_arg_in_pat<'hir>(
         _ => true,
     });
     arg_path
+}
+
+pub(super) fn default_anon_const_substs(tcx: TyCtxt<'_>, def_id: DefId) -> SubstsRef<'_> {
+    let substs = InternalSubsts::identity_for_item(tcx, def_id);
+    // We only expect the following lifetimes, types and constants as default substs.
+    //
+    // Getting this wrong can lead to ICE and unsoundness, so we assert it here.
+    for arg in substs.iter() {
+        match arg.unpack() {
+            GenericArgKind::Lifetime(ty::ReEarlyBound(_)) => {}
+            GenericArgKind::Type(ty) if matches!(ty.kind(), ty::Param(_)) => {}
+            GenericArgKind::Const(ct) if matches!(ct.val, ty::ConstKind::Param(_)) => {}
+            _ => bug!("unexpected default anon const subst for {:?}: {:?}", def_id, substs),
+        }
+    }
+    substs
 }
 
 pub(super) fn type_of(tcx: TyCtxt<'_>, def_id: DefId) -> Ty<'_> {

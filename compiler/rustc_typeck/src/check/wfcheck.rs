@@ -731,7 +731,7 @@ fn check_where_clauses<'tcx, 'fcx>(
                     // Ignore dependent defaults -- that is, where the default of one type
                     // parameter includes another (e.g., `<T, U = T>`). In those cases, we can't
                     // be sure if it will error or not as user might always specify the other.
-                    if !ty.needs_subst() {
+                    if !ty.needs_subst(tcx) {
                         fcx.register_wf_obligation(
                             ty.into(),
                             tcx.def_span(param.def_id),
@@ -747,7 +747,7 @@ fn check_where_clauses<'tcx, 'fcx>(
                     // for `struct Foo<const N: usize, const M: usize = { 1 - 2 }>`
                     // we should eagerly error.
                     let default_ct = tcx.const_param_default(param.def_id);
-                    if !default_ct.needs_subst() {
+                    if !default_ct.needs_subst(tcx) {
                         fcx.register_wf_obligation(
                             default_ct.into(),
                             tcx.def_span(param.def_id),
@@ -781,7 +781,7 @@ fn check_where_clauses<'tcx, 'fcx>(
                 if is_our_default(param) {
                     let default_ty = tcx.type_of(param.def_id);
                     // ... and it's not a dependent default, ...
-                    if !default_ty.needs_subst() {
+                    if !default_ty.needs_subst(tcx) {
                         // ... then substitute it with the default.
                         return default_ty.into();
                     }
@@ -794,7 +794,7 @@ fn check_where_clauses<'tcx, 'fcx>(
                 if is_our_default(param) {
                     let default_ct = tcx.const_param_default(param.def_id);
                     // ... and it's not a dependent default, ...
-                    if !default_ct.needs_subst() {
+                    if !default_ct.needs_subst(tcx) {
                         // ... then substitute it with the default.
                         return default_ct.into();
                     }
@@ -810,12 +810,15 @@ fn check_where_clauses<'tcx, 'fcx>(
         .predicates
         .iter()
         .flat_map(|&(pred, sp)| {
-            #[derive(Default)]
-            struct CountParams {
+            struct CountParams<'tcx> {
+                tcx: TyCtxt<'tcx>,
                 params: FxHashSet<u32>,
             }
-            impl<'tcx> ty::fold::TypeVisitor<'tcx> for CountParams {
+            impl<'tcx> ty::fold::TypeVisitor<'tcx> for CountParams<'tcx> {
                 type BreakTy = ();
+                fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
+                    Some(self.tcx)
+                }
 
                 fn visit_ty(&mut self, t: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
                     if let ty::Param(param) = t.kind() {
@@ -835,12 +838,12 @@ fn check_where_clauses<'tcx, 'fcx>(
                     c.super_visit_with(self)
                 }
             }
-            let mut param_count = CountParams::default();
+            let mut param_count = CountParams { tcx: fcx.tcx, params: FxHashSet::default() };
             let has_region = pred.visit_with(&mut param_count).is_break();
             let substituted_pred = pred.subst(tcx, substs);
             // Don't check non-defaulted params, dependent defaults (including lifetimes)
             // or preds with multiple params.
-            if substituted_pred.has_param_types_or_consts()
+            if substituted_pred.has_param_types_or_consts(tcx)
                 || param_count.params.len() > 1
                 || has_region
             {
@@ -1327,7 +1330,7 @@ fn check_false_global_bounds(fcx: &FnCtxt<'_, '_>, span: Span, id: hir::HirId) {
     for obligation in implied_obligations {
         let pred = obligation.predicate;
         // Match the existing behavior.
-        if pred.is_global() && !pred.has_late_bound_regions() {
+        if pred.is_global(fcx.tcx) && !pred.has_late_bound_regions() {
             let pred = fcx.normalize_associated_types_in(span, pred);
             let obligation = traits::Obligation::new(
                 traits::ObligationCause::new(span, id, traits::TrivialBound),

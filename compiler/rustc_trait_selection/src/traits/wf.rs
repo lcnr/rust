@@ -417,7 +417,7 @@ impl<'a, 'tcx> WfPredicates<'a, 'tcx> {
 
     /// Pushes all the predicates needed to validate that `ty` is WF into `out`.
     fn compute(&mut self, arg: GenericArg<'tcx>) {
-        let mut walker = arg.walk();
+        let mut walker = arg.walk(self.tcx());
         let param_env = self.param_env;
         let depth = self.recursion_depth;
         while let Some(arg) = walker.next() {
@@ -430,13 +430,14 @@ impl<'a, 'tcx> WfPredicates<'a, 'tcx> {
 
                 GenericArgKind::Const(constant) => {
                     match constant.val {
-                        ty::ConstKind::Unevaluated(ty::Unevaluated { def, substs, promoted }) => {
-                            assert!(promoted.is_none());
+                        ty::ConstKind::Unevaluated(uv) => {
+                            assert!(uv.promoted.is_none());
+                            let substs = uv.substs(self.tcx());
 
-                            let obligations = self.nominal_obligations(def.did, substs);
+                            let obligations = self.nominal_obligations(uv.def.did, substs);
                             self.out.extend(obligations);
 
-                            let predicate = ty::PredicateKind::ConstEvaluatable(def, substs)
+                            let predicate = ty::PredicateKind::ConstEvaluatable(uv.def, substs)
                                 .to_predicate(self.tcx());
                             let cause = self.cause(traits::MiscObligation);
                             self.out.push(traits::Obligation::with_depth(
