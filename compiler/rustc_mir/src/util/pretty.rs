@@ -682,8 +682,10 @@ pub fn write_allocations<'tcx>(
     }
     struct CollectAllocIds(BTreeSet<AllocId>);
     impl<'tcx> TypeVisitor<'tcx> for CollectAllocIds {
-        fn tcx_for_anon_const_substs(&self) -> TyCtxt<'tcx> {
-            bug!("tcx_for_anon_const_substs called for CollectAllocIds")
+        fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
+            // `AllocId`s are only inside of `ConstKind::Value` which
+            // can't be part of the anon const default substs.
+            None
         }
 
         fn visit_const(&mut self, c: &'tcx ty::Const<'tcx>) -> ControlFlow<Self::BreakTy> {
