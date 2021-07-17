@@ -75,7 +75,8 @@ pub trait TypeFoldable<'tcx>: fmt::Debug + Clone {
     }
 
     fn has_type_flags(&self, flags: TypeFlags) -> bool {
-        self.visit_with(&mut HasTypeFlagsVisitor { flags }).break_value() == Some(FoundFlags)
+        self.visit_with(&mut HasTypeFlagsVisitor { tcx: None, flags }).break_value()
+            == Some(FoundFlags)
     }
     fn has_projections(&self) -> bool {
         self.has_type_flags(TypeFlags::HAS_PROJECTION)
@@ -87,7 +88,8 @@ pub trait TypeFoldable<'tcx>: fmt::Debug + Clone {
         self.has_type_flags(TypeFlags::HAS_ERROR)
     }
     fn has_param_types_or_consts(&self) -> bool {
-        self.has_type_flags(TypeFlags::HAS_TY_PARAM | TypeFlags::HAS_CT_PARAM)
+        // TODO
+        self.has_type_flags(TypeFlags::HAS_KNOWN_TY_PARAM | TypeFlags::HAS_KNOWN_CT_PARAM)
     }
     fn has_infer_regions(&self) -> bool {
         self.has_type_flags(TypeFlags::HAS_RE_INFER)
@@ -109,12 +111,14 @@ pub trait TypeFoldable<'tcx>: fmt::Debug + Clone {
         )
     }
     fn needs_subst(&self) -> bool {
-        self.has_type_flags(TypeFlags::NEEDS_SUBST)
+        // TODO
+        self.has_type_flags(TypeFlags::KNOWN_NEEDS_SUBST)
     }
     /// "Free" regions in this context means that it has any region
     /// that is not (a) erased or (b) late-bound.
     fn has_free_regions(&self) -> bool {
-        self.has_type_flags(TypeFlags::HAS_FREE_REGIONS)
+        // TODO
+        self.has_type_flags(TypeFlags::HAS_KNOWN_FREE_REGIONS)
     }
 
     fn has_erased_regions(&self) -> bool {
@@ -123,14 +127,16 @@ pub trait TypeFoldable<'tcx>: fmt::Debug + Clone {
 
     /// True if there are any un-erased free regions.
     fn has_erasable_regions(&self) -> bool {
-        self.has_type_flags(TypeFlags::HAS_FREE_REGIONS)
+        // TODO
+        self.has_type_flags(TypeFlags::HAS_KNOWN_FREE_REGIONS)
     }
 
     /// Indicates whether this value references only 'global'
     /// generic parameters that are the same regardless of what fn we are
     /// in. This is used for caching.
     fn is_global(&self) -> bool {
-        !self.has_type_flags(TypeFlags::HAS_FREE_LOCAL_NAMES)
+        // TODO
+        !self.has_type_flags(TypeFlags::HAS_KNOWN_FREE_LOCAL_NAMES)
     }
 
     /// True if there are any late-bound regions
@@ -369,7 +375,7 @@ impl<'tcx> TyCtxt<'tcx> {
 
             fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
                 // We're only interested in types involving regions
-                if ty.flags().intersects(TypeFlags::HAS_FREE_REGIONS) {
+                if ty.flags().intersects(TypeFlags::HAS_POTENTIAL_FREE_REGIONS) {
                     ty.super_visit_with(self)
                 } else {
                     ControlFlow::CONTINUE
@@ -1078,23 +1084,19 @@ impl<'tcx> TypeVisitor<'tcx> for HasEscapingVarsVisitor {
 struct FoundFlags;
 
 // FIXME: Optimize for checking for infer flags
-struct HasTypeFlagsVisitor {
+struct HasTypeFlagsVisitor<'tcx> {
+    tcx: Option<TyCtxt<'tcx>>,
     flags: ty::TypeFlags,
 }
 
-impl<'tcx> TypeVisitor<'tcx> for HasTypeFlagsVisitor {
+impl<'tcx> TypeVisitor<'tcx> for HasTypeFlagsVisitor<'tcx> {
     type BreakTy = FoundFlags;
     fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
-        // TypeFlagsVisitor must not look into the default anon const substs
-        // as that would cause cycle errors, but we do care about them for
-        // some flags.
-        //
-        // We therefore have to be very careful here.
-        None
+        self.tcx
     }
 
     #[inline]
-    fn visit_ty(&mut self, t: Ty<'_>) -> ControlFlow<Self::BreakTy> {
+    fn visit_ty(&mut self, t: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
         debug!(
             "HasTypeFlagsVisitor: t={:?} t.flags={:?} self.flags={:?}",
             t,
@@ -1103,6 +1105,11 @@ impl<'tcx> TypeVisitor<'tcx> for HasTypeFlagsVisitor {
         );
         if t.flags().intersects(self.flags) {
             ControlFlow::Break(FoundFlags)
+        } else if self.tcx.is_some()
+            && t.flags().intersects(TypeFlags::HAS_UNKNOWN_DEFAULT_CONST_SUBSTS)
+            && self.flags.intersects(TypeFlags::MAY_NEED_DEFAULT_CONST_SUBSTS)
+        {
+            t.super_visit_with(self)
         } else {
             ControlFlow::CONTINUE
         }
@@ -1125,6 +1132,11 @@ impl<'tcx> TypeVisitor<'tcx> for HasTypeFlagsVisitor {
         debug!("HasTypeFlagsVisitor: c={:?} c.flags={:?} self.flags={:?}", c, flags, self.flags);
         if flags.intersects(self.flags) {
             ControlFlow::Break(FoundFlags)
+        } else if self.tcx.is_some()
+            && flags.intersects(TypeFlags::HAS_UNKNOWN_DEFAULT_CONST_SUBSTS)
+            && self.flags.intersects(TypeFlags::MAY_NEED_DEFAULT_CONST_SUBSTS)
+        {
+            c.super_visit_with(self)
         } else {
             ControlFlow::CONTINUE
         }
@@ -1138,6 +1150,11 @@ impl<'tcx> TypeVisitor<'tcx> for HasTypeFlagsVisitor {
         );
         if predicate.inner.flags.intersects(self.flags) {
             ControlFlow::Break(FoundFlags)
+        } else if self.tcx.is_some()
+            && predicate.inner.flags.intersects(TypeFlags::HAS_UNKNOWN_DEFAULT_CONST_SUBSTS)
+            && self.flags.intersects(TypeFlags::MAY_NEED_DEFAULT_CONST_SUBSTS)
+        {
+            predicate.super_visit_with(self)
         } else {
             ControlFlow::CONTINUE
         }

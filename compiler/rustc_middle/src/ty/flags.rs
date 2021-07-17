@@ -91,7 +91,7 @@ impl FlagComputation {
             &ty::Error(_) => self.add_flags(TypeFlags::HAS_ERROR),
 
             &ty::Param(_) => {
-                self.add_flags(TypeFlags::HAS_TY_PARAM);
+                self.add_flags(TypeFlags::HAS_KNOWN_TY_PARAM);
                 self.add_flags(TypeFlags::STILL_FURTHER_SPECIALIZABLE);
             }
 
@@ -288,7 +288,7 @@ impl FlagComputation {
                 self.add_bound_var(debruijn);
             }
             ty::ConstKind::Param(_) => {
-                self.add_flags(TypeFlags::HAS_CT_PARAM);
+                self.add_flags(TypeFlags::HAS_KNOWN_CT_PARAM);
                 self.add_flags(TypeFlags::STILL_FURTHER_SPECIALIZABLE);
             }
             ty::ConstKind::Placeholder(_) => {
@@ -301,8 +301,11 @@ impl FlagComputation {
     }
 
     fn add_unevaluated_const(&mut self, ct: ty::Unevaluated<'tcx>) {
-        // TODO
-        self.add_substs(ct.substs_.unwrap());
+        if let Some(substs) = ct.substs_ {
+            self.add_substs(substs);
+        } else {
+            self.add_flags(TypeFlags::HAS_UNKNOWN_DEFAULT_CONST_SUBSTS);
+        }
         self.add_flags(TypeFlags::HAS_CT_PROJECTION);
     }
 

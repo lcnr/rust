@@ -269,7 +269,19 @@ fn get_path_containing_arg_in_pat<'hir>(
 }
 
 pub(super) fn default_anon_const_substs(tcx: TyCtxt<'_>, def_id: DefId) -> SubstsRef<'_> {
-    InternalSubsts::identity_for_item(tcx, def_id)
+    let substs = InternalSubsts::identity_for_item(tcx, def_id);
+    // We only expect the following lifetimes, types and constants as default substs.
+    //
+    // Getting this wrong can lead to ICE and unsoundness, so we assert it here.
+    for arg in substs.iter().flat_map(|s| s.walk(tcx)) {
+        match arg.unpack() {
+            GenericArgKind::Lifetime(ty::ReEarlyBound(_)) => {}
+            GenericArgKind::Type(ty) if matches!(ty.kind(), ty::Param(_)) => {}
+            GenericArgKind::Const(ct) if matches!(ct.val, ty::ConstKind::Param(_)) => {}
+            _ => bug!("unexpected default anon const subst: {:?}", arg),
+        }
+    }
+    substs
 }
 
 pub(super) fn type_of(tcx: TyCtxt<'_>, def_id: DefId) -> Ty<'_> {
