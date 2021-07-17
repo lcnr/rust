@@ -128,9 +128,7 @@ impl<'a, 'tcx> TypeVisitor<'tcx> for UnresolvedTypeFinder<'a, 'tcx> {
     type BreakTy = (Ty<'tcx>, Option<Span>);
 
     fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
-        // Unevaluated constants cannot have unresolved types as their default substs,
-        // so we don't have to bother looking into them.
-        None
+        Some(self.infcx.tcx)
     }
 
     fn visit_ty(&mut self, t: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
