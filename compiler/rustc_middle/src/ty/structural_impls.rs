@@ -1082,8 +1082,10 @@ impl<'tcx> TypeFoldable<'tcx> for ty::Unevaluated<'tcx> {
     fn super_visit_with<V: TypeVisitor<'tcx>>(&self, visitor: &mut V) -> ControlFlow<V::BreakTy> {
         if let Some(tcx) = visitor.tcx_for_anon_const_substs() {
             self.substs(tcx).visit_with(visitor)
+        } else if let Some(substs) = self.substs_ {
+            substs.visit_with(visitor)
         } else {
-            debug!("no tcx supplied for `{:?}`", self.def);
+            debug!("ignoring default substs of `{:?}`", self.def);
             ControlFlow::CONTINUE
         }
     }
