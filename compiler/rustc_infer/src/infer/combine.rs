@@ -748,11 +748,7 @@ impl TypeRelation<'tcx> for Generalizer<'_, 'tcx> {
                 )?;
                 Ok(self.tcx().mk_const(ty::Const {
                     ty: c.ty,
-                    val: ty::ConstKind::Unevaluated(ty::Unevaluated {
-                        def: uv.def,
-                        substs_: Some(substs),
-                        promoted: uv.promoted,
-                    }),
+                    val: ty::ConstKind::Unevaluated(ty::Unevaluated::new(def, substs)),
                 }))
             }
             _ => relate::super_relate_consts(self, c, c),
