@@ -82,6 +82,7 @@ pub enum FulfillmentErrorCode<'tcx> {
     CodeProjectionError(MismatchedProjectionTypes<'tcx>),
     CodeSubtypeError(ExpectedFound<Ty<'tcx>>, TypeError<'tcx>), // always comes from a SubtypePredicate
     CodeConstEquateError(ExpectedFound<&'tcx Const<'tcx>>, TypeError<'tcx>),
+    CodeConcreteNonZeroError,
     CodeAmbiguity,
 }
 

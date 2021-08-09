@@ -562,6 +562,19 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                     }
                 }
 
+                ty::PredicateKind::ConstConcreteNonZero(ct) => {
+                    match const_evaluatable::concrete_non_zero(
+                        self.tcx(),
+                        obligation.param_env,
+                        obligation.cause.span,
+                        ct,
+                    ) {
+                        Ok(()) => Ok(EvaluatedToOk),
+                        Err(true) => Ok(EvaluatedToAmbig),
+                        Err(false) => Ok(EvaluatedToErr),
+                    }
+                }
+
                 ty::PredicateKind::ConstEquate(c1, c2) => {
                     debug!(?c1, ?c2, "evaluate_predicate_recursively: equating consts");
 

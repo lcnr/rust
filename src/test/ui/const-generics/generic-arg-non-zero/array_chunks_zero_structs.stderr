@@ -1,0 +1,14 @@
+error: expected a non zero value, found `0_usize`
+  --> $DIR/array_chunks_zero_structs.rs:6:8
+   |
+LL |     a: ArrayChunks<'static, u32, 0>,
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected a concrete const argument, found `N`
+  --> $DIR/array_chunks_zero_structs.rs:7:8
+   |
+LL |     b: ArrayChunks<'static, u32, N>,
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to 2 previous errors
+

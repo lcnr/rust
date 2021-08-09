@@ -1,0 +1,36 @@
+error[E0425]: cannot find function `bar` in this scope
+  --> $DIR/incorrect.rs:6:5
+   |
+LL |     bar::<u32, 0, 0, 10>();
+   |     ^^^ not found in this scope
+   |
+help: consider importing this function
+   |
+LL | use aux::bar;
+   |
+
+error[E0425]: cannot find function `bar` in this scope
+  --> $DIR/incorrect.rs:7:5
+   |
+LL |     bar::<u8, N, 0, 13>();
+   |     ^^^ not found in this scope
+   |
+help: consider importing this function
+   |
+LL | use aux::bar;
+   |
+
+error[E0425]: cannot find value `Foo` in this scope
+  --> $DIR/incorrect.rs:8:28
+   |
+LL |     let ([_, _], [], []) = Foo::<3>.foo();
+   |                            ^^^ not found in this scope
+   |
+help: consider importing this unit struct
+   |
+LL | use aux::Foo;
+   |
+
+error: aborting due to 3 previous errors
+
+For more information about this error, try `rustc --explain E0425`.

@@ -2289,6 +2289,9 @@ define_print_and_forward_display! {
             ty::PredicateKind::ConstEquate(c1, c2) => {
                 p!("the constant `", print(c1), "` equals `", print(c2), "`")
             }
+            ty::PredicateKind::ConstConcreteNonZero(ct) => {
+                p!(" the constant `", print(ct), "` is a concrete value not equal to `0`")
+            }
             ty::PredicateKind::TypeWellFormedFromEnv(ty) => {
                 p!("the type `", print(ty), "` is found in the environment")
             }

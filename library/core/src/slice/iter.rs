@@ -1985,6 +1985,7 @@ unsafe impl<'a, T> TrustedRandomAccessNoCoerce for ChunksExactMut<'a, T> {
 /// [slices]: slice
 #[derive(Debug, Clone, Copy)]
 #[unstable(feature = "array_windows", issue = "75027")]
+#[cfg_attr(not(bootstrap), rustc_generic_arg_non_zero(2))]
 pub struct ArrayWindows<'a, T: 'a, const N: usize> {
     slice_head: *const T,
     num: usize,
@@ -2107,6 +2108,7 @@ impl<T, const N: usize> ExactSizeIterator for ArrayWindows<'_, T, N> {
 /// [slices]: slice
 #[derive(Debug)]
 #[unstable(feature = "array_chunks", issue = "74985")]
+#[cfg_attr(not(bootstrap), rustc_generic_arg_non_zero(2))]
 pub struct ArrayChunks<'a, T: 'a, const N: usize> {
     iter: Iter<'a, [T; N]>,
     rem: &'a [T],
@@ -2232,6 +2234,7 @@ unsafe impl<'a, T, const N: usize> TrustedRandomAccessNoCoerce for ArrayChunks<'
 /// [slices]: slice
 #[derive(Debug)]
 #[unstable(feature = "array_chunks", issue = "74985")]
+#[cfg_attr(not(bootstrap), rustc_generic_arg_non_zero(2))]
 pub struct ArrayChunksMut<'a, T: 'a, const N: usize> {
     iter: IterMut<'a, [T; N]>,
     rem: &'a mut [T],

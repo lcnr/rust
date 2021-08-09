@@ -249,6 +249,9 @@ impl FlagComputation {
                 self.add_const(expected);
                 self.add_const(found);
             }
+            ty::PredicateKind::ConstConcreteNonZero(ct) => {
+                self.add_const(ct);
+            }
             ty::PredicateKind::TypeWellFormedFromEnv(ty) => {
                 self.add_ty(ty);
             }

@@ -706,3 +706,28 @@ pub(super) fn try_unify<'tcx>(
         _ => false,
     }
 }
+
+pub fn concrete_non_zero(
+    tcx: TyCtxt<'tcx>,
+    param_env: ty::ParamEnv<'tcx>,
+    span: Span,
+    ct: &'tcx ty::Const<'tcx>,
+) -> Result<(), bool> {
+    if ct.has_infer_types_or_consts() {
+        Err(true)
+    } else if let Some(bits) = ct.try_eval_bits(tcx, param_env, ct.ty) {
+        if bits == 0 {
+            tcx.sess
+                .struct_span_err(span, &format!("expected a non zero value, found `{}`", ct))
+                .emit();
+            Err(false)
+        } else {
+            Ok(())
+        }
+    } else {
+        tcx.sess
+            .struct_span_err(span, &format!("expected a concrete const argument, found `{}`", ct))
+            .emit();
+        Err(false)
+    }
+}

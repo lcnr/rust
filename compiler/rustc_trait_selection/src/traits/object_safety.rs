@@ -310,6 +310,7 @@ fn predicate_references_self(
         | ty::PredicateKind::Subtype(..)
         | ty::PredicateKind::ConstEvaluatable(..)
         | ty::PredicateKind::ConstEquate(..)
+        | ty::PredicateKind::ConstConcreteNonZero(..)
         | ty::PredicateKind::TypeWellFormedFromEnv(..) => None,
     }
 }
@@ -343,6 +344,7 @@ fn generics_require_sized_self(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
             | ty::PredicateKind::TypeOutlives(..)
             | ty::PredicateKind::ConstEvaluatable(..)
             | ty::PredicateKind::ConstEquate(..)
+            | ty::PredicateKind::ConstConcreteNonZero(..)
             | ty::PredicateKind::TypeWellFormedFromEnv(..) => false,
         }
     })

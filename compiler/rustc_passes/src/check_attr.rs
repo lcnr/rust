@@ -13,7 +13,8 @@ use rustc_errors::{pluralize, struct_span_err, Applicability};
 use rustc_hir as hir;
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir::intravisit::{self, NestedVisitorMap, Visitor};
-use rustc_hir::{self, FnSig, ForeignItem, HirId, Item, ItemKind, TraitItem, CRATE_HIR_ID};
+use rustc_hir::{self, FnSig, HirId, TraitItem, CRATE_HIR_ID};
+use rustc_hir::{ForeignItem, ImplItem, Item, ItemKind};
 use rustc_hir::{MethodKind, Target};
 use rustc_session::lint::builtin::{
     CONFLICTING_REPR_HINTS, INVALID_DOC_ATTRIBUTES, UNUSED_ATTRIBUTES,
@@ -45,9 +46,10 @@ pub(crate) fn target_from_impl_item<'tcx>(
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum ItemLike<'tcx> {
     Item(&'tcx Item<'tcx>),
+    ImplItem(&'tcx ImplItem<'tcx>),
     ForeignItem(&'tcx ForeignItem<'tcx>),
 }
 
@@ -90,6 +92,9 @@ impl CheckAttrVisitor<'tcx> {
                     self.check_rustc_allow_const_fn_unstable(hir_id, &attr, span, target)
                 }
                 sym::naked => self.check_naked(hir_id, attr, span, target),
+                sym::rustc_generic_arg_non_zero => {
+                    self.check_rustc_generic_arg_non_zero(&attr, span, item)
+                }
                 sym::rustc_legacy_const_generics => {
                     self.check_rustc_legacy_const_generics(&attr, span, target, item)
                 }
@@ -1025,6 +1030,91 @@ impl CheckAttrVisitor<'tcx> {
         }
     }
 
+    /// Checks if `#[rustc_generic_arg_non_zero]` is applied to a function and has a valid argument.
+    fn check_rustc_generic_arg_non_zero(
+        &self,
+        attr: &Attribute,
+        span: &Span,
+        item: Option<ItemLike<'_>>,
+    ) -> bool {
+        let list = match attr.meta_item_list() {
+            // The attribute form is validated on AST.
+            None => return false,
+            Some(it) => it,
+        };
+
+        let generics = match item {
+            Some(ItemLike::Item(Item {
+                kind: ItemKind::Fn(_, generics, _) | ItemKind::Struct(_, generics),
+                ..
+            }))
+            | Some(ItemLike::ImplItem(ImplItem { generics, .. })) => generics,
+
+            _ => {
+                self.tcx
+                    .sess
+                    .struct_span_err(
+                        attr.span,
+                        "attribute should be applied to a function or struct",
+                    )
+                    .span_label(*span, "not a function or struct")
+                    .emit();
+                return false;
+            }
+        };
+
+        let mut invalid_args = vec![];
+        let num_params = generics.params.len();
+        for meta in list {
+            if let Some(&LitKind::Int(val, _)) = meta.literal().map(|lit| &lit.kind) {
+                if let Some(param) = generics.params.get(val as usize) {
+                    if matches!(param.kind, hir::GenericParamKind::Const { .. }) {
+                        // ok
+                    } else {
+                        let span = meta.span();
+                        self.tcx
+                            .sess
+                            .struct_span_err(
+                                span,
+                                "attribute can only be applied to const parameters",
+                            )
+                            .span_label(param.span, "not a const parameter")
+                            .emit();
+                        return false;
+                    }
+                } else {
+                    let span = meta.span();
+                    self.tcx
+                        .sess
+                        .struct_span_err(span, "index exceeds number of generic parameters")
+                        .span_label(
+                            span,
+                            format!(
+                                "there {} only {} argument{}",
+                                if num_params != 1 { "are" } else { "is" },
+                                num_params,
+                                pluralize!(num_params)
+                            ),
+                        )
+                        .emit();
+                    return false;
+                }
+            } else {
+                invalid_args.push(meta.span());
+            }
+        }
+
+        if !invalid_args.is_empty() {
+            self.tcx
+                .sess
+                .struct_span_err(invalid_args, "arguments should be non-negative integers")
+                .emit();
+            false
+        } else {
+            true
+        }
+    }
+
     /// Checks if `#[rustc_legacy_const_generics]` is applied to a function and has a valid argument.
     fn check_rustc_legacy_const_generics(
         &self,
@@ -1539,9 +1629,14 @@ impl Visitor<'tcx> for CheckAttrVisitor<'tcx> {
         intravisit::walk_foreign_item(self, f_item)
     }
 
-    fn visit_impl_item(&mut self, impl_item: &'tcx hir::ImplItem<'tcx>) {
+    fn visit_impl_item(&mut self, impl_item: &'tcx ImplItem<'tcx>) {
         let target = target_from_impl_item(self.tcx, impl_item);
-        self.check_attributes(impl_item.hir_id(), &impl_item.span, target, None);
+        self.check_attributes(
+            impl_item.hir_id(),
+            &impl_item.span,
+            target,
+            Some(ItemLike::ImplItem(impl_item)),
+        );
         intravisit::walk_impl_item(self, impl_item)
     }
 

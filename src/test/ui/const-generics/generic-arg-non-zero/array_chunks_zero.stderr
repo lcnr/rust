@@ -1,0 +1,38 @@
+error: expected a non zero value, found `0_usize`
+  --> $DIR/array_chunks_zero.rs:7:7
+   |
+LL |     s.array_chunks::<0>();
+   |       ^^^^^^^^^^^^
+
+error: expected a concrete const argument, found `N`
+  --> $DIR/array_chunks_zero.rs:8:7
+   |
+LL |     s.array_chunks::<N>();
+   |       ^^^^^^^^^^^^
+
+error: expected a non zero value, found `0_usize`
+  --> $DIR/array_chunks_zero.rs:10:7
+   |
+LL |     s.array_chunks_mut::<0>();
+   |       ^^^^^^^^^^^^^^^^
+
+error: expected a concrete const argument, found `N`
+  --> $DIR/array_chunks_zero.rs:11:7
+   |
+LL |     s.array_chunks_mut::<N>();
+   |       ^^^^^^^^^^^^^^^^
+
+error: expected a non zero value, found `0_usize`
+  --> $DIR/array_chunks_zero.rs:13:7
+   |
+LL |     s.array_windows::<0>();
+   |       ^^^^^^^^^^^^^
+
+error: expected a concrete const argument, found `N`
+  --> $DIR/array_chunks_zero.rs:14:7
+   |
+LL |     s.array_windows::<N>();
+   |       ^^^^^^^^^^^^^
+
+error: aborting due to 6 previous errors
+

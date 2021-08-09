@@ -488,6 +488,15 @@ pub enum PredicateKind<'tcx> {
     /// Constants must be equal. The first component is the const that is expected.
     ConstEquate(&'tcx Const<'tcx>, &'tcx Const<'tcx>),
 
+    /// HACK(const_generics): This predicate is used to prevent some methods from
+    /// being called with a generic const parameter of `0` without needing
+    /// any kind of const evaluatable bounds using the `#[rustc_generic_arg_non_zero]`
+    /// attribute.
+    ///
+    /// Once const evaluatable bounds are stable enough this predicate should get replaced
+    /// with a less hacky solution.
+    ConstConcreteNonZero(&'tcx Const<'tcx>),
+
     /// Represents a type found in the environment that we can use for implied bounds.
     ///
     /// Only used for Chalk.
@@ -800,6 +809,7 @@ impl<'tcx> Predicate<'tcx> {
             | PredicateKind::TypeOutlives(..)
             | PredicateKind::ConstEvaluatable(..)
             | PredicateKind::ConstEquate(..)
+            | PredicateKind::ConstConcreteNonZero(..)
             | PredicateKind::TypeWellFormedFromEnv(..) => None,
         }
     }
@@ -817,6 +827,7 @@ impl<'tcx> Predicate<'tcx> {
             | PredicateKind::ClosureKind(..)
             | PredicateKind::ConstEvaluatable(..)
             | PredicateKind::ConstEquate(..)
+            | PredicateKind::ConstConcreteNonZero(..)
             | PredicateKind::TypeWellFormedFromEnv(..) => None,
         }
     }

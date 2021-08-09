@@ -1612,6 +1612,7 @@ impl<'tcx> LateLintPass<'tcx> for TrivialConstraints {
                     Subtype(..) |
                     ConstEvaluatable(..) |
                     ConstEquate(..) |
+                    ConstConcreteNonZero(..) |
                     TypeWellFormedFromEnv(..) => continue,
                 };
                 if predicate.is_global() {

@@ -172,6 +172,9 @@ impl Elaborator<'tcx> {
                 // Currently, we do not elaborate const-equate
                 // predicates.
             }
+            ty::PredicateKind::ConstConcreteNonZero(..) => {
+                // we do not elaborate these predicates.
+            }
             ty::PredicateKind::RegionOutlives(..) => {
                 // Nothing to elaborate from `'a: 'b`.
             }

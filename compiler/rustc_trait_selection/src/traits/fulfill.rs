@@ -17,6 +17,7 @@ use super::project;
 use super::select::SelectionContext;
 use super::wf;
 use super::CodeAmbiguity;
+use super::CodeConcreteNonZeroError;
 use super::CodeProjectionError;
 use super::CodeSelectionError;
 use super::Unimplemented;
@@ -377,7 +378,8 @@ impl<'a, 'b, 'tcx> FulfillProcessor<'a, 'b, 'tcx> {
                 | ty::PredicateKind::ClosureKind(..)
                 | ty::PredicateKind::Subtype(_)
                 | ty::PredicateKind::ConstEvaluatable(..)
-                | ty::PredicateKind::ConstEquate(..) => {
+                | ty::PredicateKind::ConstEquate(..)
+                | ty::PredicateKind::ConstConcreteNonZero(..) => {
                     let pred = infcx.replace_bound_vars_with_placeholders(binder);
                     ProcessResult::Changed(mk_pending(vec![
                         obligation.with(pred.to_predicate(self.selcx.tcx())),
@@ -513,6 +515,25 @@ impl<'a, 'b, 'tcx> FulfillProcessor<'a, 'b, 'tcx> {
                         ) => ProcessResult::Error(CodeSelectionError(
                             SelectionError::NotConstEvaluatable(e),
                         )),
+                    }
+                }
+
+                ty::PredicateKind::ConstConcreteNonZero(ct) => {
+                    match const_evaluatable::concrete_non_zero(
+                        self.selcx.tcx(),
+                        obligation.param_env,
+                        obligation.cause.span,
+                        ct,
+                    ) {
+                        Ok(()) => ProcessResult::Changed(vec![]),
+                        Err(true) => {
+                            pending_obligation.stalled_on.clear();
+                            pending_obligation.stalled_on.extend(
+                                ct.walk().filter_map(TyOrConstInferVar::maybe_from_generic_arg),
+                            );
+                            ProcessResult::Unchanged
+                        }
+                        Err(false) => ProcessResult::Error(CodeConcreteNonZeroError),
                     }
                 }
 

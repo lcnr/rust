@@ -7,7 +7,8 @@ use rustc_hir::def_id::DefId;
 use rustc_hir::lang_items::LangItem;
 use rustc_middle::ty::subst::{GenericArg, GenericArgKind, SubstsRef};
 use rustc_middle::ty::{self, ToPredicate, Ty, TyCtxt, TypeFoldable, WithConstness};
-use rustc_span::Span;
+use rustc_span::{Span, symbol::sym};
+use rustc_ast::ast;
 
 use std::iter;
 /// Returns the set of obligations needed to make `arg` well-formed.
@@ -139,6 +140,9 @@ pub fn predicate_obligations<'a, 'tcx>(
         ty::PredicateKind::ConstEquate(c1, c2) => {
             wf.compute(c1.into());
             wf.compute(c2.into());
+        }
+        ty::PredicateKind::ConstConcreteNonZero(ct) => {
+            wf.compute(ct.into());
         }
         ty::PredicateKind::TypeWellFormedFromEnv(..) => {
             bug!("TypeWellFormedFromEnv is only used for Chalk")
@@ -677,6 +681,42 @@ impl<'a, 'tcx> WfPredicates<'a, 'tcx> {
         }
     }
 
+    fn generic_arg_non_zero_obligations(
+        &mut self,
+        def_id: DefId,
+        substs: SubstsRef<'tcx>,
+        obligations: &mut Vec<traits::PredicateObligation<'tcx>>,
+    ) {
+        // We ignore the attribute in the crate which defines
+        // the definition so that we can use generic impls there.
+        //
+        // As not satisfying a `ConstConcreteNonZero` obligation
+        // always leads to errors this is sound.
+        if def_id.is_local() {
+            return;
+        }
+
+        let tcx = self.infcx.tcx;
+        if let Some(attr) = tcx
+            .get_attrs(def_id)
+            .iter()
+            .find(|a| tcx.sess.check_name(a, sym::rustc_generic_arg_non_zero))
+        {
+            for meta in attr.meta_item_list().unwrap() {
+                match meta.literal().unwrap().kind {
+                    ast::LitKind::Int(a, _) => {
+                        let arg_idx = a as usize;
+                        let pred = ty::PredicateKind::ConstConcreteNonZero(substs[arg_idx].expect_const()).to_predicate(tcx);
+                        let cause = self.cause(traits::MiscObligation);
+                        obligations.push(traits::Obligation::with_depth(cause, self.recursion_depth, self.param_env, pred))
+                    }
+                    ref lit => panic!("invalid arg index {:?}", lit),
+                }
+            }
+
+        }
+    }
+
     fn nominal_obligations(
         &mut self,
         def_id: DefId,
@@ -693,13 +733,20 @@ impl<'a, 'tcx> WfPredicates<'a, 'tcx> {
         let predicates = predicates.instantiate(self.infcx.tcx, substs);
         debug_assert_eq!(predicates.predicates.len(), origins.len());
 
-        iter::zip(iter::zip(predicates.predicates, predicates.spans), origins.into_iter().rev())
-            .map(|((pred, span), origin_def_id)| {
-                let cause = self.cause(traits::BindingObligation(origin_def_id, span));
-                traits::Obligation::with_depth(cause, self.recursion_depth, self.param_env, pred)
-            })
-            .filter(|pred| !pred.has_escaping_bound_vars())
-            .collect()
+        let mut obligations = iter::zip(
+            iter::zip(predicates.predicates, predicates.spans),
+            origins.into_iter().rev(),
+        )
+        .map(|((pred, span), origin_def_id)| {
+            let cause = self.cause(traits::BindingObligation(origin_def_id, span));
+            traits::Obligation::with_depth(cause, self.recursion_depth, self.param_env, pred)
+        })
+        .filter(|pred| !pred.has_escaping_bound_vars())
+        .collect();
+
+        self.generic_arg_non_zero_obligations(def_id, substs, &mut obligations);
+
+        obligations
     }
 
     fn from_object_ty(

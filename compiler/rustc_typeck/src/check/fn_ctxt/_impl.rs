@@ -832,13 +832,14 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                     ty::PredicateKind::Trait(data, _) => {
                         Some((bound_predicate.rebind(data).to_poly_trait_ref(), obligation))
                     }
-                    ty::PredicateKind::Subtype(..) => None,
-                    ty::PredicateKind::RegionOutlives(..) => None,
-                    ty::PredicateKind::TypeOutlives(..) => None,
-                    ty::PredicateKind::WellFormed(..) => None,
-                    ty::PredicateKind::ObjectSafe(..) => None,
-                    ty::PredicateKind::ConstEvaluatable(..) => None,
-                    ty::PredicateKind::ConstEquate(..) => None,
+                    ty::PredicateKind::Subtype(..)
+                    | ty::PredicateKind::RegionOutlives(..)
+                    | ty::PredicateKind::TypeOutlives(..)
+                    | ty::PredicateKind::WellFormed(..)
+                    | ty::PredicateKind::ObjectSafe(..)
+                    | ty::PredicateKind::ConstEvaluatable(..)
+                    | ty::PredicateKind::ConstEquate(..)
+                    | ty::PredicateKind::ConstConcreteNonZero(..) => None,
                     // N.B., this predicate is created by breaking down a
                     // `ClosureType: FnFoo()` predicate, where
                     // `ClosureType` represents some `Closure`. It can't

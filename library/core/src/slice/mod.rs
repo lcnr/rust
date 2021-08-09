@@ -1035,8 +1035,8 @@ impl<T> [T] {
     /// [`chunks_exact`]: slice::chunks_exact
     #[unstable(feature = "array_chunks", issue = "74985")]
     #[inline]
+    #[cfg_attr(not(bootstrap), rustc_generic_arg_non_zero(0))]
     pub fn array_chunks<const N: usize>(&self) -> ArrayChunks<'_, T, N> {
-        assert_ne!(N, 0);
         ArrayChunks::new(self)
     }
 
@@ -1185,8 +1185,8 @@ impl<T> [T] {
     /// [`chunks_exact_mut`]: slice::chunks_exact_mut
     #[unstable(feature = "array_chunks", issue = "74985")]
     #[inline]
+    #[cfg_attr(not(bootstrap), rustc_generic_arg_non_zero(0))]
     pub fn array_chunks_mut<const N: usize>(&mut self) -> ArrayChunksMut<'_, T, N> {
-        assert_ne!(N, 0);
         ArrayChunksMut::new(self)
     }
 
@@ -1217,8 +1217,8 @@ impl<T> [T] {
     /// [`windows`]: slice::windows
     #[unstable(feature = "array_windows", issue = "75027")]
     #[inline]
+    #[cfg_attr(not(bootstrap), rustc_generic_arg_non_zero(0))]
     pub fn array_windows<const N: usize>(&self) -> ArrayWindows<'_, T, N> {
-        assert_ne!(N, 0);
         ArrayWindows::new(self)
     }
 

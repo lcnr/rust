@@ -112,6 +112,16 @@ impl<'tcx> super::TyS<'tcx> {
     }
 }
 
+impl<'tcx> ty::Const<'tcx> {
+    /// Iterator that walks `self` and any types reachable from
+    /// `self`, in depth-first order. Note that just walks the types
+    /// that appear in `self`, it does not descend into the fields of
+    /// structs or variants.
+    pub fn walk(&'tcx self) -> TypeWalker<'tcx> {
+        TypeWalker::new(self.into())
+    }
+}
+
 // We push `GenericArg`s on the stack in reverse order so as to
 // maintain a pre-order traversal. As of the time of this
 // writing, the fact that the traversal is pre-order is not
