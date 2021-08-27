@@ -215,6 +215,11 @@ impl<'tcx> Generics {
     }
 }
 
+#[derive(Clone, Default, Debug, TyEncodable, TyDecodable, HashStable)]
+pub struct AnonConstGenerics<'tcx> {
+    pub consts: FxHashMap<DefId, ty::Const<'tcx>>,
+}
+
 /// Bounds on generics.
 #[derive(Copy, Clone, Default, Debug, TyEncodable, TyDecodable, HashStable)]
 pub struct GenericPredicates<'tcx> {

@@ -50,6 +50,7 @@ use rustc_target::spec::{abi, SanitizerSet};
 use rustc_trait_selection::traits::error_reporting::suggestions::NextTypeParamName;
 use std::iter;
 
+mod anon_const;
 mod item_bounds;
 mod type_of;
 
@@ -68,7 +69,8 @@ fn collect_mod_item_types(tcx: TyCtxt<'_>, module_def_id: LocalDefId) {
 pub fn provide(providers: &mut Providers) {
     *providers = Providers {
         opt_const_param_of: type_of::opt_const_param_of,
-        default_anon_const_substs: type_of::default_anon_const_substs,
+        default_anon_const_substs: anon_const::default_anon_const_substs,
+        filter_anon_const_generics: anon_const::filter_anon_const_generics,
         type_of: type_of::type_of,
         item_bounds: item_bounds::item_bounds,
         explicit_item_bounds: item_bounds::explicit_item_bounds,
@@ -1498,7 +1500,7 @@ fn generics_of(tcx: TyCtxt<'_>, def_id: DefId) -> ty::Generics {
                 //
                 // Note that we do not supply the parent generics when using
                 // `min_const_generics`.
-                Some(parent_def_id.to_def_id())
+                return anon_const::generics_of_anon_const(tcx, parent_def_id, def_id);
             } else {
                 let parent_node = tcx.hir().get(tcx.hir().get_parent_node(hir_id));
                 match parent_node {

@@ -111,7 +111,12 @@ rustc_queries! {
     /// Given the def_id of a const-generic parameter, computes the associated default const
     /// parameter. e.g. `fn example<const N: usize=3>` called on `N` would return `3`.
     query const_param_default(param: DefId) -> &'tcx ty::Const<'tcx> {
-        desc { |tcx| "compute const default for a given parameter `{}`", tcx.def_path_str(param)  }
+        desc { |tcx| "computing const default for a given parameter `{}`", tcx.def_path_str(param)  }
+    }
+
+    query filter_anon_const_generics(key: LocalDefId) -> ty::AnonConstGenerics<'tcx> {
+        storage(ArenaCacheSelector<'tcx>)
+        desc { |tcx| "computing the generics of constants in `{}`", tcx.def_path_str(key.to_def_id()) }
     }
 
     query default_anon_const_substs(key: DefId) -> SubstsRef<'tcx> {
