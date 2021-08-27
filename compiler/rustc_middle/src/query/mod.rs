@@ -114,7 +114,7 @@ rustc_queries! {
         desc { |tcx| "computing const default for a given parameter `{}`", tcx.def_path_str(param)  }
     }
 
-    query filter_anon_const_generics(key: LocalDefId) -> ty::AnonConstGenerics<'tcx> {
+    query filter_anon_const_generics(key: LocalDefId) -> ty::AnonConstGenerics {
         storage(ArenaCacheSelector<'tcx>)
         desc { |tcx| "computing the generics of constants in `{}`", tcx.def_path_str(key.to_def_id()) }
     }

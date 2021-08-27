@@ -146,6 +146,12 @@ impl<T: Idx> BitSet<T> {
         other.subtract_from(self)
     }
 
+    /// Returns true if `self & other` is not empty.
+    pub fn intersects(&self, other: &BitSet<T>) -> bool {
+        assert_eq!(self.domain_size, other.domain_size);
+        self.words.iter().zip(other.words()).any(|(a, b)| a & b != 0)
+    }
+
     /// Sets `self = self & other` and return `true` if `self` changed.
     /// (i.e., if any bits were removed).
     pub fn intersect(&mut self, other: &BitSet<T>) -> bool {

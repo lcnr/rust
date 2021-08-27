@@ -1500,7 +1500,11 @@ fn generics_of(tcx: TyCtxt<'_>, def_id: DefId) -> ty::Generics {
                 //
                 // Note that we do not supply the parent generics when using
                 // `min_const_generics`.
-                return anon_const::generics_of_anon_const(tcx, parent_def_id, def_id);
+                return anon_const::generics_of_anon_const(
+                    tcx,
+                    parent_def_id,
+                    def_id.expect_local(),
+                );
             } else {
                 let parent_node = tcx.hir().get(tcx.hir().get_parent_node(hir_id));
                 match parent_node {

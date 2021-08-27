@@ -4,7 +4,8 @@ use crate::ty::subst::{Subst, SubstsRef};
 use rustc_ast as ast;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_hir as hir;
-use rustc_hir::def_id::DefId;
+use rustc_hir::def_id::{DefId, LocalDefId};
+use rustc_index::bit_set::BitSet;
 use rustc_span::symbol::Symbol;
 use rustc_span::Span;
 
@@ -216,8 +217,8 @@ impl<'tcx> Generics {
 }
 
 #[derive(Clone, Default, Debug, TyEncodable, TyDecodable, HashStable)]
-pub struct AnonConstGenerics<'tcx> {
-    pub consts: FxHashMap<DefId, ty::Const<'tcx>>,
+pub struct AnonConstGenerics {
+    pub consts: FxHashMap<LocalDefId, BitSet<u32>>,
 }
 
 /// Bounds on generics.
