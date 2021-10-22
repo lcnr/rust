@@ -7,10 +7,10 @@ pub fn foo<T: 'static>(_: T) -> TypeId {
     TypeId::of::<T>()
 }
 
-fn outer<T: 'static>() {
-    foo(|| ());
+fn outer<T: 'static>() -> TypeId {
+    foo(|| ())
 }
 
 fn main() {
-    outer::<u8>();
+    assert!(outer::<u8>() != outer::<u16>());
 }

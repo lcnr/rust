@@ -718,10 +718,7 @@ pub fn is_polymorphic_parent(
         for (a, b) in a_infer.iter().zip(b) {
             match infcx.at(cause, ParamEnv::reveal_all()).eq(a, b) {
                 Ok(InferOk { value: (), obligations }) if obligations.is_empty() => {}
-                err => {
-                    warn!("unexpected polymorphize result: {:?}", err);
-                    return false;
-                }
+                _ => return false,
             }
         }
 
