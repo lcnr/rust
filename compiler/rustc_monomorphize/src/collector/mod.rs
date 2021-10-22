@@ -218,6 +218,7 @@ pub enum MonoItemCollectionMode {
 }
 
 pub struct Visited<'tcx> {
+    tcx: TyCtxt<'tcx>,
     map: MonoItemMap<'tcx>,
     /// We can eagerly insert trivially concrete items
     /// into our map, so we only care about cycles for
@@ -226,8 +227,8 @@ pub struct Visited<'tcx> {
 }
 
 impl Visited<'tcx> {
-    fn new() -> Visited<'tcx> {
-        Visited { map: Default::default(), in_progress_fns: Default::default() }
+    fn new(tcx: TyCtxt<'tcx>) -> Visited<'tcx> {
+        Visited { tcx, map: Default::default(), in_progress_fns: Default::default() }
     }
 
     #[instrument(skip(self), level = "debug")]
@@ -245,7 +246,7 @@ impl Visited<'tcx> {
 
                 debug!("fresh: {:?}", instance);
 
-                if let Some(instance) = self.map.get_polymorphic_instance(instance) {
+                if let Some(instance) = self.map.get_polymorphic_instance(self.tcx, instance) {
                     return Some(MonoItem::Fn(instance));
                 }
 
@@ -268,7 +269,7 @@ impl Visited<'tcx> {
         match item {
             MonoItem::Fn(instance) if item.is_generic_fn() => {
                 assert_eq!(Some(instance.def), self.in_progress_fns.pop().map(|i| i.def));
-                debug_assert_eq!(self.map.get_polymorphic_instance(instance), None);
+                debug_assert_eq!(self.map.get_polymorphic_instance(self.tcx, instance), None);
 
                 self.map.item_map.entry(instance.def).or_default().push(instance.substs);
 
@@ -363,7 +364,7 @@ pub fn collect_crate_mono_items(
 
     debug!("building mono item graph, beginning at roots");
 
-    let mut visited = MTLock::new(Visited::new());
+    let mut visited = MTLock::new(Visited::new(tcx));
     let mut inlining_map = MTLock::new(InliningMap::new());
     let recursion_limit = tcx.recursion_limit();
 

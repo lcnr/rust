@@ -1625,6 +1625,13 @@ rustc_queries! {
         }
         separate_provide_extern
     }
+    query is_polymorphic_parent(key: (ty::InstanceDef<'tcx>, SubstsRef<'tcx>, SubstsRef<'tcx>)) -> bool {
+        desc {
+            "checking whehter `{:?}` is the polymorphic parent of {:?}",
+            key.1, key.2
+        }
+    }
+
     query backend_optimization_level(_: ()) -> OptLevel {
         desc { "optimization level used by backend" }
     }

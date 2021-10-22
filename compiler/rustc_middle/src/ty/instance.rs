@@ -588,7 +588,7 @@ impl<'tcx> Instance<'tcx> {
         }
 
         let (mono_item_map, _) = tcx.collect_and_partition_mono_items(());
-        match mono_item_map.get_polymorphic_instance(self) {
+        match mono_item_map.get_polymorphic_instance(tcx, self) {
             Some(instance) => instance,
             // FIXME(polymorphization): We currently do not use
             // polymorphic instances from separate crates,
