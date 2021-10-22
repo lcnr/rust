@@ -15,6 +15,7 @@ use rustc_middle::ty::{self, query::Providers, Const, Ty, TyCtxt};
 use rustc_span::symbol::sym;
 use std::convert::TryInto;
 use std::ops::ControlFlow;
+use crate::collector::neighbor::Neighbor;
 
 /// Provide implementations of queries relating to polymorphization analysis.
 pub fn provide(providers: &mut Providers) {
@@ -387,7 +388,20 @@ impl<'a, 'tcx> TypeVisitor<'tcx> for HasUsedGenericParams<'a, 'tcx> {
 }
 
 #[instrument(skip(tcx), level = "debug")]
-pub fn polymorphize_collector_substs(
+pub(crate) fn compute_polymorphized_substs<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    instance: ty::InstanceDef<'tcx>,
+    concrete_substs: SubstsRef<'tcx>,
+    _neighbors: Vec<Neighbor<'tcx>>,
+) -> SubstsRef<'tcx> {
+    // FIXME(polymorphization): Actually implement this.
+    let maximal_substs = maximal_polymorphized_substs(tcx, instance, concrete_substs);
+    maximal_substs
+}
+
+
+#[instrument(skip(tcx), level = "debug")]
+pub(crate) fn maximal_polymorphized_substs(
     tcx: TyCtxt<'tcx>,
     instance: ty::InstanceDef<'tcx>,
     substs: SubstsRef<'tcx>,
@@ -423,7 +437,7 @@ pub fn polymorphize_collector_substs(
             debug!(?ty);
             match ty.kind() {
                 &ty::Closure(def_id, substs) => {
-                    let polymorphized_substs = polymorphize_collector_substs(
+                    let polymorphized_substs = maximal_polymorphized_substs(
                         self.tcx,
                         ty::InstanceDef::Item(ty::WithOptConstParam::unknown(def_id)),
                         substs,
@@ -435,7 +449,7 @@ pub fn polymorphize_collector_substs(
                     }
                 }
                 &ty::Generator(def_id, substs, movability) => {
-                    let polymorphized_substs = polymorphize_collector_substs(
+                    let polymorphized_substs = maximal_polymorphized_substs(
                         self.tcx,
                         ty::InstanceDef::Item(ty::WithOptConstParam::unknown(def_id)),
                         substs,
