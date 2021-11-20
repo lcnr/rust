@@ -456,75 +456,27 @@ pub(crate) fn maximal_polymorphized_substs(
     // the unpolymorphized upvar closure would result in a polymorphized closure producing
     // multiple mono items (and eventually symbol clashes).
     let def_id = instance.def_id();
-    let upvars_ty = if tcx.is_closure(def_id) {
-        Some(substs.as_closure().tupled_upvars_ty())
-    } else if tcx.type_of(def_id).is_generator() {
-        Some(substs.as_generator().tupled_upvars_ty())
-    } else {
-        None
+    let polymorphic_ty = tcx.type_of(def_id);
+    let closure_upvars = match polymorphic_ty.kind() {
+        ty::Closure(_, substs) => Some(substs.as_closure().tupled_upvars_ty()),
+        ty::Generator(_, substs, _) => Some(substs.as_generator().tupled_upvars_ty()),
+        _ => None,
     };
-    let has_upvars = upvars_ty.map_or(false, |ty| ty.tuple_fields().count() > 0);
-    debug!(?upvars_ty, ?has_upvars);
 
-    struct PolymorphizationFolder<'tcx> {
-        tcx: TyCtxt<'tcx>,
-    }
-
-    impl ty::TypeFolder<'tcx> for PolymorphizationFolder<'tcx> {
-        fn tcx<'a>(&'a self) -> TyCtxt<'tcx> {
-            self.tcx
-        }
-
-        fn fold_ty(&mut self, ty: Ty<'tcx>) -> Ty<'tcx> {
-            debug!(?ty);
-            match ty.kind() {
-                &ty::Closure(def_id, substs) => {
-                    let polymorphized_substs = maximal_polymorphized_substs(
-                        self.tcx,
-                        ty::InstanceDef::Item(ty::WithOptConstParam::unknown(def_id)),
-                        substs,
-                    );
-                    if substs == polymorphized_substs {
-                        ty
-                    } else {
-                        self.tcx.mk_closure(def_id, polymorphized_substs)
-                    }
-                }
-                &ty::Generator(def_id, substs, movability) => {
-                    let polymorphized_substs = maximal_polymorphized_substs(
-                        self.tcx,
-                        ty::InstanceDef::Item(ty::WithOptConstParam::unknown(def_id)),
-                        substs,
-                    );
-                    if substs == polymorphized_substs {
-                        ty
-                    } else {
-                        self.tcx.mk_generator(def_id, polymorphized_substs, movability)
-                    }
-                }
-                _ => ty.super_fold_with(self),
-            }
-        }
-    }
-
-    InternalSubsts::for_item(tcx, def_id, |param, _| {
+    InternalSubsts::for_item(tcx, def_id, |param, prev_params| {
         let is_unused = unused.contains(param.index).unwrap_or(false);
         debug!(?param, ?is_unused);
         match param.kind {
             // Upvar case: If parameter is a type parameter..
             ty::GenericParamDefKind::Type { .. } if
-                // ..and has upvars..
-                has_upvars &&
-                // ..and this param has the same type as the tupled upvars..
-                upvars_ty == Some(substs[param.index as usize].expect_ty()) => {
+                let Some(generic_upvars) =
+                    closure_upvars.filter(|_| param.index as usize == substs.len() - 1) => {
                     // ..then double-check that polymorphization marked it used..
                     debug_assert!(!is_unused);
-                    // ..and polymorphize any closures/generators captured as upvars.
-                    let upvars_ty = upvars_ty.unwrap();
-                    let polymorphized_upvars_ty = upvars_ty.fold_with(
-                        &mut PolymorphizationFolder { tcx });
-                    debug!(?polymorphized_upvars_ty);
-                    polymorphized_upvars_ty.into()
+                    let substs_no_upvars = tcx.intern_substs(prev_params);
+                    let resulting_substs = generic_upvars.subst(tcx, substs_no_upvars).into();
+                    let resulting_substs = tcx.normalize_erasing_regions(ty::ParamEnv::reveal_all(), resulting_substs);
+                    resulting_substs
                 },
 
             // Simple case: If parameter is a const or type parameter..

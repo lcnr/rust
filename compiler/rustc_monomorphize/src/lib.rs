@@ -4,6 +4,7 @@
 #![feature(control_flow_enum)]
 #![feature(let_else)]
 #![feature(in_band_lifetimes)]
+#![feature(if_let_guard)]
 #![recursion_limit = "256"]
 
 #[macro_use]
