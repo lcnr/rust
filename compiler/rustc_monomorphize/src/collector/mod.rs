@@ -950,14 +950,17 @@ impl<'a, 'tcx> MirVisitor<'tcx> for MirNeighborCollector<'a, 'tcx> {
                 }
             }
             mir::TerminatorKind::Assert { ref msg, .. } => {
-                let lang_item = match msg {
-                    mir::AssertKind::BoundsCheck { .. } => LangItem::PanicBoundsCheck,
-                    _ => LangItem::Panic,
-                };
-                let instance = Instance::mono(tcx, tcx.require_lang_item(lang_item, Some(source)));
-                if should_codegen_locally(tcx, &instance) {
-                    self.output.push(create_fn_mono_item(tcx, instance, source));
-                }
+                self.collect_from_source(neighbor::Concrete, |neighbor::Concrete, output| {
+                    let lang_item = match msg {
+                        mir::AssertKind::BoundsCheck { .. } => LangItem::PanicBoundsCheck,
+                        _ => LangItem::Panic,
+                    };
+                    let instance =
+                        Instance::mono(tcx, tcx.require_lang_item(lang_item, Some(source)));
+                    if should_codegen_locally(tcx, &instance) {
+                        output.push(create_fn_mono_item(tcx, instance, source));
+                    }
+                })
             }
             mir::TerminatorKind::Goto { .. }
             | mir::TerminatorKind::SwitchInt { .. }
