@@ -1424,6 +1424,10 @@ impl<'tcx> TyCtxt<'tcx> {
         features.generic_const_exprs
     }
 
+    pub fn should_polymorphize(self) -> bool {
+        self.sess.opts.debugging_opts.polymorphize
+    }
+
     #[inline]
     pub fn local_crate_exports_generics(self) -> bool {
         debug_assert!(self.sess.opts.share_generics());

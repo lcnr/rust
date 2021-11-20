@@ -583,7 +583,7 @@ impl<'tcx> Instance<'tcx> {
     /// This must only be used after mono item collection.
     pub fn polymorphize(self, tcx: TyCtxt<'tcx>) -> Self {
         debug!("polymorphize: running polymorphization analysis");
-        if !tcx.sess.opts.debugging_opts.polymorphize {
+        if !tcx.should_polymorphize() {
             return self;
         }
 
