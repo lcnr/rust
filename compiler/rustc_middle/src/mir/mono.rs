@@ -259,11 +259,14 @@ impl MonoItemMap<'tcx> {
     }
 
     pub fn def_id_iter<'a>(&'a self) -> impl Iterator<Item = DefId> + 'a {
-        self.all_items().filter_map(|mono_item| match mono_item {
-            MonoItem::Fn(instance) => Some(instance.def_id()),
-            MonoItem::Static(def_id) => Some(def_id),
-            _ => None,
-        })
+        self.trivially_concrete
+            .iter()
+            .filter_map(|&mono_item| match mono_item {
+                MonoItem::Fn(instance) => Some(instance.def_id()),
+                MonoItem::Static(def_id) => Some(def_id),
+                _ => None,
+            })
+            .chain(self.item_map.iter().map(|(&def, _)| def.def_id()))
     }
 
     pub fn contains(&self, item: MonoItem<'tcx>) -> bool {
