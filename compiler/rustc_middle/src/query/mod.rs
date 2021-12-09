@@ -1307,7 +1307,7 @@ rustc_queries! {
     /// added or removed in any upstream crate. Instead use the narrower
     /// `upstream_monomorphizations_for`, `upstream_drop_glue_for`, or, even
     /// better, `Instance::upstream_monomorphization()`.
-    query upstream_monomorphizations(_: ()) -> DefIdMap<FxHashMap<SubstsRef<'tcx>, CrateNum>> {
+    query upstream_monomorphizations(_: ()) -> DefIdMap<BTreeMap<SubstsRef<'tcx>, CrateNum>> {
         storage(ArenaCacheSelector<'tcx>)
         desc { "collecting available upstream monomorphizations" }
     }
@@ -1320,7 +1320,7 @@ rustc_queries! {
     /// You likely want to call `Instance::upstream_monomorphization()`
     /// instead of invoking this query directly.
     query upstream_monomorphizations_for(def_id: DefId)
-        -> Option<&'tcx FxHashMap<SubstsRef<'tcx>, CrateNum>> {
+        -> Option<&'tcx BTreeMap<SubstsRef<'tcx>, CrateNum>> {
             desc { |tcx|
                 "collecting available upstream monomorphizations for `{}`",
                 tcx.def_path_str(def_id),

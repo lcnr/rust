@@ -127,11 +127,16 @@ impl<'tcx> Instance<'tcx> {
         self.substs.non_erasable_generics().next()?;
 
         match self.def {
-            // FIXME(polymorphization): Deal with this. Can't use
-            // `polymorphize` as that causes cycles.
-            InstanceDef::Item(def) => tcx
-                .upstream_monomorphizations_for(def.did)
-                .and_then(|monos| monos.get(&self.substs).cloned()),
+            InstanceDef::Item(def) => {
+                tcx.upstream_monomorphizations_for(def.did).and_then(|monos| {
+                    monos.get(&self.substs).cloned().or_else(|| {
+                        monos
+                            .iter()
+                            .find(|(k, _)| tcx.is_polymorphic_parent((self.def, k, self.substs)))
+                            .map(|(_, &v)| v)
+                    })
+                })
+            }
             InstanceDef::DropGlue(_, Some(_)) => tcx.upstream_drop_glue_for(self.substs),
             _ => None,
         }
@@ -594,7 +599,18 @@ impl<'tcx> Instance<'tcx> {
             // polymorphic instances from separate crates,
             // and assume that we just have a mono item for this
             // instance in some other crate.
-            None => self,
+            None => match self.def {
+                InstanceDef::Item(def) if !def.is_local() => tcx
+                    .upstream_monomorphizations_for(def.did)
+                    .and_then(|monos| {
+                        monos
+                            .iter()
+                            .find(|(k, _)| tcx.is_polymorphic_parent((self.def, k, self.substs)))
+                            .map(|(k, _)| Instance { def: self.def, substs: k })
+                    })
+                    .unwrap_or(self),
+                _ => self,
+            },
         }
     }
 }

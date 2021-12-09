@@ -288,7 +288,6 @@ impl MonoItemMap<'tcx> {
     ) -> Option<Instance<'tcx>> {
         if instance.substs.non_erasable_generics().next().is_some() {
             for substs in self.item_map.get(&instance.def).into_iter().flat_map(|v| v).copied() {
-                // FIXME(polymorphization): Deal with more complex polymorphized stuff.
                 if substs == instance.substs
                     || tcx.is_polymorphic_parent((instance.def, substs, instance.substs))
                 {
