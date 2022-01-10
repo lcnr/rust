@@ -546,15 +546,6 @@ fn collect_items_rec<'tcx>(
         );
     }
 
-    let neighbors_iter = neighbors
-        .iter()
-        .chain(neighbors_with_source.iter().filter_map(Neighbor::codegen_locally_item));
-    record_accesses(tcx, starting_point.node, neighbors_iter.map(|i| i.node), inlining_map);
-
-    if let Some((def_id, depth)) = recursion_depth_reset {
-        recursion_depths.insert(def_id, depth);
-    }
-
     match starting_point.node {
         MonoItem::Fn(ref mut instance) => {
             assert!(neighbors.is_empty());
@@ -562,10 +553,19 @@ fn collect_items_rec<'tcx>(
                 tcx,
                 instance.def,
                 instance.substs,
-                neighbors_with_source,
+                &neighbors_with_source,
             );
         }
         _ => assert!(neighbors_with_source.is_empty()),
+    }
+
+    let neighbors_iter = neighbors
+        .iter()
+        .chain(neighbors_with_source.iter().filter_map(Neighbor::codegen_locally_item));
+    record_accesses(tcx, starting_point.node, neighbors_iter.map(|i| i.node), inlining_map);
+
+    if let Some((def_id, depth)) = recursion_depth_reset {
+        recursion_depths.insert(def_id, depth);
     }
 
     visited.lock_mut().finish_item(starting_point.node)
