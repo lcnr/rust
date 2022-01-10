@@ -6,6 +6,7 @@
 //! for their size, offset of a field, etc.).
 
 use crate::collector::neighbor::Neighbor;
+use rustc_data_structures::fx::FxHashSet;
 use rustc_hir::{def::DefKind, def_id::DefId, ConstContext};
 use rustc_index::bit_set::FiniteBitSet;
 use rustc_infer::infer::type_variable::{TypeVariableOrigin, TypeVariableOriginKind};
@@ -402,7 +403,7 @@ pub(crate) fn compute_polymorphized_substs<'tcx>(
     tcx: TyCtxt<'tcx>,
     instance: ty::InstanceDef<'tcx>,
     concrete_substs: SubstsRef<'tcx>,
-    neighbors: Vec<Neighbor<'tcx>>,
+    neighbors: &[Neighbor<'tcx>],
 ) -> SubstsRef<'tcx> {
     // Not a great, but this shouldn't error and it is better than just using `DUMMY_SP` in
     // case something goes wrong.
@@ -421,9 +422,17 @@ pub(crate) fn compute_polymorphized_substs<'tcx>(
                 // Not yet explicitly supported, mark all generic parameters mentioned
                 // by the source as used.
                 _ => {
-                    let maximal_source_substs = neighbor.source.subst(tcx, maximal_substs);
-                    let concrete_source_substs = neighbor.source.subst(tcx, concrete_substs);
-                    for (a, b) in collect_roots(maximal_source_substs, concrete_source_substs) {
+                    let used_params = collect_used_params(tcx, neighbor.source);
+                    let max_neighbor_substs =
+                        InternalSubsts::for_item(tcx, instance.def_id(), |param, _| {
+                            if used_params.get(&param.index).is_some() {
+                                concrete_substs[param.index as usize]
+                            } else {
+                                infcx.var_for_def(span, param)
+                            }
+                        });
+
+                    for (a, b) in max_neighbor_substs.iter().zip(maximal_substs) {
                         match infcx.at(cause, ParamEnv::reveal_all()).eq(a, b) {
                             Ok(InferOk { value: (), obligations }) if obligations.is_empty() => {}
                             err => {
@@ -492,35 +501,37 @@ pub(crate) fn maximal_polymorphized_substs(
     })
 }
 
-fn collect_roots<'tcx, T: TypeFoldable<'tcx>>(
-    a: T,
-    b: T,
-) -> impl Iterator<Item = (GenericArg<'tcx>, GenericArg<'tcx>)> {
-    struct RootCollector<'tcx> {
-        roots: Vec<GenericArg<'tcx>>,
+fn collect_used_params<'tcx, T: TypeFoldable<'tcx>>(tcx: TyCtxt<'tcx>, value: T) -> FxHashSet<u32> {
+    struct ParamCollector<'tcx> {
+        tcx: TyCtxt<'tcx>,
+        params: FxHashSet<u32>,
     }
-    impl<'tcx> TypeVisitor<'tcx> for RootCollector<'tcx> {
+    impl<'tcx> TypeVisitor<'tcx> for ParamCollector<'tcx> {
         fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
-            None
+            Some(self.tcx)
         }
-        fn visit_ty(&mut self, t: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
-            self.roots.push(t.into());
-            ControlFlow::CONTINUE
+        fn visit_ty(&mut self, t: Ty<'tcx>) -> ControlFlow<!> {
+            match t.kind() {
+                ty::Param(p) => {
+                    self.params.insert(p.index);
+                    ControlFlow::CONTINUE
+                }
+                _ => t.super_visit_with(self),
+            }
         }
-        fn visit_const(&mut self, c: &'tcx Const<'tcx>) -> ControlFlow<Self::BreakTy> {
-            self.roots.push(c.into());
-            ControlFlow::CONTINUE
+        fn visit_const(&mut self, c: &'tcx Const<'tcx>) -> ControlFlow<!> {
+            match c.val {
+                ty::ConstKind::Param(p) => {
+                    self.params.insert(p.index);
+                    ControlFlow::CONTINUE
+                }
+                _ => c.super_visit_with(self),
+            }
         }
     }
-
-    let mut root_collector = RootCollector { roots: Vec::new() };
-    a.visit_with(&mut root_collector);
-    let a_roots = mem::take(&mut root_collector.roots);
-
-    b.visit_with(&mut root_collector);
-    let b_roots = root_collector.roots;
-
-    a_roots.into_iter().zip(b_roots)
+    let mut collector = ParamCollector { tcx, params: Default::default() };
+    value.visit_with(&mut collector);
+    collector.params
 }
 
 fn infer_to_param<'a, 'tcx, T: TypeFoldable<'tcx>>(infcx: InferCtxt<'a, 'tcx>, v: T) -> T {
