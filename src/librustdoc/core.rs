@@ -325,7 +325,7 @@ crate fn run_global_ctxt(
     tcx.sess.time("check_mod_attrs", || {
         tcx.hir().for_each_module(|module| tcx.ensure().check_mod_attrs(module))
     });
-    rustc_passes::stability::check_unused_or_stable_features(tcx);
+    rustc_passes::stability::check_unused_library_features(tcx);
 
     let auto_traits = resolver_caches
         .all_traits

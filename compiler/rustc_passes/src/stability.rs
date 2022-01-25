@@ -889,7 +889,7 @@ impl<'tcx> Visitor<'tcx> for CheckTraitImplStable<'tcx> {
 /// Given the list of enabled features that were not language features (i.e., that
 /// were expected to be library features), and the list of features used from
 /// libraries, identify activated features that don't exist and error about them.
-pub fn check_unused_or_stable_features(tcx: TyCtxt<'_>) {
+pub fn check_unused_library_features(tcx: TyCtxt<'_>) {
     let access_levels = &tcx.privacy_access_levels(());
 
     if tcx.stability().staged_api[&LOCAL_CRATE] {

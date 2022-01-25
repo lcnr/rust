@@ -1003,7 +1003,7 @@ fn analysis(tcx: TyCtxt<'_>, (): ()) -> Result<()> {
                     },
                     {
                         sess.time("unused_lib_feature_checking", || {
-                            rustc_passes::stability::check_unused_or_stable_features(tcx)
+                            rustc_passes::stability::check_unused_library_features(tcx)
                         });
                     },
                     {
