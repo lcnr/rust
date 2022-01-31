@@ -1425,7 +1425,7 @@ impl<'tcx> TyCtxt<'tcx> {
     }
 
     pub fn should_polymorphize(self) -> bool {
-        self.sess.opts.debugging_opts.polymorphize
+        true
     }
 
     #[inline]

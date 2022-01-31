@@ -11,6 +11,7 @@ use rustc_hir::{def::DefKind, def_id::DefId, ConstContext};
 use rustc_index::bit_set::FiniteBitSet;
 use rustc_infer::infer::type_variable::{TypeVariableOrigin, TypeVariableOriginKind};
 use rustc_infer::infer::unify_key::{ConstVariableOrigin, ConstVariableOriginKind};
+use rustc_infer::infer::RegionVariableOrigin;
 use rustc_infer::infer::TyCtxtInferExt;
 use rustc_infer::infer::{InferCtxt, InferOk};
 use rustc_middle::mir::visit::{TyContext, Visitor};
@@ -445,7 +446,11 @@ pub(crate) fn compute_polymorphized_substs<'tcx>(
             }
         }
 
-        infer_to_param(infcx, maximal_substs)
+        if infcx.take_registered_region_obligations().is_empty() {
+            infer_to_param(infcx, maximal_substs)
+        } else {
+            concrete_substs
+        }
     });
     debug!(?result);
     result
@@ -616,6 +621,15 @@ fn param_to_infer<'a, 'tcx, T: TypeFoldable<'tcx>>(
             self.infcx.tcx
         }
 
+        fn fold_region(&mut self, r: ty::Region<'tcx>) -> ty::Region<'tcx> {
+            match r {
+                ty::ReErased => {
+                    self.infcx.next_region_var(RegionVariableOrigin::MiscVariable(self.span))
+                }
+                _ => r,
+            }
+        }
+
         fn fold_ty(&mut self, t: Ty<'tcx>) -> Ty<'tcx> {
             match t.kind() {
                 ty::Param(p) => {
@@ -685,7 +699,7 @@ pub fn is_polymorphic_parent(
             }
         }
 
-        true
+        infcx.take_registered_region_obligations().is_empty()
     });
     debug!(?result);
     result

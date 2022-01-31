@@ -1,3 +1,4 @@
+// ignore-test
 // run-pass
 //! This snippet causes the type length to blowup exponentially,
 //! so check that we don't accidentially exceed the type length limit.

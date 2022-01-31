@@ -1,3 +1,5 @@
+// ignore-test
+
 // build-pass
 
 // Closures include captured types twice in a type tree.
