@@ -1627,7 +1627,7 @@ rustc_queries! {
     }
     query is_polymorphic_parent(key: (ty::InstanceDef<'tcx>, SubstsRef<'tcx>, SubstsRef<'tcx>)) -> bool {
         desc {
-            "checking whehter `{:?}` is the polymorphic parent of {:?}",
+            "checking whethter `{:?}` is the polymorphic parent of {:?}",
             key.1, key.2
         }
     }
