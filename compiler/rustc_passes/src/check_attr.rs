@@ -9,9 +9,9 @@ use rustc_middle::ty::query::Providers;
 use rustc_middle::ty::TyCtxt;
 
 use rustc_ast::{ast, AttrStyle, Attribute, Lit, LitKind, NestedMetaItem};
-use rustc_data_structures::fx::{FxHashMap, FxHashSet};
+use rustc_data_structures::fx::FxHashMap;
 use rustc_errors::{pluralize, struct_span_err, Applicability};
-use rustc_feature::{AttributeType, BuiltinAttribute, BUILTIN_ATTRIBUTE_MAP};
+use rustc_feature::{AttributeDuplicates, AttributeType, BuiltinAttribute, BUILTIN_ATTRIBUTE_MAP};
 use rustc_hir as hir;
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir::intravisit::{self, NestedVisitorMap, Visitor};
@@ -23,6 +23,7 @@ use rustc_session::lint::builtin::{
 use rustc_session::parse::feature_err;
 use rustc_span::symbol::{sym, Symbol};
 use rustc_span::{MultiSpan, Span, DUMMY_SP};
+use std::collections::hash_map::Entry;
 
 pub(crate) fn target_from_impl_item<'tcx>(
     tcx: TyCtxt<'tcx>,
@@ -31,7 +32,7 @@ pub(crate) fn target_from_impl_item<'tcx>(
     match impl_item.kind {
         hir::ImplItemKind::Const(..) => Target::AssocConst,
         hir::ImplItemKind::Fn(..) => {
-            let parent_hir_id = tcx.hir().get_parent_item(impl_item.hir_id());
+            let parent_hir_id = tcx.hir().get_parent_item(impl_item.hir_id()).expect_owner();
             let containing_item = tcx.hir().expect_item(parent_hir_id);
             let containing_impl_is_for_trait = match &containing_item.kind {
                 hir::ItemKind::Impl(impl_) => impl_.of_trait.is_some(),
@@ -69,7 +70,7 @@ impl CheckAttrVisitor<'tcx> {
         let mut doc_aliases = FxHashMap::default();
         let mut is_valid = true;
         let mut specified_inline = None;
-        let mut seen = FxHashSet::default();
+        let mut seen = FxHashMap::default();
         let attrs = self.tcx.hir().attrs(hir_id);
         for attr in attrs {
             let attr_is_valid = match attr.name_or_empty() {
@@ -148,6 +149,8 @@ impl CheckAttrVisitor<'tcx> {
                 _ => {}
             }
 
+            let builtin = attr.ident().and_then(|ident| BUILTIN_ATTRIBUTE_MAP.get(&ident.name));
+
             if hir_id != CRATE_HIR_ID {
                 if let Some(BuiltinAttribute { type_: AttributeType::CrateLevel, .. }) =
                     attr.ident().and_then(|ident| BUILTIN_ATTRIBUTE_MAP.get(&ident.name))
@@ -165,21 +168,37 @@ impl CheckAttrVisitor<'tcx> {
                 }
             }
 
-            // Duplicate attributes
-            match attr.name_or_empty() {
-                name @ sym::macro_use => {
-                    let args = attr.meta_item_list().unwrap_or_else(Vec::new);
-                    let args: Vec<_> = args.iter().map(|arg| arg.name_or_empty()).collect();
-                    if !seen.insert((name, args)) {
-                        self.tcx.struct_span_lint_hir(
-                            UNUSED_ATTRIBUTES,
-                            hir_id,
+            if let Some(BuiltinAttribute { duplicates, .. }) = builtin {
+                check_duplicates(self.tcx, attr, hir_id, *duplicates, &mut seen);
+            }
+
+            // Warn on useless empty attributes.
+            if matches!(
+                attr.name_or_empty(),
+                sym::macro_use
+                    | sym::allow
+                    | sym::warn
+                    | sym::deny
+                    | sym::forbid
+                    | sym::feature
+                    | sym::repr
+                    | sym::target_feature
+            ) && attr.meta_item_list().map_or(false, |list| list.is_empty())
+            {
+                self.tcx.struct_span_lint_hir(UNUSED_ATTRIBUTES, hir_id, attr.span, |lint| {
+                    lint.build("unused attribute")
+                        .span_suggestion(
                             attr.span,
-                            |lint| lint.build("unused attribute").emit(),
-                        );
-                    }
-                }
-                _ => {}
+                            "remove this attribute",
+                            String::new(),
+                            Applicability::MachineApplicable,
+                        )
+                        .note(&format!(
+                            "attribute `{}` with an empty list has no effect",
+                            attr.name_or_empty()
+                        ))
+                        .emit();
+                });
             }
         }
 
@@ -563,7 +582,7 @@ impl CheckAttrVisitor<'tcx> {
             Target::Impl => Some("implementation block"),
             Target::ForeignMod => Some("extern block"),
             Target::AssocTy => {
-                let parent_hir_id = self.tcx.hir().get_parent_item(hir_id);
+                let parent_hir_id = self.tcx.hir().get_parent_item(hir_id).expect_owner();
                 let containing_item = self.tcx.hir().expect_item(parent_hir_id);
                 if Target::from_item(containing_item) == Target::Impl {
                     Some("type alias in implementation block")
@@ -572,7 +591,7 @@ impl CheckAttrVisitor<'tcx> {
                 }
             }
             Target::AssocConst => {
-                let parent_hir_id = self.tcx.hir().get_parent_item(hir_id);
+                let parent_hir_id = self.tcx.hir().get_parent_item(hir_id).expect_owner();
                 let containing_item = self.tcx.hir().expect_item(parent_hir_id);
                 // We can't link to trait impl's consts.
                 let err = "associated constant in trait implementation block";
@@ -963,7 +982,7 @@ impl CheckAttrVisitor<'tcx> {
                         }
 
                         sym::primitive => {
-                            if !self.tcx.features().doc_primitive {
+                            if !self.tcx.features().rustdoc_internals {
                                 self.tcx.struct_span_lint_hir(
                                     INVALID_DOC_ATTRIBUTES,
                                     hir_id,
@@ -1934,7 +1953,12 @@ fn is_c_like_enum(item: &Item<'_>) -> bool {
     }
 }
 
+// FIXME: Fix "Cannot determine resolution" error and remove built-in macros
+// from this check.
 fn check_invalid_crate_level_attr(tcx: TyCtxt<'_>, attrs: &[Attribute]) {
+    // Check for builtin attributes at the crate level
+    // which were unsuccessfully resolved due to cannot determine
+    // resolution for the attribute macro error.
     const ATTRS_TO_CHECK: &[Symbol] = &[
         sym::macro_export,
         sym::repr,
@@ -1942,20 +1966,39 @@ fn check_invalid_crate_level_attr(tcx: TyCtxt<'_>, attrs: &[Attribute]) {
         sym::automatically_derived,
         sym::start,
         sym::rustc_main,
+        sym::derive,
+        sym::test,
+        sym::test_case,
+        sym::global_allocator,
+        sym::bench,
     ];
 
     for attr in attrs {
-        for attr_to_check in ATTRS_TO_CHECK {
-            if attr.has_name(*attr_to_check) {
-                tcx.sess
-                    .struct_span_err(
+        // This function should only be called with crate attributes
+        // which are inner attributes always but lets check to make sure
+        if attr.style == AttrStyle::Inner {
+            for attr_to_check in ATTRS_TO_CHECK {
+                if attr.has_name(*attr_to_check) {
+                    let mut err = tcx.sess.struct_span_err(
                         attr.span,
                         &format!(
                             "`{}` attribute cannot be used at crate level",
                             attr_to_check.to_ident_string()
                         ),
-                    )
-                    .emit();
+                    );
+                    // Only emit an error with a suggestion if we can create a
+                    // string out of the attribute span
+                    if let Ok(src) = tcx.sess.source_map().span_to_snippet(attr.span) {
+                        let replacement = src.replace("#!", "#");
+                        err.span_suggestion_verbose(
+                            attr.span,
+                            "perhaps you meant to use an outer attribute",
+                            replacement,
+                            rustc_errors::Applicability::MachineApplicable,
+                        );
+                    }
+                    err.emit()
+                }
             }
         }
     }
@@ -1989,4 +2032,78 @@ fn check_mod_attrs(tcx: TyCtxt<'_>, module_def_id: LocalDefId) {
 
 pub(crate) fn provide(providers: &mut Providers) {
     *providers = Providers { check_mod_attrs, ..*providers };
+}
+
+fn check_duplicates(
+    tcx: TyCtxt<'_>,
+    attr: &Attribute,
+    hir_id: HirId,
+    duplicates: AttributeDuplicates,
+    seen: &mut FxHashMap<Symbol, Span>,
+) {
+    use AttributeDuplicates::*;
+    if matches!(duplicates, WarnFollowingWordOnly) && !attr.is_word() {
+        return;
+    }
+    match duplicates {
+        DuplicatesOk => {}
+        WarnFollowing | FutureWarnFollowing | WarnFollowingWordOnly | FutureWarnPreceding => {
+            match seen.entry(attr.name_or_empty()) {
+                Entry::Occupied(mut entry) => {
+                    let (this, other) = if matches!(duplicates, FutureWarnPreceding) {
+                        let to_remove = entry.insert(attr.span);
+                        (to_remove, attr.span)
+                    } else {
+                        (attr.span, *entry.get())
+                    };
+                    tcx.struct_span_lint_hir(UNUSED_ATTRIBUTES, hir_id, this, |lint| {
+                        let mut db = lint.build("unused attribute");
+                        db.span_note(other, "attribute also specified here").span_suggestion(
+                            this,
+                            "remove this attribute",
+                            String::new(),
+                            Applicability::MachineApplicable,
+                        );
+                        if matches!(duplicates, FutureWarnFollowing | FutureWarnPreceding) {
+                            db.warn(
+                                "this was previously accepted by the compiler but is \
+                                 being phased out; it will become a hard error in \
+                                 a future release!",
+                            );
+                        }
+                        db.emit();
+                    });
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(attr.span);
+                }
+            }
+        }
+        ErrorFollowing | ErrorPreceding => match seen.entry(attr.name_or_empty()) {
+            Entry::Occupied(mut entry) => {
+                let (this, other) = if matches!(duplicates, ErrorPreceding) {
+                    let to_remove = entry.insert(attr.span);
+                    (to_remove, attr.span)
+                } else {
+                    (attr.span, *entry.get())
+                };
+                tcx.sess
+                    .struct_span_err(
+                        this,
+                        &format!("multiple `{}` attributes", attr.name_or_empty()),
+                    )
+                    .span_note(other, "attribute also specified here")
+                    .span_suggestion(
+                        this,
+                        "remove this attribute",
+                        String::new(),
+                        Applicability::MachineApplicable,
+                    )
+                    .emit();
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(attr.span);
+            }
+        },
+    }
 }

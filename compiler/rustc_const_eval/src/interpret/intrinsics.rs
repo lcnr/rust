@@ -265,12 +265,6 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             }
             sym::discriminant_value => {
                 let place = self.deref_operand(&args[0])?;
-                if M::enforce_validity(self) {
-                    // This is 'using' the value, so make sure the validity invariant is satisfied.
-                    // (Also see https://github.com/rust-lang/rust/pull/89764.)
-                    self.validate_operand(&place.into())?;
-                }
-
                 let discr_val = self.read_discriminant(&place.into())?.0;
                 self.write_scalar(discr_val, dest)?;
             }
@@ -400,10 +394,12 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             sym::transmute => {
                 self.copy_op_transmute(&args[0], dest)?;
             }
-            sym::assert_inhabited => {
+            sym::assert_inhabited | sym::assert_zero_valid | sym::assert_uninit_valid => {
                 let ty = instance.substs.type_at(0);
                 let layout = self.layout_of(ty)?;
 
+                // For *all* intrinsics we first check `is_uninhabited` to give a more specific
+                // error message.
                 if layout.abi.is_uninhabited() {
                     // The run-time intrinsic panics just to get a good backtrace; here we abort
                     // since there is no problem showing a backtrace even for aborts.
@@ -411,6 +407,28 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                         self,
                         format!(
                             "aborted execution: attempted to instantiate uninhabited type `{}`",
+                            ty
+                        ),
+                    )?;
+                }
+                if intrinsic_name == sym::assert_zero_valid
+                    && !layout.might_permit_raw_init(self, /*zero:*/ true)
+                {
+                    M::abort(
+                        self,
+                        format!(
+                            "aborted execution: attempted to zero-initialize type `{}`, which is invalid",
+                            ty
+                        ),
+                    )?;
+                }
+                if intrinsic_name == sym::assert_uninit_valid
+                    && !layout.might_permit_raw_init(self, /*zero:*/ false)
+                {
+                    M::abort(
+                        self,
+                        format!(
+                            "aborted execution: attempted to leave type `{}` uninitialized, which is invalid",
                             ty
                         ),
                     )?;

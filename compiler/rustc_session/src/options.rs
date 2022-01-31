@@ -5,7 +5,9 @@ use crate::lint;
 use crate::search_paths::SearchPath;
 use crate::utils::NativeLib;
 use rustc_target::spec::{CodeModel, LinkerFlavor, MergeFunctions, PanicStrategy, SanitizerSet};
-use rustc_target::spec::{RelocModel, RelroLevel, SplitDebuginfo, TargetTriple, TlsModel};
+use rustc_target::spec::{
+    RelocModel, RelroLevel, SplitDebuginfo, StackProtector, TargetTriple, TlsModel,
+};
 
 use rustc_feature::UnstableFeatures;
 use rustc_span::edition::Edition;
@@ -97,6 +99,29 @@ macro_rules! top_level_options {
             }
         }
     );
+}
+
+impl Options {
+    pub fn mir_opt_level(&self) -> usize {
+        self.debugging_opts
+            .mir_opt_level
+            .unwrap_or_else(|| if self.optimize != OptLevel::No { 2 } else { 1 })
+    }
+
+    pub fn instrument_coverage(&self) -> bool {
+        self.debugging_opts.instrument_coverage.unwrap_or(InstrumentCoverage::Off)
+            != InstrumentCoverage::Off
+    }
+
+    pub fn instrument_coverage_except_unused_generics(&self) -> bool {
+        self.debugging_opts.instrument_coverage.unwrap_or(InstrumentCoverage::Off)
+            == InstrumentCoverage::ExceptUnusedGenerics
+    }
+
+    pub fn instrument_coverage_except_unused_functions(&self) -> bool {
+        self.debugging_opts.instrument_coverage.unwrap_or(InstrumentCoverage::Off)
+            == InstrumentCoverage::ExceptUnusedFunctions
+    }
 }
 
 top_level_options!(
@@ -202,6 +227,9 @@ top_level_options!(
 
         /// `true` if we're emitting a JSON blob containing the unused externs
         json_unused_externs: bool [UNTRACKED],
+
+        /// `true` if we're emitting a JSON job containg a future-incompat report for lints
+        json_future_incompat: bool [TRACKED],
 
         pretty: Option<PpMode> [UNTRACKED],
 
@@ -385,6 +413,8 @@ mod desc {
     pub const parse_split_debuginfo: &str =
         "one of supported split-debuginfo modes (`off`, `packed`, or `unpacked`)";
     pub const parse_gcc_ld: &str = "one of: no value, `lld`";
+    pub const parse_stack_protector: &str =
+        "one of (`none` (default), `basic`, `strong`, or `all`)";
 }
 
 mod parse {
@@ -563,7 +593,7 @@ mod parse {
             v => {
                 let mut passes = vec![];
                 if parse_list(&mut passes, v) {
-                    *slot = Passes::Some(passes);
+                    slot.extend(passes);
                     true
                 } else {
                     false
@@ -917,6 +947,14 @@ mod parse {
         }
         true
     }
+
+    crate fn parse_stack_protector(slot: &mut StackProtector, v: Option<&str>) -> bool {
+        match v.and_then(|s| StackProtector::from_str(s).ok()) {
+            Some(ssp) => *slot = ssp,
+            _ => return false,
+        }
+        true
+    }
 }
 
 options! {
@@ -1112,15 +1150,11 @@ options! {
         computed `block` spans (one span encompassing a block's terminator and \
         all statements). If `-Z instrument-coverage` is also enabled, create \
         an additional `.html` file showing the computed coverage spans."),
-    emit_future_incompat_report: bool = (false, parse_bool, [UNTRACKED],
-        "emits a future-incompatibility report for lints (RFC 2834)"),
     emit_stack_sizes: bool = (false, parse_bool, [UNTRACKED],
         "emit a section containing stack size metadata (default: no)"),
     fewer_names: Option<bool> = (None, parse_opt_bool, [TRACKED],
         "reduce memory use by retaining fewer names within compilation artifacts (LLVM-IR) \
         (default: no)"),
-    force_overflow_checks: Option<bool> = (None, parse_opt_bool, [TRACKED],
-        "force overflow checks on or off"),
     force_unstable_if_unmarked: bool = (false, parse_bool, [TRACKED],
         "force all crates to be `rustc_private` unstable (default: no)"),
     fuel: Option<(String, u64)> = (None, parse_optimization_fuel, [TRACKED],
@@ -1330,6 +1364,8 @@ options! {
         "exclude spans when debug-printing compiler state (default: no)"),
     src_hash_algorithm: Option<SourceFileHashAlgorithm> = (None, parse_src_file_hash, [TRACKED],
         "hash algorithm of source files in debug info (`md5`, `sha1`, or `sha256`)"),
+    stack_protector: StackProtector = (StackProtector::None, parse_stack_protector, [TRACKED],
+        "control stack smash protection strategy (`rustc --print stack-protector-strategies` for details)"),
     strip: Strip = (Strip::None, parse_strip, [UNTRACKED],
         "tell the linker which information to strip (`none` (default), `debuginfo` or `symbols`)"),
     split_dwarf_inlining: bool = (true, parse_bool, [UNTRACKED],

@@ -539,11 +539,6 @@ impl<'a, 'tcx> InferCtxtExt<'tcx> for InferCtxt<'a, 'tcx> {
                         // is otherwise overwhelming and unhelpful (see #85844 for an
                         // example).
 
-                        let trait_is_debug =
-                            self.tcx.is_diagnostic_item(sym::Debug, trait_ref.def_id());
-                        let trait_is_display =
-                            self.tcx.is_diagnostic_item(sym::Display, trait_ref.def_id());
-
                         let in_std_macro =
                             match obligation.cause.span.ctxt().outer_expn_data().macro_def_id {
                                 Some(macro_def_id) => {
@@ -553,7 +548,12 @@ impl<'a, 'tcx> InferCtxtExt<'tcx> for InferCtxt<'a, 'tcx> {
                                 None => false,
                             };
 
-                        if in_std_macro && (trait_is_debug || trait_is_display) {
+                        if in_std_macro
+                            && matches!(
+                                self.tcx.get_diagnostic_name(trait_ref.def_id()),
+                                Some(sym::Debug | sym::Display)
+                            )
+                        {
                             err.emit();
                             return;
                         }
@@ -2025,9 +2025,7 @@ impl<'a, 'tcx> InferCtxtPrivExt<'tcx> for InferCtxt<'a, 'tcx> {
         debug!("maybe_suggest_unsized_generics: param={:?}", param);
         match node {
             hir::Node::Item(
-                item
-                @
-                hir::Item {
+                item @ hir::Item {
                     // Only suggest indirection for uses of type parameters in ADTs.
                     kind:
                         hir::ItemKind::Enum(..) | hir::ItemKind::Struct(..) | hir::ItemKind::Union(..),

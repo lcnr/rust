@@ -13,8 +13,10 @@ use rustc_attr::{ConstStability, StabilityLevel};
 use rustc_data_structures::captures::Captures;
 use rustc_data_structures::fx::FxHashSet;
 use rustc_hir as hir;
+use rustc_hir::def::DefKind;
 use rustc_hir::def_id::DefId;
 use rustc_middle::ty;
+use rustc_middle::ty::DefIdTree;
 use rustc_middle::ty::TyCtxt;
 use rustc_span::def_id::CRATE_DEF_INDEX;
 use rustc_target::spec::abi::Abi;
@@ -344,7 +346,7 @@ crate fn print_where_clause<'a, 'tcx: 'a>(
 
 impl clean::Lifetime {
     crate fn print(&self) -> impl fmt::Display + '_ {
-        self.get_ref()
+        self.0.as_str()
     }
 }
 
@@ -502,7 +504,16 @@ crate fn href_with_root_path(
     cx: &Context<'_>,
     root_path: Option<&str>,
 ) -> Result<(String, ItemType, Vec<String>), HrefError> {
-    let cache = &cx.cache();
+    let tcx = cx.tcx();
+    let def_kind = tcx.def_kind(did);
+    let did = match def_kind {
+        DefKind::AssocTy | DefKind::AssocFn | DefKind::AssocConst | DefKind::Variant => {
+            // documented on their parent's page
+            tcx.parent(did).unwrap()
+        }
+        _ => did,
+    };
+    let cache = cx.cache();
     let relative_to = &cx.current;
     fn to_module_fqp(shortty: ItemType, fqp: &[String]) -> &[String] {
         if shortty == ItemType::Module { fqp } else { &fqp[..fqp.len() - 1] }
@@ -596,8 +607,7 @@ crate fn href_relative_parts<'a>(fqp: &'a [String], relative_to_fqp: &'a [String
     }
 }
 
-/// Used when rendering a `ResolvedPath` structure. This invokes the `path`
-/// rendering function with the necessary arguments for linking to a local path.
+/// Used to render a [`clean::Path`].
 fn resolved_path<'cx>(
     w: &mut fmt::Formatter<'_>,
     did: DefId,
@@ -751,8 +761,9 @@ fn fmt_type<'cx>(
 
     match *t {
         clean::Generic(name) => write!(f, "{}", name),
-        clean::ResolvedPath { did, ref path } => {
+        clean::Type::Path { ref path } => {
             // Paths like `T::Output` and `Self::Output` should be rendered with all segments.
+            let did = path.def_id();
             resolved_path(f, did, path, path.is_assoc_ty(), use_absolute, cx)
         }
         clean::DynTrait(ref bounds, ref lt) => {
@@ -1166,6 +1177,10 @@ impl clean::FnDecl {
                     args.push_str(" <br>");
                     args_plain.push(' ');
                 }
+                if input.is_const {
+                    args.push_str("const ");
+                    args_plain.push_str("const ");
+                }
                 if !input.name.is_empty() {
                     args.push_str(&format!("{}: ", input.name));
                     args_plain.push_str(&format!("{}: ", input.name));
@@ -1338,10 +1353,7 @@ impl PrintWithSpace for hir::Mutability {
     }
 }
 
-crate fn print_constness_with_space(
-    c: &hir::Constness,
-    s: Option<&ConstStability>,
-) -> &'static str {
+crate fn print_constness_with_space(c: &hir::Constness, s: Option<ConstStability>) -> &'static str {
     match (c, s) {
         // const stable or when feature(staged_api) is not set
         (

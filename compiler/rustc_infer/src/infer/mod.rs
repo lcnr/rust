@@ -21,6 +21,7 @@ use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_middle::infer::canonical::{Canonical, CanonicalVarValues};
 use rustc_middle::infer::unify_key::{ConstVarValue, ConstVariableValue};
 use rustc_middle::infer::unify_key::{ConstVariableOrigin, ConstVariableOriginKind, ToType};
+use rustc_middle::mir::interpret::ErrorHandled;
 use rustc_middle::mir::interpret::EvalToConstValueResult;
 use rustc_middle::traits::select;
 use rustc_middle::ty::error::{ExpectedFound, TypeError};
@@ -95,9 +96,10 @@ pub(crate) type UnificationTable<'a, 'tcx, T> = ut::UnificationTable<
 /// This is used so that the region values inferred by HIR region solving are
 /// not exposed, and so that we can avoid doing work in HIR typeck that MIR
 /// typeck will also do.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub enum RegionckMode {
     /// The default mode: report region errors, don't erase regions.
+    #[default]
     Solve,
     /// Erase the results of region after solving.
     Erase {
@@ -106,12 +108,6 @@ pub enum RegionckMode {
         /// be set to true.
         suppress_errors: bool,
     },
-}
-
-impl Default for RegionckMode {
-    fn default() -> Self {
-        RegionckMode::Solve
-    }
 }
 
 impl RegionckMode {
@@ -1589,13 +1585,27 @@ impl<'a, 'tcx> InferCtxt<'a, 'tcx> {
         unevaluated: ty::Unevaluated<'tcx>,
         span: Option<Span>,
     ) -> EvalToConstValueResult<'tcx> {
-        let mut original_values = OriginalQueryValues::default();
-        let canonical = self.canonicalize_query((param_env, unevaluated), &mut original_values);
+        let mut substs = unevaluated.substs(self.tcx);
+        substs = self.resolve_vars_if_possible(substs);
 
-        let (param_env, unevaluated) = canonical.value;
+        // Postpone the evaluation of constants whose substs depend on inference
+        // variables
+        if substs.has_infer_types_or_consts() {
+            return Err(ErrorHandled::TooGeneric);
+        }
+
+        let param_env_erased = self.tcx.erase_regions(param_env);
+        let substs_erased = self.tcx.erase_regions(substs);
+
+        let unevaluated = ty::Unevaluated {
+            def: unevaluated.def,
+            substs_: Some(substs_erased),
+            promoted: unevaluated.promoted,
+        };
+
         // The return value is the evaluated value which doesn't contain any reference to inference
         // variables, thus we don't need to substitute back the original values.
-        self.tcx.const_eval_resolve(param_env, unevaluated, span)
+        self.tcx.const_eval_resolve(param_env_erased, unevaluated, span)
     }
 
     /// If `typ` is a type variable of some kind, resolve it one level

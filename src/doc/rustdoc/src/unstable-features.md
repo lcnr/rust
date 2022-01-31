@@ -138,7 +138,8 @@ This is for Rust compiler internal use only.
 
 Since primitive types are defined in the compiler, there's no place to attach documentation
 attributes. The `#[doc(primitive)]` attribute is used by the standard library to provide a way
-to generate documentation for primitive types, and requires `#![feature(doc_primitive)]` to enable.
+to generate documentation for primitive types, and requires `#![feature(rustdoc_internals)]` to
+enable.
 
 ## Document keywords
 
@@ -149,7 +150,7 @@ Rust keywords are documented in the standard library (look for `match` for examp
 To do so, the `#[doc(keyword = "...")]` attribute is used. Example:
 
 ```rust
-#![feature(doc_keyword)]
+#![feature(rustdoc_internals)]
 
 /// Some documentation about the keyword.
 #[doc(keyword = "keyword")]
@@ -255,22 +256,6 @@ When rendering docs, `rustdoc` creates several CSS and JavaScript files as part 
 all these files are linked from every page, changing where they are can be cumbersome if you need to
 specially cache them. This flag will rename all these files in the output to include the suffix in
 the filename. For example, `light.css` would become `light-suf.css` with the above command.
-
-### `--display-doctest-warnings`: display warnings when documenting or running documentation tests
-
-Using this flag looks like this:
-
-```bash
-$ rustdoc src/lib.rs -Z unstable-options --display-doctest-warnings
-$ rustdoc --test src/lib.rs -Z unstable-options --display-doctest-warnings
-```
-
-The intent behind this flag is to allow the user to see warnings that occur within their library or
-their documentation tests, which are usually suppressed. However, [due to a
-bug][issue-display-warnings], this flag doesn't 100% work as intended. See the linked issue for
-details.
-
-[issue-display-warnings]: https://github.com/rust-lang/rust/issues/41574
 
 ### `--extern-html-root-url`: control how rustdoc links to non-local crates
 

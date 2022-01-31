@@ -356,14 +356,17 @@ impl<'tcx> ClosureSubsts<'tcx> {
     /// The ordering assumed here must match that used by `ClosureSubsts::new` above.
     fn split(self) -> ClosureSubstsParts<'tcx, GenericArg<'tcx>> {
         match self.substs[..] {
-            [ref parent_substs @ .., closure_kind_ty, closure_sig_as_fn_ptr_ty, tupled_upvars_ty] => {
-                ClosureSubstsParts {
-                    parent_substs,
-                    closure_kind_ty,
-                    closure_sig_as_fn_ptr_ty,
-                    tupled_upvars_ty,
-                }
-            }
+            [
+                ref parent_substs @ ..,
+                closure_kind_ty,
+                closure_sig_as_fn_ptr_ty,
+                tupled_upvars_ty,
+            ] => ClosureSubstsParts {
+                parent_substs,
+                closure_kind_ty,
+                closure_sig_as_fn_ptr_ty,
+                tupled_upvars_ty,
+            },
             _ => bug!("closure substs missing synthetics"),
         }
     }
@@ -890,7 +893,7 @@ impl<'tcx> List<ty::Binder<'tcx, ExistentialPredicate<'tcx>>> {
 ///
 /// Trait references also appear in object types like `Foo<U>`, but in
 /// that case the `Self` parameter is absent from the substitutions.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, TyEncodable, TyDecodable)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, TyEncodable, TyDecodable)]
 #[derive(HashStable, TypeFoldable)]
 pub struct TraitRef<'tcx> {
     pub def_id: DefId,
@@ -1099,6 +1102,18 @@ impl<'tcx, T> Binder<'tcx, T> {
             value.visit_with(&mut validator);
         }
         Binder(value, self.1)
+    }
+
+    pub fn try_map_bound<F, U: TypeFoldable<'tcx>, E>(self, f: F) -> Result<Binder<'tcx, U>, E>
+    where
+        F: FnOnce(T) -> Result<U, E>,
+    {
+        let value = f(self.0)?;
+        if cfg!(debug_assertions) {
+            let mut validator = ValidateBoundVars::new(self.1);
+            value.visit_with(&mut validator);
+        }
+        Ok(Binder(value, self.1))
     }
 
     /// Wraps a `value` in a binder, using the same bound variables as the
@@ -2263,10 +2278,11 @@ impl<'tcx> TyS<'tcx> {
 /// a miscompilation or unsoundness.
 ///
 /// When in doubt, use `VarianceDiagInfo::default()`
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum VarianceDiagInfo<'tcx> {
     /// No additional information - this is the default.
     /// We will not add any additional information to error messages.
+    #[default]
     None,
     /// We switched our variance because a type occurs inside
     /// the generic argument of a mutable reference or pointer
@@ -2299,11 +2315,5 @@ impl<'tcx> VarianceDiagInfo<'tcx> {
             VarianceDiagInfo::None => other,
             VarianceDiagInfo::Mut { .. } => self,
         }
-    }
-}
-
-impl<'tcx> Default for VarianceDiagInfo<'tcx> {
-    fn default() -> Self {
-        Self::None
     }
 }

@@ -405,6 +405,21 @@ pub struct GenericParam {
     pub kind: GenericParamKind,
 }
 
+impl GenericParam {
+    pub fn span(&self) -> Span {
+        match &self.kind {
+            GenericParamKind::Lifetime | GenericParamKind::Type { default: None } => {
+                self.ident.span
+            }
+            GenericParamKind::Type { default: Some(ty) } => self.ident.span.to(ty.span),
+            GenericParamKind::Const { kw_span, default: Some(default), .. } => {
+                kw_span.to(default.value.span)
+            }
+            GenericParamKind::Const { kw_span, default: None, ty } => kw_span.to(ty.span),
+        }
+    }
+}
+
 /// Represents lifetime, type and const parameters attached to a declaration of
 /// a function, enum, trait, etc.
 #[derive(Clone, Encodable, Decodable, Debug)]
@@ -502,6 +517,8 @@ pub struct Crate {
     pub attrs: Vec<Attribute>,
     pub items: Vec<P<Item>>,
     pub span: Span,
+    // Placeholder ID if the crate node is a macro placeholder.
+    pub is_placeholder: Option<NodeId>,
 }
 
 /// Possible values inside of compile-time attribute lists.
@@ -1964,7 +1981,7 @@ pub enum InlineAsmRegOrRegClass {
 
 bitflags::bitflags! {
     #[derive(Encodable, Decodable, HashStable_Generic)]
-    pub struct InlineAsmOptions: u8 {
+    pub struct InlineAsmOptions: u16 {
         const PURE = 1 << 0;
         const NOMEM = 1 << 1;
         const READONLY = 1 << 2;
@@ -1973,6 +1990,7 @@ bitflags::bitflags! {
         const NOSTACK = 1 << 5;
         const ATT_SYNTAX = 1 << 6;
         const RAW = 1 << 7;
+        const MAY_UNWIND = 1 << 8;
     }
 }
 

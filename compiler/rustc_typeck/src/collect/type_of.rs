@@ -172,7 +172,7 @@ pub(super) fn opt_const_param_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> Option<
                 // We've encountered an `AnonConst` in some path, so we need to
                 // figure out which generic parameter it corresponds to and return
                 // the relevant type.
-                let (arg_index, segment) = path
+                let filtered = path
                     .segments
                     .iter()
                     .filter_map(|seg| seg.args.map(|args| (args.args, seg)))
@@ -181,10 +181,17 @@ pub(super) fn opt_const_param_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> Option<
                             .filter(|arg| arg.is_const())
                             .position(|arg| arg.id() == hir_id)
                             .map(|index| (index, seg))
-                    })
-                    .unwrap_or_else(|| {
-                        bug!("no arg matching AnonConst in path");
                     });
+                let (arg_index, segment) = match filtered {
+                    None => {
+                        tcx.sess.delay_span_bug(
+                            tcx.def_span(def_id),
+                            "no arg matching AnonConst in path",
+                        );
+                        return None;
+                    }
+                    Some(inner) => inner,
+                };
 
                 // Try to use the segment resolution if it is valid, otherwise we
                 // default to the path resolution.
@@ -463,14 +470,7 @@ pub(super) fn type_of(tcx: TyCtxt<'_>, def_id: DefId) -> Ty<'_> {
 
         Node::Field(field) => icx.to_ty(field.ty),
 
-        Node::Expr(&Expr { kind: ExprKind::Closure(.., gen), .. }) => {
-            let substs = InternalSubsts::identity_for_item(tcx, def_id.to_def_id());
-            if let Some(movability) = gen {
-                tcx.mk_generator(def_id.to_def_id(), substs, movability)
-            } else {
-                tcx.mk_closure(def_id.to_def_id(), substs)
-            }
-        }
+        Node::Expr(&Expr { kind: ExprKind::Closure(..), .. }) => tcx.typeck(def_id).node_type(hir_id),
 
         Node::AnonConst(_) if let Some(param) = tcx.opt_const_param_of(def_id) => {
             // We defer to `type_of` of the corresponding parameter

@@ -10,6 +10,7 @@
 #![feature(const_assume)]
 #![feature(const_cell_into_inner)]
 #![feature(const_convert)]
+#![feature(const_maybe_uninit_as_mut_ptr)]
 #![feature(const_maybe_uninit_assume_init)]
 #![feature(const_ptr_read)]
 #![feature(const_ptr_write)]
@@ -21,12 +22,13 @@
 #![feature(core_private_diy_float)]
 #![feature(dec2flt)]
 #![feature(div_duration)]
-#![feature(duration_consts_2)]
+#![feature(duration_consts_float)]
 #![feature(duration_constants)]
 #![feature(exact_size_is_empty)]
 #![feature(extern_types)]
 #![feature(flt2dec)]
 #![feature(fmt_internals)]
+#![feature(float_minimum_maximum)]
 #![feature(array_from_fn)]
 #![feature(hashmap_internals)]
 #![feature(try_find)]
@@ -34,6 +36,7 @@
 #![feature(pattern)]
 #![feature(sort_internals)]
 #![feature(slice_partition_at_index)]
+#![feature(slice_take)]
 #![feature(maybe_uninit_uninit_array)]
 #![feature(maybe_uninit_array_assume_init)]
 #![feature(maybe_uninit_extra)]
@@ -53,14 +56,14 @@
 #![feature(iter_intersperse)]
 #![feature(iter_is_partitioned)]
 #![feature(iter_order_by)]
+#![feature(iterator_try_reduce)]
 #![feature(const_mut_refs)]
 #![feature(const_pin)]
 #![feature(const_slice_from_raw_parts)]
-#![cfg_attr(bootstrap, feature(const_raw_ptr_deref))]
 #![feature(never_type)]
 #![feature(unwrap_infallible)]
 #![feature(result_into_ok_or_err)]
-#![cfg_attr(not(bootstrap), feature(portable_simd))]
+#![feature(portable_simd)]
 #![feature(ptr_metadata)]
 #![feature(once_cell)]
 #![feature(unsized_tuple_coercion)]
@@ -106,7 +109,6 @@ mod pattern;
 mod pin;
 mod ptr;
 mod result;
-#[cfg(not(bootstrap))]
 mod simd;
 mod slice;
 mod str;

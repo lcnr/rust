@@ -17,8 +17,7 @@ use rustc_index::vec::IndexVec;
 use rustc_macros::HashStable_Generic;
 use rustc_span::source_map::Spanned;
 use rustc_span::symbol::{kw, sym, Ident, Symbol};
-use rustc_span::{def_id::LocalDefId, BytePos};
-use rustc_span::{MultiSpan, Span, DUMMY_SP};
+use rustc_span::{def_id::LocalDefId, BytePos, MultiSpan, Span, DUMMY_SP};
 use rustc_target::asm::InlineAsmRegOrRegClass;
 use rustc_target::spec::abi::Abi;
 
@@ -92,7 +91,9 @@ pub enum LifetimeName {
     Param(ParamName),
 
     /// User wrote nothing (e.g., the lifetime in `&u32`).
-    Implicit,
+    ///
+    /// The bool indicates whether the user should have written something.
+    Implicit(bool),
 
     /// Implicit lifetime in a context like `dyn Foo`. This is
     /// distinguished from implicit lifetimes elsewhere because the
@@ -122,7 +123,7 @@ impl LifetimeName {
     pub fn ident(&self) -> Ident {
         match *self {
             LifetimeName::ImplicitObjectLifetimeDefault
-            | LifetimeName::Implicit
+            | LifetimeName::Implicit(_)
             | LifetimeName::Error => Ident::empty(),
             LifetimeName::Underscore => Ident::with_dummy_span(kw::UnderscoreLifetime),
             LifetimeName::Static => Ident::with_dummy_span(kw::StaticLifetime),
@@ -133,7 +134,7 @@ impl LifetimeName {
     pub fn is_elided(&self) -> bool {
         match self {
             LifetimeName::ImplicitObjectLifetimeDefault
-            | LifetimeName::Implicit
+            | LifetimeName::Implicit(_)
             | LifetimeName::Underscore => true,
 
             // It might seem surprising that `Fresh(_)` counts as
@@ -524,12 +525,20 @@ pub struct GenericParam<'hir> {
 }
 
 impl GenericParam<'hir> {
-    pub fn bounds_span(&self) -> Option<Span> {
-        self.bounds.iter().fold(None, |span, bound| {
-            let span = span.map(|s| s.to(bound.span())).unwrap_or_else(|| bound.span());
-
-            Some(span)
-        })
+    pub fn bounds_span_for_suggestions(&self) -> Option<Span> {
+        self.bounds
+            .iter()
+            .fold(None, |span: Option<Span>, bound| {
+                // We include bounds that come from a `#[derive(_)]` but point at the user's code,
+                // as we use this method to get a span appropriate for suggestions.
+                if !bound.span().can_be_used_for_suggestions() {
+                    None
+                } else {
+                    let span = span.map(|s| s.to(bound.span())).unwrap_or_else(|| bound.span());
+                    Some(span)
+                }
+            })
+            .map(|sp| sp.shrink_to_hi())
     }
 }
 
@@ -1821,8 +1830,6 @@ impl<'hir> QPath<'hir> {
 pub enum LocalSource {
     /// A `match _ { .. }`.
     Normal,
-    /// A desugared `for _ in _ { .. }` loop.
-    ForLoopDesugar,
     /// When lowering async functions, we create locals within the `async move` so that
     /// all parameters are dropped after the future is polled.
     ///
@@ -3300,7 +3307,7 @@ mod size_asserts {
     rustc_data_structures::static_assert_size!(super::Expr<'static>, 64);
     rustc_data_structures::static_assert_size!(super::Pat<'static>, 88);
     rustc_data_structures::static_assert_size!(super::QPath<'static>, 24);
-    rustc_data_structures::static_assert_size!(super::Ty<'static>, 72);
+    rustc_data_structures::static_assert_size!(super::Ty<'static>, 80);
 
     rustc_data_structures::static_assert_size!(super::Item<'static>, 184);
     rustc_data_structures::static_assert_size!(super::TraitItem<'static>, 128);

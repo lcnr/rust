@@ -3,11 +3,15 @@
 #![feature(crate_visibility_modifier)]
 #![feature(control_flow_enum)]
 #![feature(let_else)]
+#![feature(never_type)]
 #![feature(in_band_lifetimes)]
+#![feature(if_let_guard)]
 #![recursion_limit = "256"]
 
 #[macro_use]
 extern crate tracing;
+#[macro_use]
+extern crate rustc_macros;
 #[macro_use]
 extern crate rustc_middle;
 

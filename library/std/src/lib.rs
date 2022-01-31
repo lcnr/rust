@@ -216,10 +216,7 @@
 // std may use features in a platform-specific way
 #![allow(unused_features)]
 #![feature(rustc_allow_const_fn_unstable)]
-#![cfg_attr(
-    test,
-    feature(internal_output_capture, print_internals, update_panic_count, thread_local_const_init)
-)]
+#![cfg_attr(test, feature(internal_output_capture, print_internals, update_panic_count))]
 #![cfg_attr(
     all(target_vendor = "fortanix", target_env = "sgx"),
     feature(slice_index_methods, coerce_unsized, sgx_platform)
@@ -264,8 +261,7 @@
 #![feature(const_ipv4)]
 #![feature(const_ipv6)]
 #![feature(const_option)]
-#![cfg_attr(bootstrap, feature(const_raw_ptr_deref))]
-#![cfg_attr(not(bootstrap), feature(const_mut_refs))]
+#![feature(const_mut_refs)]
 #![feature(const_socketaddr)]
 #![feature(const_trait_impl)]
 #![feature(container_error_extra)]
@@ -275,10 +271,9 @@
 #![feature(decl_macro)]
 #![feature(doc_cfg)]
 #![feature(doc_cfg_hide)]
-#![feature(doc_keyword)]
+#![feature(rustdoc_internals)]
 #![feature(doc_masked)]
 #![feature(doc_notable_trait)]
-#![feature(doc_primitive)]
 #![feature(dropck_eyepatch)]
 #![feature(duration_checked_float)]
 #![feature(duration_constants)]
@@ -287,6 +282,7 @@
 #![feature(exhaustive_patterns)]
 #![feature(extend_one)]
 #![feature(fn_traits)]
+#![feature(float_minimum_maximum)]
 #![feature(format_args_nl)]
 #![feature(gen_future)]
 #![feature(generator_trait)]
@@ -321,7 +317,7 @@
 #![feature(panic_internals)]
 #![feature(panic_unwind)]
 #![feature(pin_static_ref)]
-#![cfg_attr(not(bootstrap), feature(portable_simd))]
+#![feature(portable_simd)]
 #![feature(prelude_import)]
 #![feature(ptr_internals)]
 #![feature(rustc_attrs)]
@@ -474,7 +470,6 @@ pub use core::ptr;
 #[stable(feature = "rust1", since = "1.0.0")]
 pub use core::result;
 #[unstable(feature = "portable_simd", issue = "86656")]
-#[cfg(not(bootstrap))]
 pub use core::simd;
 #[unstable(feature = "async_stream", issue = "79024")]
 pub use core::stream;

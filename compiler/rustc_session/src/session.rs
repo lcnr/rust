@@ -27,7 +27,9 @@ use rustc_span::source_map::{FileLoader, MultiSpan, RealFileLoader, SourceMap, S
 use rustc_span::{sym, SourceFileHashAlgorithm, Symbol};
 use rustc_target::asm::InlineAsmArch;
 use rustc_target::spec::{CodeModel, PanicStrategy, RelocModel, RelroLevel};
-use rustc_target::spec::{SanitizerSet, SplitDebuginfo, Target, TargetTriple, TlsModel};
+use rustc_target::spec::{
+    SanitizerSet, SplitDebuginfo, StackProtector, Target, TargetTriple, TlsModel,
+};
 
 use std::cell::{self, RefCell};
 use std::env;
@@ -278,7 +280,7 @@ impl Session {
     }
 
     fn emit_future_breakage(&self) {
-        if !self.opts.debugging_opts.emit_future_incompat_report {
+        if !self.opts.json_future_incompat {
             return;
         }
 
@@ -560,10 +562,7 @@ impl Session {
         self.opts.debugging_opts.binary_dep_depinfo
     }
     pub fn mir_opt_level(&self) -> usize {
-        self.opts
-            .debugging_opts
-            .mir_opt_level
-            .unwrap_or_else(|| if self.opts.optimize != config::OptLevel::No { 2 } else { 1 })
+        self.opts.mir_opt_level()
     }
 
     /// Gets the features enabled for the current compilation session.
@@ -676,11 +675,7 @@ impl Session {
         self.opts.debugging_opts.sanitizer.contains(SanitizerSet::CFI)
     }
     pub fn overflow_checks(&self) -> bool {
-        self.opts
-            .cg
-            .overflow_checks
-            .or(self.opts.debugging_opts.force_overflow_checks)
-            .unwrap_or(self.opts.debug_assertions)
+        self.opts.cg.overflow_checks.unwrap_or(self.opts.debug_assertions)
     }
 
     /// Check whether this compile session and crate type use static crt.
@@ -730,6 +725,14 @@ impl Session {
 
     pub fn split_debuginfo(&self) -> SplitDebuginfo {
         self.opts.cg.split_debuginfo.unwrap_or(self.target.split_debuginfo)
+    }
+
+    pub fn stack_protector(&self) -> StackProtector {
+        if self.target.options.supports_stack_protector {
+            self.opts.debugging_opts.stack_protector
+        } else {
+            StackProtector::None
+        }
     }
 
     pub fn target_can_use_split_dwarf(&self) -> bool {
@@ -789,12 +792,11 @@ impl Session {
     /// Returns a list of directories where target-specific tool binaries are located.
     pub fn get_tools_search_paths(&self, self_contained: bool) -> Vec<PathBuf> {
         let rustlib_path = rustc_target::target_rustlib_path(&self.sysroot, &config::host_triple());
-        let p = std::array::IntoIter::new([
+        let p = PathBuf::from_iter([
             Path::new(&self.sysroot),
             Path::new(&rustlib_path),
             Path::new("bin"),
-        ])
-        .collect::<PathBuf>();
+        ]);
         if self_contained { vec![p.clone(), p.join("self-contained")] } else { vec![p] }
     }
 
@@ -1041,18 +1043,15 @@ impl Session {
     }
 
     pub fn instrument_coverage(&self) -> bool {
-        self.opts.debugging_opts.instrument_coverage.unwrap_or(config::InstrumentCoverage::Off)
-            != config::InstrumentCoverage::Off
+        self.opts.instrument_coverage()
     }
 
     pub fn instrument_coverage_except_unused_generics(&self) -> bool {
-        self.opts.debugging_opts.instrument_coverage.unwrap_or(config::InstrumentCoverage::Off)
-            == config::InstrumentCoverage::ExceptUnusedGenerics
+        self.opts.instrument_coverage_except_unused_generics()
     }
 
     pub fn instrument_coverage_except_unused_functions(&self) -> bool {
-        self.opts.debugging_opts.instrument_coverage.unwrap_or(config::InstrumentCoverage::Off)
-            == config::InstrumentCoverage::ExceptUnusedFunctions
+        self.opts.instrument_coverage_except_unused_functions()
     }
 
     pub fn is_proc_macro_attr(&self, attr: &Attribute) -> bool {
@@ -1409,6 +1408,15 @@ fn validate_commandline_args_with_session_available(sess: &Session) {
             || sess.opts.cg.lto == config::LtoCli::Thin
         {
             sess.err("`-Zsanitizer=cfi` requires `-Clto`");
+        }
+    }
+
+    if sess.opts.debugging_opts.stack_protector != StackProtector::None {
+        if !sess.target.options.supports_stack_protector {
+            sess.warn(&format!(
+                "`-Z stack-protector={}` is not supported for target {} and will be ignored",
+                sess.opts.debugging_opts.stack_protector, sess.opts.target_triple
+            ))
         }
     }
 }

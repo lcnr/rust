@@ -204,13 +204,6 @@ pub use self::local::os::Key as __OsLocalKeyInner;
 #[doc(hidden)]
 pub use self::local::statik::Key as __StaticLocalKeyInner;
 
-// This is only used to make thread locals with `const { .. }` initialization
-// expressions unstable. If and/or when that syntax is stabilized with thread
-// locals this will simply be removed.
-#[doc(hidden)]
-#[unstable(feature = "thread_local_const_init", issue = "84223")]
-pub const fn require_unstable_const_init_thread_local() {}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Builder
 ////////////////////////////////////////////////////////////////////////////////
@@ -1460,9 +1453,12 @@ fn _assert_sync_and_send() {
 /// The purpose of this API is to provide an easy and portable way to query
 /// the default amount of parallelism the program should use. Among other things it
 /// does not expose information on NUMA regions, does not account for
-/// differences in (co)processor capabilities, and will not modify the program's
-/// global state in order to more accurately query the amount of available
-/// parallelism.
+/// differences in (co)processor capabilities or current system load,
+/// and will not modify the program's global state in order to more accurately
+/// query the amount of available parallelism.
+///
+/// Where both fixed steady-state and burst limits are available the steady-state
+/// capacity will be used to ensure more predictable latencies.
 ///
 /// Resource limits can be changed during the runtime of a program, therefore the value is
 /// not cached and instead recomputed every time this function is called. It should not be

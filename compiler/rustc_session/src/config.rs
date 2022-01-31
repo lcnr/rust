@@ -335,20 +335,15 @@ impl Default for ErrorOutputType {
 }
 
 /// Parameter to control path trimming.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum TrimmedDefPaths {
     /// `try_print_trimmed_def_path` never prints a trimmed path and never calls the expensive query
+    #[default]
     Never,
     /// `try_print_trimmed_def_path` calls the expensive query, the query doesn't call `delay_good_path_bug`
     Always,
     /// `try_print_trimmed_def_path` calls the expensive query, the query calls `delay_good_path_bug`
     GoodPath,
-}
-
-impl Default for TrimmedDefPaths {
-    fn default() -> Self {
-        Self::Never
-    }
 }
 
 /// Use tree-based collections to cheaply get a deterministic `Hash` implementation.
@@ -538,6 +533,7 @@ pub enum PrintRequest {
     TlsModels,
     TargetSpec,
     NativeStaticLibs,
+    StackProtectorStrategies,
 }
 
 #[derive(Copy, Clone)]
@@ -750,6 +746,7 @@ impl Default for Options {
             edition: DEFAULT_EDITION,
             json_artifact_notifications: false,
             json_unused_externs: false,
+            json_future_incompat: false,
             pretty: None,
             working_dir: RealFileName::LocalPath(std::env::current_dir().unwrap()),
         }
@@ -835,6 +832,13 @@ impl Passes {
         match *self {
             Passes::Some(ref v) => v.is_empty(),
             Passes::All => false,
+        }
+    }
+
+    pub fn extend(&mut self, passes: impl IntoIterator<Item = String>) {
+        match *self {
+            Passes::Some(ref mut v) => v.extend(passes),
+            Passes::All => {}
         }
     }
 }
@@ -1110,8 +1114,8 @@ pub fn rustc_short_optgroups() -> Vec<RustcOptGroup> {
             "print",
             "Compiler information to print on stdout",
             "[crate-name|file-names|sysroot|target-libdir|cfg|target-list|\
-             target-cpus|target-features|relocation-models|\
-             code-models|tls-models|target-spec-json|native-static-libs]",
+             target-cpus|target-features|relocation-models|code-models|\
+             tls-models|target-spec-json|native-static-libs|stack-protector-strategies]",
         ),
         opt::flagmulti_s("g", "", "Equivalent to -C debuginfo=2"),
         opt::flagmulti_s("O", "", "Equivalent to -C opt-level=2"),
@@ -1254,6 +1258,7 @@ pub struct JsonConfig {
     pub json_rendered: HumanReadableErrorType,
     pub json_artifact_notifications: bool,
     pub json_unused_externs: bool,
+    pub json_future_incompat: bool,
 }
 
 /// Parse the `--json` flag.
@@ -1266,6 +1271,7 @@ pub fn parse_json(matches: &getopts::Matches) -> JsonConfig {
     let mut json_color = ColorConfig::Never;
     let mut json_artifact_notifications = false;
     let mut json_unused_externs = false;
+    let mut json_future_incompat = false;
     for option in matches.opt_strs("json") {
         // For now conservatively forbid `--color` with `--json` since `--json`
         // won't actually be emitting any colors and anything colorized is
@@ -1283,6 +1289,7 @@ pub fn parse_json(matches: &getopts::Matches) -> JsonConfig {
                 "diagnostic-rendered-ansi" => json_color = ColorConfig::Always,
                 "artifacts" => json_artifact_notifications = true,
                 "unused-externs" => json_unused_externs = true,
+                "future-incompat" => json_future_incompat = true,
                 s => early_error(
                     ErrorOutputType::default(),
                     &format!("unknown `--json` option `{}`", s),
@@ -1295,6 +1302,7 @@ pub fn parse_json(matches: &getopts::Matches) -> JsonConfig {
         json_rendered: json_rendered(json_color),
         json_artifact_notifications,
         json_unused_externs,
+        json_future_incompat,
     }
 }
 
@@ -1527,6 +1535,7 @@ fn collect_print_requests(
         "code-models" => PrintRequest::CodeModels,
         "tls-models" => PrintRequest::TlsModels,
         "native-static-libs" => PrintRequest::NativeStaticLibs,
+        "stack-protector-strategies" => PrintRequest::StackProtectorStrategies,
         "target-spec-json" => {
             if dopts.unstable_options {
                 PrintRequest::TargetSpec
@@ -2007,8 +2016,12 @@ pub fn build_session_options(matches: &getopts::Matches) -> Options {
 
     let edition = parse_crate_edition(matches);
 
-    let JsonConfig { json_rendered, json_artifact_notifications, json_unused_externs } =
-        parse_json(matches);
+    let JsonConfig {
+        json_rendered,
+        json_artifact_notifications,
+        json_unused_externs,
+        json_future_incompat,
+    } = parse_json(matches);
 
     let error_format = parse_error_format(matches, color, json_rendered);
 
@@ -2244,6 +2257,7 @@ pub fn build_session_options(matches: &getopts::Matches) -> Options {
         edition,
         json_artifact_notifications,
         json_unused_externs,
+        json_future_incompat,
         pretty,
         working_dir,
     }
@@ -2494,7 +2508,9 @@ crate mod dep_tracking {
     use rustc_span::edition::Edition;
     use rustc_span::RealFileName;
     use rustc_target::spec::{CodeModel, MergeFunctions, PanicStrategy, RelocModel};
-    use rustc_target::spec::{RelroLevel, SanitizerSet, SplitDebuginfo, TargetTriple, TlsModel};
+    use rustc_target::spec::{
+        RelroLevel, SanitizerSet, SplitDebuginfo, StackProtector, TargetTriple, TlsModel,
+    };
     use std::collections::hash_map::DefaultHasher;
     use std::collections::BTreeMap;
     use std::hash::Hash;
@@ -2568,6 +2584,7 @@ crate mod dep_tracking {
         Edition,
         LinkerPluginLto,
         SplitDebuginfo,
+        StackProtector,
         SwitchWithOptPath,
         SymbolManglingVersion,
         SourceFileHashAlgorithm,

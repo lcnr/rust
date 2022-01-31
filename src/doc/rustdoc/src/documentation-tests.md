@@ -261,6 +261,16 @@ conversion, so type inference fails because the type is not unique. Please note
 that you must write the `(())` in one sequence without intermediate whitespace
 so that `rustdoc` understands you want an implicit `Result`-returning function.
 
+## Showing warnings in doctests
+
+You can show warnings in doctests by running `rustdoc --test --test-args=--show-output`
+(or, if you're using cargo, `cargo test --doc -- --show-output`).
+By default, this will still hide `unused` warnings, since so many examples use private functions;
+you can add `#![warn(unused)]` to the top of your example if you want to see unused variables or dead code warnings.
+You can also use [`#![doc(test(attr(warn(unused))))]`][test-attr] in the crate root to enable warnings globally.
+
+[test-attr]: ./the-doc-attribute.md#testattr
+
 ## Documenting macros
 
 Here’s an example of documenting a macro:
@@ -349,9 +359,8 @@ are added.
 # fn foo() {}
 ```
 
-`edition2018` tells `rustdoc` that the code sample should be compiled using
-the 2018 edition of Rust. Similarly, you can specify `edition2015` to compile
-the code with the 2015 edition.
+`edition2015`, `edition2018` and `edition2021` tell `rustdoc`
+that the code sample should be compiled using the respective edition of Rust.
 
 ```rust
 /// Only runs on the 2018 edition.

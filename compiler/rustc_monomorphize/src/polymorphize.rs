@@ -5,26 +5,33 @@
 //! generic parameters are unused (and eventually, in what ways generic parameters are used - only
 //! for their size, offset of a field, etc.).
 
+use crate::collector::neighbor::Neighbor;
+use rustc_data_structures::fx::FxHashSet;
 use rustc_hir::{def::DefKind, def_id::DefId, ConstContext};
 use rustc_index::bit_set::FiniteBitSet;
-use rustc_middle::mir::{
-    visit::{TyContext, Visitor},
-    Local, LocalDecl, Location,
-};
-use rustc_middle::ty::{
-    self,
-    fold::{TypeFoldable, TypeVisitor},
-    query::Providers,
-    subst::SubstsRef,
-    Const, Ty, TyCtxt,
-};
+use rustc_infer::infer::type_variable::{TypeVariableOrigin, TypeVariableOriginKind};
+use rustc_infer::infer::unify_key::{ConstVariableOrigin, ConstVariableOriginKind};
+use rustc_infer::infer::RegionVariableOrigin;
+use rustc_infer::infer::TyCtxtInferExt;
+use rustc_infer::infer::{InferCtxt, InferOk};
+use rustc_middle::mir::visit::{TyContext, Visitor};
+use rustc_middle::mir::{Local, LocalDecl, Location};
+use rustc_middle::traits::ObligationCause;
+use rustc_middle::ty::fold::{TypeFoldable, TypeVisitor};
+use rustc_middle::ty::subst::Subst;
+use rustc_middle::ty::subst::{GenericArg, InternalSubsts, SubstsRef};
+use rustc_middle::ty::ParamTy;
+use rustc_middle::ty::TypeFolder;
+use rustc_middle::ty::{self, query::Providers, Const, ParamEnv, Ty, TyCtxt};
 use rustc_span::symbol::sym;
+use rustc_span::{Span, Symbol};
 use std::convert::TryInto;
+use std::mem;
 use std::ops::ControlFlow;
-
 /// Provide implementations of queries relating to polymorphization analysis.
 pub fn provide(providers: &mut Providers) {
     providers.unused_generic_params = unused_generic_params;
+    providers.is_polymorphic_parent = |tcx, (a, b, c)| is_polymorphic_parent(tcx, a, b, c);
 }
 
 /// Determine which generic parameters are used by the instance.
@@ -36,7 +43,7 @@ fn unused_generic_params<'tcx>(
     tcx: TyCtxt<'tcx>,
     instance: ty::InstanceDef<'tcx>,
 ) -> FiniteBitSet<u32> {
-    if !tcx.sess.opts.debugging_opts.polymorphize {
+    if !tcx.should_polymorphize() {
         // If polymorphization disabled, then all parameters are used.
         return FiniteBitSet::new_empty();
     }
@@ -390,4 +397,310 @@ impl<'a, 'tcx> TypeVisitor<'tcx> for HasUsedGenericParams<'a, 'tcx> {
             _ => ty.super_visit_with(self),
         }
     }
+}
+
+#[instrument(skip(tcx, neighbors), level = "debug")]
+pub(crate) fn compute_polymorphized_substs<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    instance: ty::InstanceDef<'tcx>,
+    concrete_substs: SubstsRef<'tcx>,
+    neighbors: &[Neighbor<'tcx>],
+) -> SubstsRef<'tcx> {
+    // Not a great, but this shouldn't error and it is better than just using `DUMMY_SP` in
+    // case something goes wrong.
+    let span = tcx.def_span(instance.def_id());
+    let cause = &ObligationCause::dummy_with_span(span);
+    let maximal_substs = maximal_polymorphized_substs(tcx, instance, concrete_substs);
+    debug!(?maximal_substs);
+    let result = tcx.infer_ctxt().enter(|infcx| {
+        let infer_substs = InternalSubsts::for_item(tcx, instance.def_id(), |param, _| {
+            infcx.var_for_def(span, param)
+        });
+        let maximal_substs = maximal_substs.subst(tcx, infer_substs);
+        for neighbor in neighbors {
+            debug!(?neighbor.source);
+            match neighbor.source {
+                // Not yet explicitly supported, mark all generic parameters mentioned
+                // by the source as used.
+                _ => {
+                    let used_params = collect_used_params(tcx, neighbor.source);
+                    let max_neighbor_substs =
+                        InternalSubsts::for_item(tcx, instance.def_id(), |param, _| {
+                            if used_params.get(&param.index).is_some() {
+                                concrete_substs[param.index as usize]
+                            } else {
+                                infcx.var_for_def(span, param)
+                            }
+                        });
+
+                    for (a, b) in max_neighbor_substs.iter().zip(maximal_substs) {
+                        match infcx.at(cause, ParamEnv::reveal_all()).eq(a, b) {
+                            Ok(InferOk { value: (), obligations }) if obligations.is_empty() => {}
+                            err => {
+                                warn!("unexpected polymorphize result: {:?}", err);
+                                return concrete_substs;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if infcx.take_registered_region_obligations().is_empty() {
+            infer_to_param(infcx, maximal_substs)
+        } else {
+            concrete_substs
+        }
+    });
+    debug!(?result);
+    result
+}
+
+#[instrument(skip(tcx), level = "debug")]
+pub(crate) fn maximal_polymorphized_substs(
+    tcx: TyCtxt<'tcx>,
+    instance: ty::InstanceDef<'tcx>,
+    substs: SubstsRef<'tcx>,
+) -> SubstsRef<'tcx> {
+    let unused = tcx.unused_generic_params(instance);
+    debug!(?unused);
+
+    // If this is a closure or generator then we need to handle the case where another closure
+    // from the function is captured as an upvar and hasn't been polymorphized. In this case,
+    // the unpolymorphized upvar closure would result in a polymorphized closure producing
+    // multiple mono items (and eventually symbol clashes).
+    let def_id = instance.def_id();
+    let polymorphic_ty = tcx.type_of(def_id);
+    let closure_upvars = match polymorphic_ty.kind() {
+        ty::Closure(_, substs) => Some(substs.as_closure().tupled_upvars_ty()),
+        ty::Generator(_, substs, _) => Some(substs.as_generator().tupled_upvars_ty()),
+        _ => None,
+    };
+
+    InternalSubsts::for_item(tcx, def_id, |param, prev_params| {
+        let is_unused = unused.contains(param.index).unwrap_or(false);
+        debug!(?param, ?is_unused);
+        match param.kind {
+            // Upvar case: If parameter is a type parameter..
+            ty::GenericParamDefKind::Type { .. } if
+                let Some(generic_upvars) =
+                    closure_upvars.filter(|_| param.index as usize == substs.len() - 1) => {
+                    // ..then double-check that polymorphization marked it used..
+                    debug_assert!(!is_unused);
+                    let substs_no_upvars = tcx.intern_substs(prev_params);
+                    let resulting_substs = generic_upvars.subst(tcx, substs_no_upvars).into();
+                    let resulting_substs = tcx.normalize_erasing_regions(ty::ParamEnv::reveal_all(), resulting_substs);
+                    resulting_substs
+                },
+
+            // Simple case: If parameter is a const or type parameter..
+            ty::GenericParamDefKind::Const { .. } | ty::GenericParamDefKind::Type { .. } if
+                // ..and is within range and unused..
+               is_unused =>
+                    // ..then use the identity for this parameter.
+                    tcx.mk_param_from_def(param),
+
+            // Otherwise, use the parameter as before.
+            _ => substs[param.index as usize],
+        }
+    })
+}
+
+fn collect_used_params<'tcx, T: TypeFoldable<'tcx>>(tcx: TyCtxt<'tcx>, value: T) -> FxHashSet<u32> {
+    struct ParamCollector<'tcx> {
+        tcx: TyCtxt<'tcx>,
+        params: FxHashSet<u32>,
+    }
+    impl<'tcx> TypeVisitor<'tcx> for ParamCollector<'tcx> {
+        fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
+            Some(self.tcx)
+        }
+        fn visit_ty(&mut self, t: Ty<'tcx>) -> ControlFlow<!> {
+            match t.kind() {
+                ty::Param(p) => {
+                    self.params.insert(p.index);
+                    ControlFlow::CONTINUE
+                }
+                _ => t.super_visit_with(self),
+            }
+        }
+        fn visit_const(&mut self, c: &'tcx Const<'tcx>) -> ControlFlow<!> {
+            match c.val {
+                ty::ConstKind::Param(p) => {
+                    self.params.insert(p.index);
+                    ControlFlow::CONTINUE
+                }
+                _ => c.super_visit_with(self),
+            }
+        }
+    }
+    let mut collector = ParamCollector { tcx, params: Default::default() };
+    value.visit_with(&mut collector);
+    collector.params
+}
+
+fn infer_to_param<'a, 'tcx, T: TypeFoldable<'tcx>>(infcx: InferCtxt<'a, 'tcx>, v: T) -> T {
+    struct Folder<'a, 'tcx> {
+        infcx: InferCtxt<'a, 'tcx>,
+        param_map: Vec<(GenericArg<'tcx>, GenericArg<'tcx>)>,
+    }
+
+    impl<'a, 'tcx> TypeFolder<'tcx> for Folder<'a, 'tcx> {
+        fn tcx(&self) -> TyCtxt<'tcx> {
+            self.infcx.tcx
+        }
+
+        fn fold_ty(&mut self, t: Ty<'tcx>) -> Ty<'tcx> {
+            let tn = self.infcx.shallow_resolve(t);
+            if t != tn {
+                tn.fold_with(self)
+            } else {
+                match t.kind() {
+                    ty::Infer(_) => {
+                        if let Some(&(_, param)) =
+                            self.param_map.iter().find(|&&(arg, _)| arg == t.into())
+                        {
+                            param.expect_ty()
+                        } else {
+                            let idx = self.param_map.len() as u32;
+                            let param_ty = ParamTy::new(idx, Symbol::intern(&format!("T{}", idx)))
+                                .to_ty(self.infcx.tcx);
+                            self.param_map.push((t.into(), param_ty.into()));
+                            param_ty
+                        }
+                    }
+                    _ => t.super_fold_with(self),
+                }
+            }
+        }
+
+        fn fold_const(&mut self, c: &'tcx Const<'tcx>) -> &'tcx Const<'tcx> {
+            let cn = self.infcx.shallow_resolve(c);
+            if c != cn {
+                cn.fold_with(self)
+            } else {
+                match c.val {
+                    ty::ConstKind::Infer(_) => {
+                        if let Some(&(_, param)) =
+                            self.param_map.iter().find(|&&(arg, _)| arg == c.into())
+                        {
+                            param.expect_const()
+                        } else {
+                            let idx = self.param_map.len() as u32;
+                            let param_const = self.infcx.tcx.mk_const_param(
+                                idx,
+                                Symbol::intern(&format!("N{}", idx)),
+                                c.ty,
+                            );
+                            self.param_map.push((c.into(), param_const.into()));
+                            param_const
+                        }
+                    }
+                    _ => c.super_fold_with(self),
+                }
+            }
+        }
+    }
+
+    v.fold_with(&mut Folder { infcx, param_map: Vec::new() })
+}
+
+fn param_to_infer<'a, 'tcx, T: TypeFoldable<'tcx>>(
+    infcx: &InferCtxt<'a, 'tcx>,
+    span: Span,
+    v: T,
+) -> T {
+    struct Folder<'a, 'tcx> {
+        infcx: &'a InferCtxt<'a, 'tcx>,
+        span: Span,
+        param_map: Vec<Option<GenericArg<'tcx>>>,
+    }
+
+    impl<'a, 'tcx> TypeFolder<'tcx> for Folder<'a, 'tcx> {
+        fn tcx(&self) -> TyCtxt<'tcx> {
+            self.infcx.tcx
+        }
+
+        fn fold_region(&mut self, r: ty::Region<'tcx>) -> ty::Region<'tcx> {
+            match r {
+                ty::ReErased => {
+                    self.infcx.next_region_var(RegionVariableOrigin::MiscVariable(self.span))
+                }
+                _ => r,
+            }
+        }
+
+        fn fold_ty(&mut self, t: Ty<'tcx>) -> Ty<'tcx> {
+            match t.kind() {
+                ty::Param(p) => {
+                    while self.param_map.len() <= p.index as usize {
+                        self.param_map.push(None);
+                    }
+
+                    (*self.param_map[p.index as usize].get_or_insert_with(|| {
+                        self.infcx
+                            .next_ty_var(TypeVariableOrigin {
+                                kind: TypeVariableOriginKind::MiscVariable,
+                                span: self.span,
+                            })
+                            .into()
+                    }))
+                    .expect_ty()
+                }
+                _ => t.super_fold_with(self),
+            }
+        }
+
+        fn fold_const(&mut self, c: &'tcx Const<'tcx>) -> &'tcx Const<'tcx> {
+            match c.val {
+                ty::ConstKind::Param(p) => {
+                    while self.param_map.len() <= p.index as usize {
+                        self.param_map.push(None);
+                    }
+
+                    (*self.param_map[p.index as usize].get_or_insert_with(|| {
+                        self.infcx
+                            .next_const_var(
+                                c.ty,
+                                ConstVariableOrigin {
+                                    kind: ConstVariableOriginKind::MiscVariable,
+                                    span: self.span,
+                                },
+                            )
+                            .into()
+                    }))
+                    .expect_const()
+                }
+                _ => c.super_fold_with(self),
+            }
+        }
+    }
+
+    v.fold_with(&mut Folder { infcx, span, param_map: Vec::new() })
+}
+
+#[instrument(skip(tcx), level = "debug")]
+pub fn is_polymorphic_parent(
+    tcx: TyCtxt<'tcx>,
+    instance: ty::InstanceDef<'tcx>,
+    a: SubstsRef<'tcx>,
+    b: SubstsRef<'tcx>,
+) -> bool {
+    // Not a great, but this shouldn't error and it is better than just using `DUMMY_SP` in
+    // case something goes wrong.
+    let span = tcx.def_span(instance.def_id());
+    let cause = &ObligationCause::dummy_with_span(span);
+    let result = tcx.infer_ctxt().enter(|infcx| {
+        let a_infer = param_to_infer(&infcx, span, a);
+        for (a, b) in a_infer.iter().zip(b) {
+            match infcx.at(cause, ParamEnv::reveal_all()).eq(a, b) {
+                Ok(InferOk { value: (), obligations }) if obligations.is_empty() => {}
+                _ => return false,
+            }
+        }
+
+        infcx.take_registered_region_obligations().is_empty()
+    });
+    debug!(?result);
+    result
 }

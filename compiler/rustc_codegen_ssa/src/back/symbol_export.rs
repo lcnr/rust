@@ -1,4 +1,5 @@
-use std::collections::hash_map::Entry::*;
+use std::collections::btree_map::Entry::*;
+use std::collections::BTreeMap;
 
 use rustc_ast::expand::allocator::ALLOCATOR_METHODS;
 use rustc_data_structures::fingerprint::Fingerprint;
@@ -14,7 +15,7 @@ use rustc_middle::middle::exported_symbols::{
 use rustc_middle::ty::query::{ExternProviders, Providers};
 use rustc_middle::ty::subst::{GenericArgKind, SubstsRef};
 use rustc_middle::ty::Instance;
-use rustc_middle::ty::{SymbolName, TyCtxt};
+use rustc_middle::ty::{self, SymbolName, TyCtxt};
 use rustc_session::config::CrateType;
 use rustc_target::spec::SanitizerSet;
 
@@ -272,10 +273,10 @@ fn exported_symbols_provider_local(
 fn upstream_monomorphizations_provider(
     tcx: TyCtxt<'_>,
     (): (),
-) -> DefIdMap<FxHashMap<SubstsRef<'_>, CrateNum>> {
+) -> DefIdMap<BTreeMap<SubstsRef<'_>, CrateNum>> {
     let cnums = tcx.crates(());
 
-    let mut instances: DefIdMap<FxHashMap<_, _>> = Default::default();
+    let mut instances: DefIdMap<BTreeMap<_, _>> = Default::default();
 
     let cnum_stable_ids: IndexVec<CrateNum, Fingerprint> = {
         let mut cnum_stable_ids = IndexVec::from_elem_n(Fingerprint::ZERO, cnums.len() + 1);
@@ -333,7 +334,7 @@ fn upstream_monomorphizations_provider(
 fn upstream_monomorphizations_for_provider(
     tcx: TyCtxt<'_>,
     def_id: DefId,
-) -> Option<&FxHashMap<SubstsRef<'_>, CrateNum>> {
+) -> Option<&BTreeMap<SubstsRef<'_>, CrateNum>> {
     debug_assert!(!def_id.is_local());
     tcx.upstream_monomorphizations(()).get(&def_id)
 }
@@ -343,7 +344,20 @@ fn upstream_drop_glue_for_provider<'tcx>(
     substs: SubstsRef<'tcx>,
 ) -> Option<CrateNum> {
     if let Some(def_id) = tcx.lang_items().drop_in_place_fn() {
-        tcx.upstream_monomorphizations_for(def_id).and_then(|monos| monos.get(&substs).cloned())
+        tcx.upstream_monomorphizations_for(def_id).and_then(|monos| {
+            monos.get(&substs).cloned().or_else(|| {
+                monos
+                    .iter()
+                    .find(|(k, _)| {
+                        tcx.is_polymorphic_parent((
+                            ty::InstanceDef::Item(ty::WithOptConstParam::unknown(def_id)),
+                            k,
+                            substs,
+                        ))
+                    })
+                    .map(|(_, &v)| v)
+            })
+        })
     } else {
         None
     }

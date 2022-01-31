@@ -42,6 +42,7 @@ use rustc_serialize::json::{Json, ToJson};
 use rustc_span::symbol::{sym, Symbol};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
+use std::iter::FromIterator;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -712,6 +713,59 @@ impl ToJson for FramePointer {
     }
 }
 
+/// Controls use of stack canaries.
+#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq)]
+pub enum StackProtector {
+    /// Disable stack canary generation.
+    None,
+
+    /// On LLVM, mark all generated LLVM functions with the `ssp` attribute (see
+    /// llvm/docs/LangRef.rst). This triggers stack canary generation in
+    /// functions which contain an array of a byte-sized type with more than
+    /// eight elements.
+    Basic,
+
+    /// On LLVM, mark all generated LLVM functions with the `sspstrong`
+    /// attribute (see llvm/docs/LangRef.rst). This triggers stack canary
+    /// generation in functions which either contain an array, or which take
+    /// the address of a local variable.
+    Strong,
+
+    /// Generate stack canaries in all functions.
+    All,
+}
+
+impl StackProtector {
+    fn as_str(&self) -> &'static str {
+        match self {
+            StackProtector::None => "none",
+            StackProtector::Basic => "basic",
+            StackProtector::Strong => "strong",
+            StackProtector::All => "all",
+        }
+    }
+}
+
+impl FromStr for StackProtector {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<StackProtector, ()> {
+        Ok(match s {
+            "none" => StackProtector::None,
+            "basic" => StackProtector::Basic,
+            "strong" => StackProtector::Strong,
+            "all" => StackProtector::All,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl fmt::Display for StackProtector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 macro_rules! supported_targets {
     ( $(($( $triple:literal, )+ $module:ident ),)+ ) => {
         $(mod $module;)+
@@ -813,6 +867,7 @@ supported_targets! {
     ("powerpc-unknown-freebsd", powerpc_unknown_freebsd),
     ("powerpc64-unknown-freebsd", powerpc64_unknown_freebsd),
     ("powerpc64le-unknown-freebsd", powerpc64le_unknown_freebsd),
+    ("riscv64gc-unknown-freebsd", riscv64gc_unknown_freebsd),
     ("x86_64-unknown-freebsd", x86_64_unknown_freebsd),
 
     ("x86_64-unknown-dragonfly", x86_64_unknown_dragonfly),
@@ -1360,6 +1415,10 @@ pub struct TargetOptions {
 
     /// Whether or not the DWARF `.debug_aranges` section should be generated.
     pub generate_arange_section: bool,
+
+    /// Whether the target supports stack canary checks. `true` by default,
+    /// since this is most common among tier 1 and tier 2 targets.
+    pub supports_stack_protector: bool,
 }
 
 impl Default for TargetOptions {
@@ -1466,6 +1525,7 @@ impl Default for TargetOptions {
             default_adjusted_cabi: None,
             c_enum_min_bits: 32,
             generate_arange_section: true,
+            supports_stack_protector: true,
         }
     }
 }
@@ -2052,6 +2112,7 @@ impl Target {
         key!(default_adjusted_cabi, Option<Abi>)?;
         key!(c_enum_min_bits, u64);
         key!(generate_arange_section, bool);
+        key!(supports_stack_protector, bool);
 
         if base.is_builtin {
             // This can cause unfortunate ICEs later down the line.
@@ -2114,12 +2175,11 @@ impl Target {
                 // Additionally look in the sysroot under `lib/rustlib/<triple>/target.json`
                 // as a fallback.
                 let rustlib_path = crate::target_rustlib_path(&sysroot, &target_triple);
-                let p = std::array::IntoIter::new([
+                let p = PathBuf::from_iter([
                     Path::new(sysroot),
                     Path::new(&rustlib_path),
                     Path::new("target.json"),
-                ])
-                .collect::<PathBuf>();
+                ]);
                 if p.is_file() {
                     return load_file(&p);
                 }
@@ -2292,6 +2352,7 @@ impl ToJson for Target {
         target_option_val!(supported_sanitizers);
         target_option_val!(c_enum_min_bits);
         target_option_val!(generate_arange_section);
+        target_option_val!(supports_stack_protector);
 
         if let Some(abi) = self.default_adjusted_cabi {
             d.insert("default-adjusted-cabi".to_string(), Abi::name(abi).to_json());

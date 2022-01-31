@@ -89,9 +89,8 @@ pub(super) fn vtable_allocation_provider<'tcx>(
             VtblEntry::MetadataSize => Scalar::from_uint(size, ptr_size).into(),
             VtblEntry::MetadataAlign => Scalar::from_uint(align, ptr_size).into(),
             VtblEntry::Vacant => continue,
-            VtblEntry::Method(instance) => {
+            &VtblEntry::Method(instance) => {
                 // Prepare the fn ptr we write into the vtable.
-                let instance = instance.polymorphize(tcx);
                 let fn_alloc_id = tcx.create_fn_alloc(instance);
                 let fn_ptr = Pointer::from(fn_alloc_id);
                 ScalarMaybeUninit::from_pointer(fn_ptr, &tcx)

@@ -13,7 +13,6 @@
 #![feature(drain_filter)]
 #![feature(bool_to_option)]
 #![feature(crate_visibility_modifier)]
-#![cfg_attr(bootstrap, feature(format_args_capture))]
 #![feature(iter_zip)]
 #![feature(let_else)]
 #![feature(never_type)]
@@ -1430,12 +1429,9 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn next_node_id(&mut self) -> NodeId {
-        let next = self
-            .next_node_id
-            .as_usize()
-            .checked_add(1)
-            .expect("input too large; ran out of NodeIds");
-        self.next_node_id = ast::NodeId::from_usize(next);
+        let next =
+            self.next_node_id.as_u32().checked_add(1).expect("input too large; ran out of NodeIds");
+        self.next_node_id = ast::NodeId::from_u32(next);
         self.next_node_id
     }
 
@@ -3288,7 +3284,9 @@ impl<'a> Resolver<'a> {
                 Some(binding)
             } else {
                 let crate_id = if !speculative {
-                    self.crate_loader.process_path_extern(ident.name, ident.span)
+                    let Some(crate_id) =
+                        self.crate_loader.process_path_extern(ident.name, ident.span) else { return Some(self.dummy_binding); };
+                    crate_id
                 } else {
                     self.crate_loader.maybe_process_path_extern(ident.name)?
                 };

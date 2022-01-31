@@ -392,6 +392,9 @@ impl Error {
     /// originate from the OS itself. The `error` argument is an arbitrary
     /// payload which will be contained in this [`Error`].
     ///
+    /// If no extra payload is required, use the `From` conversion from
+    /// `ErrorKind`.
+    ///
     /// # Examples
     ///
     /// ```
@@ -402,6 +405,9 @@ impl Error {
     ///
     /// // errors can also be created from other errors
     /// let custom_error2 = Error::new(ErrorKind::Interrupted, custom_error);
+    ///
+    /// // creating an error without payload
+    /// let eof_error = Error::from(ErrorKind::UnexpectedEof);
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     pub fn new<E>(kind: ErrorKind, error: E) -> Error
@@ -434,12 +440,18 @@ impl Error {
     /// `GetLastError` on Windows) and will return a corresponding instance of
     /// [`Error`] for the error code.
     ///
+    /// This should be called immediately after a call to a platform function,
+    /// otherwise the state of the error value is indeterminate. In particular,
+    /// other standard library functions may call platform functions that may
+    /// (or may not) reset the error value even if they succeed.
+    ///
     /// # Examples
     ///
     /// ```
     /// use std::io::Error;
     ///
-    /// println!("last OS error: {:?}", Error::last_os_error());
+    /// let os_error = Error::last_os_error();
+    /// println!("last OS error: {:?}", os_error);
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     #[must_use]

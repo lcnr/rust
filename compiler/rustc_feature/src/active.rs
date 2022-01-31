@@ -206,6 +206,8 @@ declare_features! (
     (active, rustc_allow_const_fn_unstable, "1.49.0", Some(69399), None),
     /// Allows using compiler's own crates.
     (active, rustc_private, "1.0.0", Some(27812), None),
+    /// Allows using internal rustdoc features like `doc(primitive)` or `doc(keyword)`.
+    (active, rustdoc_internals, "1.58.0", Some(90418), None),
     /// Allows using `#[start]` on a function indicating that it is the program entrypoint.
     (active, start, "1.0.0", Some(29633), None),
     /// Allows using `#[structural_match]` which indicates that a type is structurally matchable.
@@ -288,6 +290,8 @@ declare_features! (
     (active, asm_experimental_arch, "1.58.0", Some(72016), None),
     /// Allows using `sym` operands in inline assembly.
     (active, asm_sym, "1.58.0", Some(72016), None),
+    /// Allows the `may_unwind` option in inline assembly.
+    (active, asm_unwind, "1.58.0", Some(72016), None),
     /// Allows the user of associated type bounds.
     (active, associated_type_bounds, "1.34.0", Some(52662), None),
     /// Allows associated type defaults.
@@ -366,12 +370,8 @@ declare_features! (
     (active, doc_cfg, "1.21.0", Some(43781), None),
     /// Allows `#[doc(cfg_hide(...))]`.
     (active, doc_cfg_hide, "1.57.0", Some(43781), None),
-    /// Allows using `#[doc(keyword = "...")]`.
-    (active, doc_keyword, "1.28.0", Some(51315), None),
     /// Allows `#[doc(masked)]`.
     (active, doc_masked, "1.21.0", Some(44027), None),
-    /// Allows using doc(primitive) without a future-incompat warning
-    (active, doc_primitive, "1.56.0", Some(88070), None),
     /// Allows `X..Y` patterns.
     (active, exclusive_range_pattern, "1.11.0", Some(37854), None),
     /// Allows exhaustive pattern matching on types that contain uninhabited types.
@@ -409,7 +409,9 @@ declare_features! (
     /// Allows associated types in inherent impls.
     (incomplete, inherent_associated_types, "1.52.0", Some(8995), None),
     /// Allow anonymous constants from an inline `const` block
-    (incomplete, inline_const, "1.49.0", Some(76001), None),
+    (active, inline_const, "1.49.0", Some(76001), None),
+    /// Allow anonymous constants from an inline `const` block in pattern position
+    (incomplete, inline_const_pat, "1.58.0", Some(76001), None),
     /// Allows using `pointer` and `reference` in intra-doc links
     (active, intra_doc_pointers, "1.51.0", Some(80896), None),
     /// Allows `#[instruction_set(_)]` attribute

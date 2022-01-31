@@ -1,17 +1,17 @@
 use crate::infer::type_variable::TypeVariableOriginKind;
 use crate::infer::InferCtxt;
+use crate::rustc_middle::ty::TypeFoldable;
 use rustc_errors::{pluralize, struct_span_err, Applicability, DiagnosticBuilder};
 use rustc_hir as hir;
 use rustc_hir::def::{DefKind, Namespace};
 use rustc_hir::def_id::DefId;
 use rustc_hir::intravisit::{self, NestedVisitorMap, Visitor};
-use rustc_hir::{Body, Expr, ExprKind, FnRetTy, HirId, Local, Pat};
+use rustc_hir::{Body, Expr, ExprKind, FnRetTy, HirId, Local, MatchSource, Pat};
 use rustc_middle::hir::map::Map;
 use rustc_middle::infer::unify_key::ConstVariableOriginKind;
 use rustc_middle::ty::print::Print;
 use rustc_middle::ty::subst::{GenericArg, GenericArgKind};
 use rustc_middle::ty::{self, DefIdTree, InferConst, Ty, TyCtxt};
-use rustc_span::source_map::DesugaringKind;
 use rustc_span::symbol::kw;
 use rustc_span::Span;
 use std::borrow::Cow;
@@ -26,6 +26,7 @@ struct FindHirNodeVisitor<'a, 'tcx> {
     found_closure: Option<&'tcx Expr<'tcx>>,
     found_method_call: Option<&'tcx Expr<'tcx>>,
     found_exact_method_call: Option<&'tcx Expr<'tcx>>,
+    found_for_loop_iter: Option<&'tcx Expr<'tcx>>,
     found_use_diagnostic: Option<UseDiagnostic<'tcx>>,
 }
 
@@ -41,6 +42,7 @@ impl<'a, 'tcx> FindHirNodeVisitor<'a, 'tcx> {
             found_closure: None,
             found_method_call: None,
             found_exact_method_call: None,
+            found_for_loop_iter: None,
             found_use_diagnostic: None,
         }
     }
@@ -111,6 +113,15 @@ impl<'a, 'tcx> Visitor<'tcx> for FindHirNodeVisitor<'a, 'tcx> {
     }
 
     fn visit_expr(&mut self, expr: &'tcx Expr<'tcx>) {
+        if let ExprKind::Match(scrutinee, [_, arm], MatchSource::ForLoopDesugar) = expr.kind {
+            if let Some(pat) = arm.pat.for_loop_some() {
+                if let Some(ty) = self.node_ty_contains_target(pat.hir_id) {
+                    self.found_for_loop_iter = Some(scrutinee);
+                    self.found_node_ty = Some(ty);
+                    return;
+                }
+            }
+        }
         if let ExprKind::MethodCall(_, call_span, exprs, _) = expr.kind {
             if call_span == self.target_span
                 && Some(self.target)
@@ -390,36 +401,75 @@ impl<'a, 'tcx> InferCtxt<'a, 'tcx> {
                 }
             }
             GenericArgKind::Const(ct) => {
-                if let ty::ConstKind::Infer(InferConst::Var(vid)) = ct.val {
-                    let origin =
-                        self.inner.borrow_mut().const_unification_table().probe_value(vid).origin;
-                    if let ConstVariableOriginKind::ConstParameterDefinition(name, def_id) =
-                        origin.kind
-                    {
-                        return InferenceDiagnosticsData {
-                            name: name.to_string(),
-                            span: Some(origin.span),
-                            kind: UnderspecifiedArgKind::Const { is_parameter: true },
-                            parent: InferenceDiagnosticsParentData::for_def_id(self.tcx, def_id),
-                        };
-                    }
+                match ct.val {
+                    ty::ConstKind::Infer(InferConst::Var(vid)) => {
+                        let origin = self
+                            .inner
+                            .borrow_mut()
+                            .const_unification_table()
+                            .probe_value(vid)
+                            .origin;
+                        if let ConstVariableOriginKind::ConstParameterDefinition(name, def_id) =
+                            origin.kind
+                        {
+                            return InferenceDiagnosticsData {
+                                name: name.to_string(),
+                                span: Some(origin.span),
+                                kind: UnderspecifiedArgKind::Const { is_parameter: true },
+                                parent: InferenceDiagnosticsParentData::for_def_id(
+                                    self.tcx, def_id,
+                                ),
+                            };
+                        }
 
-                    debug_assert!(!origin.span.is_dummy());
-                    let mut s = String::new();
-                    let mut printer =
-                        ty::print::FmtPrinter::new(self.tcx, &mut s, Namespace::ValueNS);
-                    if let Some(highlight) = highlight {
-                        printer.region_highlight_mode = highlight;
+                        debug_assert!(!origin.span.is_dummy());
+                        let mut s = String::new();
+                        let mut printer =
+                            ty::print::FmtPrinter::new(self.tcx, &mut s, Namespace::ValueNS);
+                        if let Some(highlight) = highlight {
+                            printer.region_highlight_mode = highlight;
+                        }
+                        let _ = ct.print(printer);
+                        InferenceDiagnosticsData {
+                            name: s,
+                            span: Some(origin.span),
+                            kind: UnderspecifiedArgKind::Const { is_parameter: false },
+                            parent: None,
+                        }
                     }
-                    let _ = ct.print(printer);
-                    InferenceDiagnosticsData {
-                        name: s,
-                        span: Some(origin.span),
-                        kind: UnderspecifiedArgKind::Const { is_parameter: false },
-                        parent: None,
+                    ty::ConstKind::Unevaluated(ty::Unevaluated {
+                        substs_: Some(substs), ..
+                    }) => {
+                        assert!(substs.has_infer_types_or_consts());
+
+                        // FIXME: We only use the first inference variable we encounter in
+                        // `substs` here, this gives insufficiently informative diagnostics
+                        // in case there are multiple inference variables
+                        for s in substs.iter() {
+                            match s.unpack() {
+                                GenericArgKind::Type(t) => match t.kind() {
+                                    ty::Infer(_) => {
+                                        return self.extract_inference_diagnostics_data(s, None);
+                                    }
+                                    _ => {}
+                                },
+                                GenericArgKind::Const(c) => match c.val {
+                                    ty::ConstKind::Infer(InferConst::Var(_)) => {
+                                        return self.extract_inference_diagnostics_data(s, None);
+                                    }
+                                    _ => {}
+                                },
+                                _ => {}
+                            }
+                        }
+                        bug!(
+                            "expected an inference variable in substs of unevaluated const {:?}",
+                            ct
+                        );
                     }
-                } else {
-                    bug!("unexpect const: {:?}", ct);
+                    _ => {
+                        bug!("unexpect const: {:?}", ct);
+                    }
                 }
             }
             GenericArgKind::Lifetime(_) => bug!("unexpected lifetime"),
@@ -643,10 +693,7 @@ impl<'a, 'tcx> InferCtxt<'a, 'tcx> {
             let msg = if let Some(simple_ident) = pattern.simple_ident() {
                 match pattern.span.desugaring_kind() {
                     None => format!("consider giving `{}` {}", simple_ident, suffix),
-                    Some(DesugaringKind::ForLoop(_)) => {
-                        "the element type for this iterator is not specified".to_string()
-                    }
-                    _ => format!("this needs {}", suffix),
+                    Some(_) => format!("this needs {}", suffix),
                 }
             } else {
                 format!("consider giving this pattern {}", suffix)
@@ -719,6 +766,11 @@ impl<'a, 'tcx> InferCtxt<'a, 'tcx> {
                 //    = note: type must be known at this point
                 self.annotate_method_call(segment, e, &mut err);
             }
+        } else if let Some(scrutinee) = local_visitor.found_for_loop_iter {
+            err.span_label(
+                scrutinee.span,
+                "the element type for this iterator is not specified".to_string(),
+            );
         }
         // Instead of the following:
         // error[E0282]: type annotations needed

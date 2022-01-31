@@ -1032,6 +1032,8 @@ impl<'a> Parser<'a> {
             [IdentLike(_), Punct('+' | '-')] |
             // 1e+2 | 1e-2
             [IdentLike(_), Punct('+' | '-'), IdentLike(_)] |
+            // 1.2e+ | 1.2e-
+            [IdentLike(_), Punct('.'), IdentLike(_), Punct('+' | '-')] |
             // 1.2e+3 | 1.2e-3
             [IdentLike(_), Punct('.'), IdentLike(_), Punct('+' | '-'), IdentLike(_)] => {
                 // See the FIXME about `TokenCursor` above.
@@ -1148,7 +1150,7 @@ impl<'a> Parser<'a> {
         }
 
         let fn_span_lo = self.token.span;
-        let mut segment = self.parse_path_segment(PathStyle::Expr)?;
+        let mut segment = self.parse_path_segment(PathStyle::Expr, None)?;
         self.check_trailing_angle_brackets(&segment, &[&token::OpenDelim(token::Paren)]);
         self.check_turbofish_missing_angle_brackets(&mut segment);
 
@@ -1241,7 +1243,7 @@ impl<'a> Parser<'a> {
         } else if self.eat_keyword(kw::Unsafe) {
             self.parse_block_expr(None, lo, BlockCheckMode::Unsafe(ast::UserProvided), attrs)
         } else if self.check_inline_const(0) {
-            self.parse_const_block(lo.to(self.token.span))
+            self.parse_const_block(lo.to(self.token.span), false)
         } else if self.is_do_catch_block() {
             self.recover_do_catch(attrs)
         } else if self.is_try_block() {
@@ -1986,31 +1988,62 @@ impl<'a> Parser<'a> {
         let lo = self.prev_token.span;
         let cond = self.parse_cond_expr()?;
 
+        let missing_then_block_binop_span = || {
+            match cond.kind {
+                ExprKind::Binary(Spanned { span: binop_span, .. }, _, ref right)
+                    if let ExprKind::Block(..) = right.kind => Some(binop_span),
+                _ => None
+            }
+        };
+
         // Verify that the parsed `if` condition makes sense as a condition. If it is a block, then
         // verify that the last statement is either an implicit return (no `;`) or an explicit
         // return. This won't catch blocks with an explicit `return`, but that would be caught by
         // the dead code lint.
-        let thn = if self.eat_keyword(kw::Else) || !cond.returns() {
-            self.error_missing_if_cond(lo, cond.span)
+        let thn = if self.token.is_keyword(kw::Else) || !cond.returns() {
+            if let Some(binop_span) = missing_then_block_binop_span() {
+                self.error_missing_if_then_block(lo, None, Some(binop_span)).emit();
+                self.mk_block_err(cond.span)
+            } else {
+                self.error_missing_if_cond(lo, cond.span)
+            }
         } else {
             let attrs = self.parse_outer_attributes()?.take_for_recovery(); // For recovery.
             let not_block = self.token != token::OpenDelim(token::Brace);
-            let block = self.parse_block().map_err(|mut err| {
+            let block = self.parse_block().map_err(|err| {
                 if not_block {
-                    err.span_label(lo, "this `if` expression has a condition, but no block");
-                    if let ExprKind::Binary(_, _, ref right) = cond.kind {
-                        if let ExprKind::Block(_, _) = right.kind {
-                            err.help("maybe you forgot the right operand of the condition?");
-                        }
-                    }
+                    self.error_missing_if_then_block(lo, Some(err), missing_then_block_binop_span())
+                } else {
+                    err
                 }
-                err
             })?;
             self.error_on_if_block_attrs(lo, false, block.span, &attrs);
             block
         };
         let els = if self.eat_keyword(kw::Else) { Some(self.parse_else_expr()?) } else { None };
         Ok(self.mk_expr(lo.to(self.prev_token.span), ExprKind::If(cond, thn, els), attrs))
+    }
+
+    fn error_missing_if_then_block(
+        &self,
+        if_span: Span,
+        err: Option<DiagnosticBuilder<'a>>,
+        binop_span: Option<Span>,
+    ) -> DiagnosticBuilder<'a> {
+        let msg = "this `if` expression has a condition, but no block";
+
+        let mut err = if let Some(mut err) = err {
+            err.span_label(if_span, msg);
+            err
+        } else {
+            self.struct_span_err(if_span, msg)
+        };
+
+        if let Some(binop_span) = binop_span {
+            err.span_help(binop_span, "maybe you forgot the right operand of the condition?");
+        }
+
+        err
     }
 
     fn error_missing_if_cond(&self, lo: Span, span: Span) -> P<ast::Block> {

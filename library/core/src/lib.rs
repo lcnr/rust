@@ -101,7 +101,7 @@
 #![feature(const_align_of_val)]
 #![feature(const_alloc_layout)]
 #![feature(const_arguments_as_str)]
-#![feature(const_assert_type)]
+#![feature(const_array_into_iter_constructors)]
 #![feature(const_bigint_helper_methods)]
 #![feature(const_caller_location)]
 #![feature(const_cell_into_inner)]
@@ -117,7 +117,7 @@
 #![feature(const_intrinsic_copy)]
 #![feature(const_intrinsic_forget)]
 #![feature(const_likely)]
-#![feature(const_maybe_uninit_as_ptr)]
+#![feature(const_maybe_uninit_as_mut_ptr)]
 #![feature(const_maybe_uninit_assume_init)]
 #![feature(const_num_from_num)]
 #![feature(const_ops)]
@@ -138,7 +138,8 @@
 #![feature(const_type_id)]
 #![feature(const_type_name)]
 #![feature(const_default_impls)]
-#![feature(duration_consts_2)]
+#![feature(duration_consts_float)]
+#![feature(maybe_uninit_uninit_array)]
 #![feature(ptr_metadata)]
 #![feature(slice_ptr_get)]
 #![feature(str_internals)]
@@ -160,12 +161,12 @@
 #![feature(const_impl_trait)]
 #![feature(const_mut_refs)]
 #![feature(const_precise_live_drops)]
-#![cfg_attr(bootstrap, feature(const_raw_ptr_deref))]
 #![feature(const_refs_to_cell)]
 #![feature(decl_macro)]
+#![feature(derive_default_enum)]
 #![feature(doc_cfg)]
 #![feature(doc_notable_trait)]
-#![feature(doc_primitive)]
+#![feature(rustdoc_internals)]
 #![feature(exhaustive_patterns)]
 #![feature(doc_cfg_hide)]
 #![feature(extern_types)]
@@ -197,7 +198,7 @@
 #![feature(try_blocks)]
 #![feature(unboxed_closures)]
 #![feature(unsized_fn_params)]
-#![cfg_attr(not(bootstrap), feature(asm_const))]
+#![feature(asm_const)]
 //
 // Target features:
 #![feature(aarch64_target_feature)]
@@ -407,13 +408,11 @@ pub mod arch {
 #[allow(rustdoc::bare_urls)]
 #[unstable(feature = "portable_simd", issue = "86656")]
 #[cfg(not(all(miri, doctest)))] // Miri does not support all SIMD intrinsics
-#[cfg(not(bootstrap))]
 mod core_simd;
 
 #[doc = include_str!("../../portable-simd/crates/core_simd/src/core_simd_docs.md")]
 #[unstable(feature = "portable_simd", issue = "86656")]
 #[cfg(not(all(miri, doctest)))] // Miri does not support all SIMD intrinsics
-#[cfg(not(bootstrap))]
 pub mod simd {
     #[unstable(feature = "portable_simd", issue = "86656")]
     pub use crate::core_simd::simd::*;
