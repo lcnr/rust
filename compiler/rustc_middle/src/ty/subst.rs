@@ -396,15 +396,40 @@ impl<'tcx> TypeFoldable<'tcx> for SubstsRef<'tcx> {
                 }
             }
             0 => Ok(self),
-            _ => {
-                let params: SmallVec<[_; 8]> =
-                    self.iter().map(|k| k.try_fold_with(folder)).collect::<Result<_, _>>()?;
-                if params[..] == self[..] {
+            _ => ty::util::fold_list(self, folder, |tcx, v| tcx.intern_substs(v)),
+        }
+    }
+
+    fn super_visit_with<V: TypeVisitor<'tcx>>(&self, visitor: &mut V) -> ControlFlow<V::BreakTy> {
+        self.iter().try_for_each(|t| t.visit_with(visitor))
+    }
+}
+
+impl<'tcx> TypeFoldable<'tcx> for &'tcx ty::List<Ty<'tcx>> {
+    fn try_super_fold_with<F: FallibleTypeFolder<'tcx>>(
+        self,
+        folder: &mut F,
+    ) -> Result<Self, F::Error> {
+        match self.len() {
+            1 => {
+                let param0 = self[0].try_fold_with(folder)?;
+                if param0 == self[0] {
                     Ok(self)
                 } else {
-                    Ok(folder.tcx().intern_substs(&params))
+                    Ok(folder.tcx().intern_type_list(&[param0]))
                 }
             }
+            2 => {
+                let param0 = self[0].try_fold_with(folder)?;
+                let param1 = self[1].try_fold_with(folder)?;
+                if param0 == self[0] && param1 == self[1] {
+                    Ok(self)
+                } else {
+                    Ok(folder.tcx().intern_type_list(&[param0, param1]))
+                }
+            }
+            0 => Ok(self),
+            _ => ty::util::fold_list(self, folder, |tcx, v| tcx.intern_type_list(v)),
         }
     }
 
