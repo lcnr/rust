@@ -251,6 +251,8 @@ fn layout_of<'tcx>(
                 }
             };
 
+            let ty = tcx.erase_closures(ty);
+
             if ty != unnormalized_ty {
                 // Ensure this layout is also cached for the normalized type.
                 return tcx.layout_of(param_env.and(ty));
@@ -698,10 +700,14 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
 
             ty::Generator(def_id, substs, _) => self.generator_layout(ty, def_id, substs)?,
 
-            ty::Closure(_, ref substs) => {
-                let tys = substs.as_closure().upvar_tys();
+            ty::Closure(..) => bug!("unerased closure in layout_of"),
+            ty::ErasedClosure(def_id, substs) => {
+                let upvars = tcx.upvar_types(def_id).subst(tcx, substs);
                 univariant(
-                    &tys.map(|ty| self.layout_of(ty)).collect::<Result<Vec<_>, _>>()?,
+                    &upvars
+                        .iter()
+                        .map(|ty| self.layout_of(ty.expect_ty()))
+                        .collect::<Result<Vec<_>, _>>()?,
                     &ReprOptions::default(),
                     StructKind::AlwaysSized,
                 )?
@@ -2363,6 +2369,10 @@ where
                     cx,
                     i,
                 ),
+                ty::ErasedClosure(..) => {
+                    // FIXME(#92617)
+                    unimplemented!()
+                }
 
                 ty::Generator(def_id, ref substs, _) => match this.variants {
                     Variants::Single { index } => TyMaybeWithLayout::Ty(

@@ -69,6 +69,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         wbcx.visit_coercion_casts();
         wbcx.visit_user_provided_tys();
         wbcx.visit_user_provided_sigs();
+        wbcx.visit_upvar_types();
         wbcx.visit_generator_interior_types();
 
         let used_trait_imports =
@@ -487,6 +488,12 @@ impl<'cx, 'tcx> WritebackCx<'cx, 'tcx> {
 
             self.typeck_results.user_provided_sigs.insert(def_id, *c_sig);
         }
+    }
+
+    fn visit_upvar_types(&mut self) {
+        let fcx_typeck_results = self.fcx.typeck_results.borrow();
+        assert_eq!(fcx_typeck_results.hir_owner, self.typeck_results.hir_owner);
+        self.typeck_results.closure_upvar_types = fcx_typeck_results.closure_upvar_types.clone();
     }
 
     fn visit_generator_interior_types(&mut self) {

@@ -496,6 +496,9 @@ pub struct TypeckResults<'tcx> {
     /// issue by fake reading `t`.
     pub closure_fake_reads: FxHashMap<DefId, Vec<(HirPlace<'tcx>, FakeReadCause, hir::HirId)>>,
 
+    /// Stores the final upvar types of a closure with erased lifetimes.
+    pub closure_upvar_types: FxHashMap<LocalDefId, SubstsRef<'tcx>>,
+
     /// Stores the type, expression, span and optional scope span of all types
     /// that are live across the yield of this generator (if a generator).
     pub generator_interior_types: ty::Binder<'tcx, Vec<GeneratorInteriorTypeCause<'tcx>>>,
@@ -533,6 +536,7 @@ impl<'tcx> TypeckResults<'tcx> {
             concrete_opaque_types: Default::default(),
             closure_min_captures: Default::default(),
             closure_fake_reads: Default::default(),
+            closure_upvar_types: Default::default(),
             generator_interior_types: ty::Binder::dummy(Default::default()),
             treat_byte_string_as_slice: Default::default(),
             closure_size_eval: Default::default(),
@@ -778,6 +782,7 @@ impl<'a, 'tcx> HashStable<StableHashingContext<'a>> for TypeckResults<'tcx> {
             ref concrete_opaque_types,
             ref closure_min_captures,
             ref closure_fake_reads,
+            closure_upvar_types: ref erased_closure_upvars,
             ref generator_interior_types,
             ref treat_byte_string_as_slice,
             ref closure_size_eval,
@@ -805,6 +810,7 @@ impl<'a, 'tcx> HashStable<StableHashingContext<'a>> for TypeckResults<'tcx> {
             concrete_opaque_types.hash_stable(hcx, hasher);
             closure_min_captures.hash_stable(hcx, hasher);
             closure_fake_reads.hash_stable(hcx, hasher);
+            erased_closure_upvars.hash_stable(hcx, hasher);
             generator_interior_types.hash_stable(hcx, hasher);
             treat_byte_string_as_slice.hash_stable(hcx, hasher);
             closure_size_eval.hash_stable(hcx, hasher);
@@ -1931,6 +1937,7 @@ impl<'tcx> TyCtxt<'tcx> {
                     GeneratorWitness,
                     Dynamic,
                     Closure,
+                    ErasedClosure,
                     Tuple,
                     Bound,
                     Param,

@@ -703,7 +703,22 @@ pub trait PrettyPrinter<'tcx>:
             }
             ty::Closure(did, substs) => {
                 p!(write("["));
-                if !self.tcx().sess.verbose() {
+                if self.tcx().sess.verbose() {
+                    p!(print_def_path(did, substs));
+                    if !substs.as_closure().is_valid() {
+                        p!(" closure_substs=(unavailable)");
+                        p!(write(" substs={:?}", substs));
+                    } else {
+                        p!(" closure_kind_ty=", print(substs.as_closure().kind_ty()));
+                        p!(
+                            " closure_sig_as_fn_ptr_ty=",
+                            print(substs.as_closure().sig_as_fn_ptr_ty())
+                        );
+                        p!(" upvar_tys=(");
+                        self = self.comma_sep(substs.as_closure().upvar_tys())?;
+                        p!(")");
+                    }
+                } else {
                     p!(write("closure"));
                     // FIXME(eddyb) should use `def_span`.
                     if let Some(did) = did.as_local() {
@@ -721,22 +736,12 @@ pub trait PrettyPrinter<'tcx>:
                     } else {
                         p!(write("@"), print_def_path(did, substs));
                     }
-                } else {
-                    p!(print_def_path(did, substs));
-                    if !substs.as_closure().is_valid() {
-                        p!(" closure_substs=(unavailable)");
-                        p!(write(" substs={:?}", substs));
-                    } else {
-                        p!(" closure_kind_ty=", print(substs.as_closure().kind_ty()));
-                        p!(
-                            " closure_sig_as_fn_ptr_ty=",
-                            print(substs.as_closure().sig_as_fn_ptr_ty())
-                        );
-                        p!(" upvar_tys=(");
-                        self = self.comma_sep(substs.as_closure().upvar_tys())?;
-                        p!(")");
-                    }
                 }
+                p!("]");
+            }
+            ty::ErasedClosure(def_id, substs) => {
+                p!(write("["));
+                p!(print_def_path(def_id, substs));
                 p!("]");
             }
             ty::Array(ty, sz) => {

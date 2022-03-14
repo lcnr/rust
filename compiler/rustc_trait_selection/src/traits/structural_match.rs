@@ -154,6 +154,10 @@ impl<'a, 'tcx> TypeVisitor<'tcx> for Search<'a, 'tcx> {
             ty::Closure(..) => {
                 return ControlFlow::Break(NonStructuralMatchTy::Closure);
             }
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
+            }
             ty::Generator(..) | ty::GeneratorWitness(..) => {
                 return ControlFlow::Break(NonStructuralMatchTy::Generator);
             }

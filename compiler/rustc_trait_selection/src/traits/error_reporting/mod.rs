@@ -1441,7 +1441,7 @@ impl<'a, 'tcx> InferCtxtPrivExt<'a, 'tcx> for InferCtxt<'a, 'tcx> {
                 ty::Array(..) | ty::Slice(..) => Some(6),
                 ty::FnDef(..) | ty::FnPtr(..) => Some(7),
                 ty::Dynamic(..) => Some(8),
-                ty::Closure(..) => Some(9),
+                ty::Closure(..) | ty::ErasedClosure(..) => Some(9),
                 ty::Tuple(..) => Some(10),
                 ty::Projection(..) => Some(11),
                 ty::Param(..) => Some(12),

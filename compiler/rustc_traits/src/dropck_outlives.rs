@@ -229,6 +229,10 @@ fn dtorck_constraint_for_ty<'tcx>(
                 Ok::<_, NoSolution>(())
             })?
         }
+        ty::ErasedClosure(..) => {
+            // FIXME(#92617)
+            unimplemented!()
+        }
 
         ty::Generator(_, substs, _movability) => {
             // rust-lang/rust#49918: types can be constructed, stored

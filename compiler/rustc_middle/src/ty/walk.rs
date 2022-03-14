@@ -179,6 +179,10 @@ fn push_inner<'tcx>(stack: &mut TypeWalkerStack<'tcx>, parent: GenericArg<'tcx>)
             | ty::FnDef(_, substs) => {
                 stack.extend(substs.iter().rev());
             }
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617):
+                unimplemented!()
+            }
             ty::GeneratorWitness(ts) => {
                 stack.extend(ts.skip_binder().iter().rev().map(|ty| ty.into()));
             }

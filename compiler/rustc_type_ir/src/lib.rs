@@ -107,6 +107,9 @@ bitflags! {
 
         /// Does this value have `InferConst::Fresh`?
         const HAS_CT_FRESH                = 1 << 19;
+
+        const HAS_UNERASED_CLOSURES       = 1 << 20;
+        const HAS_ERASED_CLOSURES         = 1 << 21;
     }
 }
 

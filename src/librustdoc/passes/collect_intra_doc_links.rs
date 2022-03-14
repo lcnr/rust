@@ -657,6 +657,7 @@ impl<'a, 'tcx> LinkCollector<'a, 'tcx> {
             }
             ty::Projection(_)
             | ty::Closure(..)
+            | ty::ErasedClosure(..)
             | ty::Generator(..)
             | ty::GeneratorWitness(_)
             | ty::Opaque(..)

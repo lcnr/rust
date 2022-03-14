@@ -980,6 +980,8 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 }
             }
 
+            ty::ErasedClosure(..) => bug!("erased closure during selection"),
+
             ty::Infer(_) => {
                 candidates.ambiguous = true;
             }

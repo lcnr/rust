@@ -118,6 +118,7 @@ provide! { <'tcx> tcx, def_id, other, cdata,
     promoted_mir => { tcx.arena.alloc(cdata.get_promoted_mir(tcx, def_id.index)) }
     thir_abstract_const => { cdata.get_thir_abstract_const(tcx, def_id.index) }
     unused_generic_params => { cdata.get_unused_generic_params(def_id.index) }
+    upvar_types => { cdata.get_upvar_types(tcx, def_id.index) }
     const_param_default => { tcx.mk_const(cdata.get_const_param_default(tcx, def_id.index)) }
     mir_const_qualif => { cdata.mir_const_qualif(def_id.index) }
     fn_sig => { cdata.fn_sig(def_id.index, tcx) }

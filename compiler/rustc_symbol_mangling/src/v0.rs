@@ -461,6 +461,10 @@ impl<'tcx> Printer<'tcx> for &mut SymbolMangler<'tcx> {
             | ty::Generator(def_id, substs, _) => {
                 self = self.print_def_path(def_id, substs)?;
             }
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
+            }
             ty::Foreign(def_id) => {
                 self = self.print_def_path(def_id, &[])?;
             }

@@ -112,6 +112,10 @@ pub fn trivial_dropck_outlives<'tcx>(tcx: TyCtxt<'tcx>, ty: Ty<'tcx>) -> bool {
         ty::Closure(_, ref substs) => {
             trivial_dropck_outlives(tcx, substs.as_closure().tupled_upvars_ty())
         }
+        ty::ErasedClosure(..) => {
+            // FIXME(#92617)
+            unimplemented!()
+        }
 
         ty::Adt(def, _) => {
             if Some(def.did) == tcx.lang_items().manually_drop() {

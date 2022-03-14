@@ -135,6 +135,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             | ty::FnDef(..)
             | ty::FnPtr(..)
             | ty::Closure(..)
+            | ty::ErasedClosure(..)
             | ty::Generator(..)
             | ty::Adt(..)
             | ty::Never

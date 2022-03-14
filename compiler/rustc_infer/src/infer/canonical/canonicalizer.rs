@@ -406,6 +406,10 @@ impl<'cx, 'tcx> TypeFolder<'tcx> for Canonicalizer<'cx, 'tcx> {
                     t
                 }
             }
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
+            }
         }
     }
 

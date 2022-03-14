@@ -1617,6 +1617,10 @@ impl<'tcx> Clean<Type> for Ty<'tcx> {
             }
 
             ty::Closure(..) | ty::Generator(..) => Tuple(vec![]), // FIXME(pcwalton)
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
+            }
 
             ty::Bound(..) => panic!("Bound"),
             ty::Placeholder(..) => panic!("Placeholder"),

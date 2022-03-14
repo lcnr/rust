@@ -1601,6 +1601,7 @@ impl<'a, 'tcx> EncodeContext<'a, 'tcx> {
         self.encode_item_type(def_id.to_def_id());
         if let ty::Closure(def_id, substs) = *ty.kind() {
             record!(self.tables.fn_sig[def_id] <- substs.as_closure().sig());
+            record!(self.tables.upvar_types[def_id] <- self.tcx.upvar_types(def_id));
         }
     }
 

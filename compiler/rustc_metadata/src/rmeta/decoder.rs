@@ -1018,11 +1018,11 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
         self.root.tables.expn_that_defined.get(self, id).unwrap().decode((self, sess))
     }
 
-    fn get_const_param_default(
-        self,
-        tcx: TyCtxt<'tcx>,
-        id: DefIndex,
-    ) -> rustc_middle::ty::Const<'tcx> {
+    fn get_upvar_types(self, tcx: TyCtxt<'tcx>, id: DefIndex) -> SubstsRef<'tcx> {
+        self.root.tables.upvar_types.get(self, id).unwrap().decode((self, tcx))
+    }
+
+    fn get_const_param_default(self, tcx: TyCtxt<'tcx>, id: DefIndex) -> ty::Const<'tcx> {
         self.root.tables.const_defaults.get(self, id).unwrap().decode((self, tcx))
     }
 

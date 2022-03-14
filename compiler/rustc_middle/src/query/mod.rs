@@ -1588,6 +1588,10 @@ rustc_queries! {
         desc { "allocator kind for the current crate" }
     }
 
+    query upvar_types(def_id: DefId) -> SubstsRef<'tcx> {
+        desc { |tcx| "computing the types contained in `{}`", tcx.def_path_str(def_id)}
+        separate_provide_extern
+    }
     query upvars_mentioned(def_id: DefId) -> Option<&'tcx FxIndexMap<hir::HirId, hir::Upvar>> {
         desc { |tcx| "collecting upvars mentioned in `{}`", tcx.def_path_str(def_id) }
     }

@@ -117,6 +117,7 @@ pub fn simplify_type(
             }
         }
         ty::FnDef(def_id, _) | ty::Closure(def_id, _) => Some(ClosureSimplifiedType(def_id)),
+        ty::ErasedClosure(..) => bug!("erased closures in `fast_reject`"),
         ty::Generator(def_id, _, _) => Some(GeneratorSimplifiedType(def_id)),
         ty::GeneratorWitness(ref tys) => {
             Some(GeneratorWitnessSimplifiedType(tys.skip_binder().len()))

@@ -41,6 +41,7 @@ use rustc_hir::intravisit::{self, Visitor};
 use rustc_infer::infer::UpvarRegion;
 use rustc_middle::hir::place::{Place, PlaceBase, PlaceWithHirId, Projection, ProjectionKind};
 use rustc_middle::mir::FakeReadCause;
+use rustc_middle::ty::subst::GenericArg;
 use rustc_middle::ty::{
     self, ClosureSizeProfileData, Ty, TyCtxt, TypeckResults, UpvarCapture, UpvarSubsts,
 };
@@ -303,9 +304,17 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             closure_hir_id, substs, final_upvar_tys
         );
 
+        let upvars_as_substs = self.tcx.intern_substs(
+            &final_upvar_tys.iter().map(|&t| GenericArg::from(t)).collect::<Vec<_>>(),
+        );
+
+        self.typeck_results
+            .borrow_mut()
+            .closure_upvar_types
+            .insert(closure_def_id.expect_local(), upvars_as_substs);
         // Build a tuple (U0..Un) of the final upvar types U0..Un
         // and unify the upvar tupe type in the closure with it:
-        let final_tupled_upvars_type = self.tcx.mk_tup(final_upvar_tys.iter());
+        let final_tupled_upvars_type = self.tcx.mk_ty(ty::Tuple(upvars_as_substs));
         self.demand_suptype(span, substs.tupled_upvars_ty(), final_tupled_upvars_type);
 
         let fake_reads = delegate

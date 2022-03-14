@@ -287,7 +287,7 @@ impl<'tcx> ty::TyS<'tcx> {
                 format!("trait object `dyn {}`", tcx.def_path_str(principal.def_id())).into()
             }
             ty::Dynamic(..) => "trait object".into(),
-            ty::Closure(..) => "closure".into(),
+            ty::Closure(..) | ty::ErasedClosure(..) => "closure".into(),
             ty::Generator(def_id, ..) => tcx.generator_kind(def_id).unwrap().descr().into(),
             ty::GeneratorWitness(..) => "generator witness".into(),
             ty::Tuple(..) => "tuple".into(),
@@ -331,7 +331,7 @@ impl<'tcx> ty::TyS<'tcx> {
             ty::FnDef(..) => "fn item".into(),
             ty::FnPtr(_) => "fn pointer".into(),
             ty::Dynamic(..) => "trait object".into(),
-            ty::Closure(..) => "closure".into(),
+            ty::Closure(..) | ty::ErasedClosure(..) => "closure".into(),
             ty::Generator(def_id, ..) => tcx.generator_kind(def_id).unwrap().descr().into(),
             ty::GeneratorWitness(..) => "generator witness".into(),
             ty::Tuple(..) => "tuple".into(),

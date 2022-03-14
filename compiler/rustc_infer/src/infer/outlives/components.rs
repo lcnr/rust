@@ -102,6 +102,11 @@ fn compute_components<'tcx>(
                 compute_components(tcx, tupled_ty, out, visited);
             }
 
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
+            }
+
             ty::Generator(_, ref substs, _) => {
                 // Same as the closure case
                 let tupled_ty = substs.as_generator().tupled_upvars_ty();

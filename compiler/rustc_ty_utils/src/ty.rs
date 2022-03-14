@@ -66,6 +66,10 @@ fn sized_constraint_for_ty<'tcx>(
         Placeholder(..) | Bound(..) | Infer(..) => {
             bug!("unexpected type `{:?}` in sized_constraint_for_ty", ty)
         }
+        ty::ErasedClosure(..) => {
+            // FIXME(#92617)
+            unimplemented!()
+        }
     };
     debug!("sized_constraint_for_ty({:?}) = {:?}", ty, result);
     result

@@ -317,6 +317,10 @@ impl<'tcx> LowerInto<'tcx, chalk_ir::Ty<RustInterner<'tcx>>> for Ty<'tcx> {
             ty::Closure(def_id, substs) => {
                 chalk_ir::TyKind::Closure(chalk_ir::ClosureId(def_id), substs.lower_into(interner))
             }
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
+            }
             ty::Generator(_def_id, _substs, _) => unimplemented!(),
             ty::GeneratorWitness(_) => unimplemented!(),
             ty::Never => chalk_ir::TyKind::Never,

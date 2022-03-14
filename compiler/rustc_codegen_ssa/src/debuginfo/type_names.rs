@@ -345,7 +345,8 @@ fn push_debuginfo_type_name<'tcx>(
             // processing
             visited.remove(t);
         }
-        ty::Closure(def_id, ..) | ty::Generator(def_id, ..) => {
+        // FIXME(#92617): remove `ty::Closure` here.
+        ty::Closure(def_id, ..) | ty::ErasedClosure(def_id, ..) | ty::Generator(def_id, ..) => {
             let key = tcx.def_key(def_id);
             if qualified {
                 let parent_def_id = DefId { index: key.parent.unwrap(), ..def_id };

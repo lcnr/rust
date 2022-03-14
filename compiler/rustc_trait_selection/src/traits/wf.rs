@@ -613,6 +613,10 @@ impl<'a, 'tcx> WfPredicates<'a, 'tcx> {
                     // FIXME(eddyb) add the type to `walker` instead of recursing.
                     self.compute(substs.as_closure().tupled_upvars_ty().into());
                 }
+                ty::ErasedClosure(..) => {
+                    // FIXME(#92617)
+                    unimplemented!()
+                }
 
                 ty::FnPtr(_) => {
                     // let the loop iterate into the argument/return

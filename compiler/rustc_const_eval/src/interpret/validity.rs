@@ -600,6 +600,10 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValidityVisitor<'rt, 'mir, '
             | ty::Dynamic(..)
             | ty::Closure(..)
             | ty::Generator(..) => Ok(false),
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
+            }
             // Some types only occur during typechecking, they have no layout.
             // We should not see them here and we could not check them anyway.
             ty::Error(_)

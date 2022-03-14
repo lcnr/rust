@@ -143,6 +143,41 @@ impl<'tcx> TyCtxt<'tcx> {
         hasher.finish()
     }
 
+    pub fn erase_closures<T: TypeFoldable<'tcx>>(self, value: T) -> T {
+        struct EraseClosures<'tcx> {
+            tcx: TyCtxt<'tcx>,
+        }
+        impl<'tcx> TypeFolder<'tcx> for EraseClosures<'tcx> {
+            fn tcx(&self) -> TyCtxt<'tcx> {
+                self.tcx
+            }
+
+            fn fold_ty(&mut self, t: Ty<'tcx>) -> Ty<'tcx> {
+                if t.flags().contains(ty::TypeFlags::HAS_UNERASED_CLOSURES) {
+                    let t = t.super_fold_with(self);
+                    match t.kind() {
+                        &ty::Closure(def_id, substs) => self.tcx.mk_ty(ty::ErasedClosure(
+                            def_id,
+                            self.tcx.mk_substs(substs.as_closure().parent_substs().iter()),
+                        )),
+                        _ => t,
+                    }
+                } else {
+                    t
+                }
+            }
+
+            fn fold_predicate(&mut self, p: ty::Predicate<'tcx>) -> ty::Predicate<'tcx> {
+                if p.has_type_flags(ty::TypeFlags::HAS_UNERASED_CLOSURES) {
+                    p.super_fold_with(self)
+                } else {
+                    p
+                }
+            }
+        }
+        value.fold_with(&mut EraseClosures { tcx: self })
+    }
+
     pub fn has_error_field(self, ty: Ty<'tcx>) -> bool {
         if let ty::Adt(def, substs) = *ty.kind() {
             for field in def.all_fields() {
@@ -715,6 +750,7 @@ impl<'tcx> ty::TyS<'tcx> {
             ty::Adt(..)
             | ty::Bound(..)
             | ty::Closure(..)
+            | ty::ErasedClosure(..)
             | ty::Dynamic(..)
             | ty::Foreign(_)
             | ty::Generator(..)
@@ -755,6 +791,7 @@ impl<'tcx> ty::TyS<'tcx> {
             ty::Adt(..)
             | ty::Bound(..)
             | ty::Closure(..)
+            | ty::ErasedClosure(..)
             | ty::Dynamic(..)
             | ty::Foreign(_)
             | ty::Generator(..)
@@ -881,7 +918,7 @@ impl<'tcx> ty::TyS<'tcx> {
             // Conservatively return `false` for all others...
 
             // Anonymous function types
-            FnDef(..) | Closure(..) | Dynamic(..) | Generator(..) => false,
+            FnDef(..) | Closure(..) | ty::ErasedClosure(..) | Dynamic(..) | Generator(..) => false,
 
             // Generic or inferred types
             //
@@ -1038,6 +1075,7 @@ pub fn needs_drop_components<'tcx>(
         | ty::Infer(_)
         | ty::Closure(..)
         | ty::Generator(..) => Ok(smallvec![ty]),
+        ty::ErasedClosure(..) => bug!("erased closure"),
     }
 }
 
@@ -1070,6 +1108,10 @@ pub fn is_trivially_const_drop<'tcx>(ty: Ty<'tcx>) -> bool {
         // Not trivial because they have components, and instead of looking inside,
         // we'll just perform trait selection.
         ty::Closure(..) | ty::Generator(..) | ty::GeneratorWitness(_) | ty::Adt(..) => false,
+        ty::ErasedClosure(..) => {
+            // FIXME(#93424)
+            unimplemented!()
+        }
 
         ty::Array(ty, _) | ty::Slice(ty) => is_trivially_const_drop(ty),
 

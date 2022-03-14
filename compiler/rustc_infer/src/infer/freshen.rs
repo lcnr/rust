@@ -217,6 +217,11 @@ impl<'a, 'tcx> TypeFolder<'tcx> for TypeFreshener<'a, 'tcx> {
             | ty::GeneratorWitness(..)
             | ty::Opaque(..) => t.super_fold_with(self),
 
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
+            }
+
             ty::Placeholder(..) | ty::Bound(..) => bug!("unexpected type {:?}", t),
         }
     }

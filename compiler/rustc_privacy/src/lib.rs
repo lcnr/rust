@@ -206,6 +206,10 @@ where
                     }
                 }
             }
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
+            }
             ty::Projection(proj) => {
                 if self.def_id_visitor.skip_assoc_tys() {
                     // Visitors searching for minimal visibility/reachability want to

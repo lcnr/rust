@@ -1009,6 +1009,7 @@ impl<'tcx> TypeFoldable<'tcx> for Ty<'tcx> {
             }
             ty::GeneratorWitness(types) => ty::GeneratorWitness(types.try_fold_with(folder)?),
             ty::Closure(did, substs) => ty::Closure(did, substs.try_fold_with(folder)?),
+            ty::ErasedClosure(did, substs) => ty::ErasedClosure(did, substs.try_fold_with(folder)?),
             ty::Projection(data) => ty::Projection(data.try_fold_with(folder)?),
             ty::Opaque(did, substs) => ty::Opaque(did, substs.try_fold_with(folder)?),
 
@@ -1036,7 +1037,7 @@ impl<'tcx> TypeFoldable<'tcx> for Ty<'tcx> {
 
     fn super_visit_with<V: TypeVisitor<'tcx>>(&self, visitor: &mut V) -> ControlFlow<V::BreakTy> {
         match self.kind() {
-            ty::RawPtr(ref tm) => tm.visit_with(visitor),
+            ty::RawPtr(tm) => tm.visit_with(visitor),
             ty::Array(typ, sz) => {
                 typ.visit_with(visitor)?;
                 sz.visit_with(visitor)
@@ -1049,16 +1050,17 @@ impl<'tcx> TypeFoldable<'tcx> for Ty<'tcx> {
             }
             ty::Tuple(ts) => ts.visit_with(visitor),
             ty::FnDef(_, substs) => substs.visit_with(visitor),
-            ty::FnPtr(ref f) => f.visit_with(visitor),
+            ty::FnPtr(f) => f.visit_with(visitor),
             ty::Ref(r, ty, _) => {
                 r.visit_with(visitor)?;
                 ty.visit_with(visitor)
             }
-            ty::Generator(_did, ref substs, _) => substs.visit_with(visitor),
-            ty::GeneratorWitness(ref types) => types.visit_with(visitor),
-            ty::Closure(_did, ref substs) => substs.visit_with(visitor),
-            ty::Projection(ref data) => data.visit_with(visitor),
-            ty::Opaque(_, ref substs) => substs.visit_with(visitor),
+            ty::Generator(_did, substs, _) => substs.visit_with(visitor),
+            ty::GeneratorWitness(types) => types.visit_with(visitor),
+            ty::Closure(_did, substs) => substs.visit_with(visitor),
+            ty::ErasedClosure(_did, substs) => substs.visit_with(visitor),
+            ty::Projection(data) => data.visit_with(visitor),
+            ty::Opaque(_, substs) => substs.visit_with(visitor),
 
             ty::Bool
             | ty::Char

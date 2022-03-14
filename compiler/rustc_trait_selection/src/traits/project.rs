@@ -1391,6 +1391,10 @@ fn assemble_candidates_from_impls<'cx, 'tcx>(
                     | ty::Placeholder(..)
                     | ty::Infer(..)
                     | ty::Error(_) => false,
+                    ty::ErasedClosure(..) => {
+                        // FIXME(#92617)
+                        unimplemented!()
+                    }
                 }
             }
             super::ImplSource::Pointee(..) => {
@@ -1450,6 +1454,10 @@ fn assemble_candidates_from_impls<'cx, 'tcx>(
                         }
                         false
                     },
+                    ty::ErasedClosure(..) => {
+                        // FIXME(#92617)
+                        unimplemented!()
+                    }
                 }
             }
             super::ImplSource::Param(..) => {

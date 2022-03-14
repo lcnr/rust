@@ -1846,6 +1846,11 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             ty::Projection(_) | ty::Param(_) | ty::Opaque(..) => None,
             ty::Infer(ty::TyVar(_)) => Ambiguous,
 
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
+            }
+
             ty::Placeholder(..)
             | ty::Bound(..)
             | ty::Infer(ty::FreshTy(_) | ty::FreshIntTy(_) | ty::FreshFloatTy(_)) => {
@@ -1905,6 +1910,10 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 } else {
                     Where(obligation.predicate.rebind(substs.as_closure().upvar_tys().collect()))
                 }
+            }
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
             }
 
             ty::Adt(..) | ty::Projection(..) | ty::Param(..) | ty::Opaque(..) => {
@@ -1979,6 +1988,10 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             ty::Closure(_, ref substs) => {
                 let ty = self.infcx.shallow_resolve(substs.as_closure().tupled_upvars_ty());
                 t.rebind(vec![ty])
+            }
+            ty::ErasedClosure(..) => {
+                // FIXME(#92617)
+                unimplemented!()
             }
 
             ty::Generator(_, ref substs, _) => {

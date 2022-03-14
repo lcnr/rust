@@ -18,6 +18,7 @@ use rustc_middle::mir;
 use rustc_middle::thir;
 use rustc_middle::ty::fast_reject::SimplifiedType;
 use rustc_middle::ty::query::Providers;
+use rustc_middle::ty::subst::SubstsRef;
 use rustc_middle::ty::{self, ReprOptions, Ty};
 use rustc_serialize::opaque::Encoder;
 use rustc_session::config::SymbolManglingVersion;
@@ -303,6 +304,7 @@ define_tables! {
     mir_for_ctfe: Table<DefIndex, Lazy!(mir::Body<'tcx>)>,
     promoted_mir: Table<DefIndex, Lazy!(IndexVec<mir::Promoted, mir::Body<'tcx>>)>,
     thir_abstract_consts: Table<DefIndex, Lazy!(&'tcx [thir::abstract_const::Node<'tcx>])>,
+    upvar_types: Table<DefIndex, Lazy<SubstsRef<'tcx>>>,
     const_defaults: Table<DefIndex, Lazy<rustc_middle::ty::Const<'tcx>>>,
     unused_generic_params: Table<DefIndex, Lazy<FiniteBitSet<u32>>>,
     // `def_keys` and `def_path_hashes` represent a lazy version of a

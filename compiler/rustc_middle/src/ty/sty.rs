@@ -153,6 +153,9 @@ pub enum TyKind<'tcx> {
     /// The anonymous type of a closure. Used to represent the type of
     /// `|a| a`.
     Closure(DefId, SubstsRef<'tcx>),
+    /// A closure for with erased closure parameters. Only useable after typeck has
+    /// completed.
+    ErasedClosure(DefId, SubstsRef<'tcx>),
 
     /// The anonymous type of a generator. Used to represent the type of
     /// `|a| yield a`.
@@ -2128,6 +2131,7 @@ impl<'tcx> TyS<'tcx> {
             | ty::FnPtr(..)
             | ty::Dynamic(..)
             | ty::Closure(..)
+            | ty::ErasedClosure(..)
             | ty::GeneratorWitness(..)
             | ty::Never
             | ty::Tuple(_)
@@ -2165,6 +2169,7 @@ impl<'tcx> TyS<'tcx> {
             | ty::GeneratorWitness(..)
             | ty::Array(..)
             | ty::Closure(..)
+            | ty::ErasedClosure(..)
             | ty::Never
             | ty::Error(_)
             | ty::Foreign(..)
@@ -2250,6 +2255,7 @@ impl<'tcx> TyS<'tcx> {
             | ty::GeneratorWitness(..)
             | ty::Array(..)
             | ty::Closure(..)
+            | ty::ErasedClosure(..)
             | ty::Never
             | ty::Error(_) => true,
 

@@ -122,6 +122,9 @@ impl FlagComputation {
             }
 
             &ty::Closure(_, substs) => {
+                assert!(!self.flags.contains(TypeFlags::HAS_ERASED_CLOSURES));
+                self.add_flags(TypeFlags::HAS_UNERASED_CLOSURES);
+
                 let substs = substs.as_closure();
                 let should_remove_further_specializable =
                     !self.flags.contains(TypeFlags::STILL_FURTHER_SPECIALIZABLE);
@@ -133,6 +136,18 @@ impl FlagComputation {
                 self.add_ty(substs.sig_as_fn_ptr_ty());
                 self.add_ty(substs.kind_ty());
                 self.add_ty(substs.tupled_upvars_ty());
+            }
+
+            &ty::ErasedClosure(_, substs) => {
+                assert!(!self.flags.contains(TypeFlags::HAS_UNERASED_CLOSURES));
+                self.add_flags(TypeFlags::HAS_ERASED_CLOSURES);
+
+                let should_remove_further_specializable =
+                    !self.flags.contains(TypeFlags::STILL_FURTHER_SPECIALIZABLE);
+                self.add_substs(substs);
+                if should_remove_further_specializable {
+                    self.flags -= TypeFlags::STILL_FURTHER_SPECIALIZABLE;
+                }
             }
 
             &ty::Bound(debruijn, _) => {

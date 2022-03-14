@@ -241,6 +241,10 @@ pub fn provide(providers: &mut Providers) {
         typeck_item_bodies,
         typeck_const_arg,
         typeck,
+        upvar_types: |tcx, def_id| {
+            let def_id = def_id.expect_local();
+            tcx.typeck(def_id).closure_upvar_types.get(&def_id).unwrap()
+        },
         diagnostic_only_typeck,
         has_typeck_results,
         adt_destructor,

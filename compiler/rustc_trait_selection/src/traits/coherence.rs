@@ -788,6 +788,10 @@ fn ty_is_local_constructor(ty: Ty<'_>, in_crate: InCrate) -> bool {
             // Similar to the `Opaque` case (#83613).
             false
         }
+        ty::ErasedClosure(..) => {
+            // FIXME(#92617)
+            unimplemented!()
+        }
 
         ty::Dynamic(ref tt, ..) => {
             if let Some(principal) = tt.principal() {
