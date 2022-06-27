@@ -1,21 +1,29 @@
-error[E0515]: cannot return reference to temporary value
-  --> $DIR/regions-creating-enums.rs:23:16
+error[E0716]: temporary value dropped while borrowed
+  --> $DIR/regions-creating-enums.rs:23:17
    |
 LL |         return &Ast::Num((*f)(x));
-   |                ^-----------------
-   |                ||
-   |                |temporary value created here
-   |                returns a reference to data owned by the current function
+   |                 ^^^^^^^^^^^^^^^^^- temporary value is freed at the end of this statement
+   |                 |
+   |                 creates a temporary which is freed while still in use
+...
+LL | }
+   |  - borrow later used here
+   |
+   = note: consider using a `let` binding to create a longer lived value
 
-error[E0515]: cannot return reference to temporary value
-  --> $DIR/regions-creating-enums.rs:28:16
+error[E0716]: temporary value dropped while borrowed
+  --> $DIR/regions-creating-enums.rs:28:17
    |
 LL |         return &Ast::Add(m_x, m_y);
-   |                ^------------------
-   |                ||
-   |                |temporary value created here
-   |                returns a reference to data owned by the current function
+   |                 ^^^^^^^^^^^^^^^^^^- temporary value is freed at the end of this statement
+   |                 |
+   |                 creates a temporary which is freed while still in use
+...
+LL | }
+   |  - borrow later used here
+   |
+   = note: consider using a `let` binding to create a longer lived value
 
 error: aborting due to 2 previous errors
 
-For more information about this error, try `rustc --explain E0515`.
+For more information about this error, try `rustc --explain E0716`.

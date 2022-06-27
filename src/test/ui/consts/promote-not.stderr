@@ -2,11 +2,13 @@ error[E0716]: temporary value dropped while borrowed
   --> $DIR/promote-not.rs:8:50
    |
 LL | static mut TEST1: Option<&mut [i32]> = Some(&mut [1, 2, 3]);
-   |                                        ----------^^^^^^^^^-
-   |                                        |         |        |
-   |                                        |         |        temporary value is freed at the end of this statement
-   |                                        |         creates a temporary which is freed while still in use
-   |                                        using this value as a static requires that borrow lasts for `'static`
+   | -------------------------------------------------^^^^^^^^^--
+   | |                                                |        |
+   | |                                                |        temporary value is freed at the end of this statement
+   | |                                                creates a temporary which is freed while still in use
+   | borrow later used here
+   |
+   = note: consider using a `let` binding to create a longer lived value
 
 error[E0716]: temporary value dropped while borrowed
   --> $DIR/promote-not.rs:11:18
@@ -14,9 +16,11 @@ error[E0716]: temporary value dropped while borrowed
 LL |     let x = &mut [1,2,3];
    |                  ^^^^^^^ creates a temporary which is freed while still in use
 LL |     x
-   |     - using this value as a static requires that borrow lasts for `'static`
+   |     - borrow later used here
 LL | };
    | - temporary value is freed at the end of this statement
+   |
+   = note: consider using a `let` binding to create a longer lived value
 
 error[E0716]: temporary value dropped while borrowed
   --> $DIR/promote-not.rs:20:32

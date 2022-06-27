@@ -6,12 +6,26 @@ LL | fn silly<'y, 'z>(_s: &'y Test<'z>) -> &'y <Test<'z> as Trait>::Out where 'z
    |
    = help: you can use the `'static` lifetime directly, in place of `'z`
 
-error[E0515]: cannot return reference to local variable `x`
+error[E0597]: `x` does not live long enough
   --> $DIR/issue-30438-c.rs:10:5
    |
+LL | fn silly<'y, 'z>(_s: &'y Test<'z>) -> &'y <Test<'z> as Trait>::Out where 'z: 'static {
+   |                       --               -- also has lifetime `'y`
+   |                       |
+   |                       has lifetime `'y`
+...
 LL |     &x
-   |     ^^ returns a reference to data owned by the current function
+   |     ^^ `x` would have to be valid for `'y`...
+LL |
+LL | }
+   | -- borrow later used here
+   | |
+   | ...but `x` will be dropped here, when the function `silly` returns
+   |
+   = help: use data from the highlighted arguments which match the `'y` lifetime of the return type
+   = note: functions cannot return a borrow to data owned within the function's scope, functions can only return borrows to data passed as arguments
+   = note: to learn more, visit <https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html#dangling-references>
 
 error: aborting due to previous error; 1 warning emitted
 
-For more information about this error, try `rustc --explain E0515`.
+For more information about this error, try `rustc --explain E0597`.

@@ -1,12 +1,16 @@
-error[E0515]: cannot return reference to temporary value
-  --> $DIR/issue-30438-a.rs:12:16
+error[E0716]: temporary value dropped while borrowed
+  --> $DIR/issue-30438-a.rs:12:17
    |
 LL |         return &Test { s: &self.s};
-   |                ^------------------
-   |                ||
-   |                |temporary value created here
-   |                returns a reference to data owned by the current function
+   |                 ^^^^^^^^^^^^^^^^^^- temporary value is freed at the end of this statement
+   |                 |
+   |                 creates a temporary which is freed while still in use
+LL |
+LL |     }
+   |      - borrow later used here
+   |
+   = note: consider using a `let` binding to create a longer lived value
 
 error: aborting due to previous error
 
-For more information about this error, try `rustc --explain E0515`.
+For more information about this error, try `rustc --explain E0716`.

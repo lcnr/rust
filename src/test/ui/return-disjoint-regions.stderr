@@ -1,11 +1,15 @@
-error[E0515]: cannot return value referencing function parameter `x`
-  --> $DIR/return-disjoint-regions.rs:4:5
+error[E0597]: `x` does not live long enough
+  --> $DIR/return-disjoint-regions.rs:3:13
    |
 LL |     let y = &x;
-   |             -- `x` is borrowed here
+   |             ^^ borrowed value does not live long enough
 LL |     (y, y)
-   |     ^^^^^^ returns a value referencing data owned by the current function
+LL | }
+   |  -
+   |  |
+   |  `x` dropped here while still borrowed
+   |  borrow later used here
 
 error: aborting due to previous error
 
-For more information about this error, try `rustc --explain E0515`.
+For more information about this error, try `rustc --explain E0597`.

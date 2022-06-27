@@ -1,30 +1,36 @@
-error[E0515]: cannot return value referencing local variable `vec`
-  --> $DIR/borrowck-vec-pattern-element-loan.rs:8:5
+error[E0597]: `vec` does not live long enough
+  --> $DIR/borrowck-vec-pattern-element-loan.rs:3:25
    |
 LL |     let vec: &[isize] = &vec;
-   |                         ---- `vec` is borrowed here
+   |                         ^^^^ borrowed value does not live long enough
 ...
-LL |     tail
-   |     ^^^^ returns a value referencing data owned by the current function
+LL | }
+   | -- borrow later used here
+   | |
+   | `vec` dropped here while still borrowed
 
-error[E0515]: cannot return value referencing local variable `vec`
-  --> $DIR/borrowck-vec-pattern-element-loan.rs:18:5
+error[E0597]: `vec` does not live long enough
+  --> $DIR/borrowck-vec-pattern-element-loan.rs:13:25
    |
 LL |     let vec: &[isize] = &vec;
-   |                         ---- `vec` is borrowed here
+   |                         ^^^^ borrowed value does not live long enough
 ...
-LL |     init
-   |     ^^^^ returns a value referencing data owned by the current function
+LL | }
+   | -- borrow later used here
+   | |
+   | `vec` dropped here while still borrowed
 
-error[E0515]: cannot return value referencing local variable `vec`
-  --> $DIR/borrowck-vec-pattern-element-loan.rs:28:5
+error[E0597]: `vec` does not live long enough
+  --> $DIR/borrowck-vec-pattern-element-loan.rs:23:25
    |
 LL |     let vec: &[isize] = &vec;
-   |                         ---- `vec` is borrowed here
+   |                         ^^^^ borrowed value does not live long enough
 ...
-LL |     slice
-   |     ^^^^^ returns a value referencing data owned by the current function
+LL | }
+   | -- borrow later used here
+   | |
+   | `vec` dropped here while still borrowed
 
 error: aborting due to 3 previous errors
 
-For more information about this error, try `rustc --explain E0515`.
+For more information about this error, try `rustc --explain E0597`.

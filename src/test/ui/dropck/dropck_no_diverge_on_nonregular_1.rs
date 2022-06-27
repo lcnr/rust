@@ -1,5 +1,3 @@
-// check-pass
-//
 // Issue 22443: Reject code using non-regular types that would
 // otherwise cause dropck to loop infinitely.
 //

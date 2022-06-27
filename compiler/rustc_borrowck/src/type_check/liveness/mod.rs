@@ -46,7 +46,7 @@ pub(super) fn generate<'mir, 'tcx>(
         &typeck.borrowck_context.universal_regions,
         &typeck.borrowck_context.constraints.outlives_constraints,
     );
-    let live_locals = compute_live_locals(typeck.tcx(), &free_regions, &body);
+    let live_locals: Vec<_> = body.local_decls.indices().collect();
     let facts_enabled = use_polonius || AllFacts::enabled(typeck.tcx());
 
     let polonius_drop_used = if facts_enabled {

@@ -1,50 +1,65 @@
-error[E0515]: cannot return value referencing temporary value
-  --> $DIR/promote-ref-mut-in-let-issue-46557.rs:6:5
+error[E0716]: temporary value dropped while borrowed
+  --> $DIR/promote-ref-mut-in-let-issue-46557.rs:5:21
    |
 LL |     let ref mut x = 1234543;
-   |                     ------- temporary value created here
+   |                     ^^^^^^^ creates a temporary which is freed while still in use
 LL |     x
-   |     ^ returns a value referencing data owned by the current function
+   |     - borrow later used here
+LL | }
+   | - temporary value is freed at the end of this statement
+   |
+   = note: consider using a `let` binding to create a longer lived value
 
-error[E0515]: cannot return value referencing temporary value
-  --> $DIR/promote-ref-mut-in-let-issue-46557.rs:11:5
+error[E0716]: temporary value dropped while borrowed
+  --> $DIR/promote-ref-mut-in-let-issue-46557.rs:10:25
    |
 LL |     let (ref mut x, ) = (1234543, );
-   |                         ----------- temporary value created here
+   |                         ^^^^^^^^^^^ creates a temporary which is freed while still in use
 LL |     x
-   |     ^ returns a value referencing data owned by the current function
-
-error[E0515]: cannot return value referencing temporary value
-  --> $DIR/promote-ref-mut-in-let-issue-46557.rs:15:5
+   |     - borrow later used here
+LL | }
+   | - temporary value is freed at the end of this statement
    |
-LL |       match 1234543 {
-   |       ^     ------- temporary value created here
-   |  _____|
-   | |
-LL | |         ref mut x => x
-LL | |     }
-   | |_____^ returns a value referencing data owned by the current function
+   = note: consider using a `let` binding to create a longer lived value
 
-error[E0515]: cannot return value referencing temporary value
-  --> $DIR/promote-ref-mut-in-let-issue-46557.rs:21:5
+error[E0716]: temporary value dropped while borrowed
+  --> $DIR/promote-ref-mut-in-let-issue-46557.rs:15:11
    |
-LL |       match (123443,) {
-   |       ^     --------- temporary value created here
-   |  _____|
+LL |     match 1234543 {
+   |           ^^^^^^^ creates a temporary which is freed while still in use
+...
+LL | }
+   | -- borrow later used here
    | |
-LL | |         (ref mut x,) => x,
-LL | |     }
-   | |_____^ returns a value referencing data owned by the current function
+   | temporary value is freed at the end of this statement
+   |
+   = note: consider using a `let` binding to create a longer lived value
 
-error[E0515]: cannot return reference to temporary value
-  --> $DIR/promote-ref-mut-in-let-issue-46557.rs:27:5
+error[E0716]: temporary value dropped while borrowed
+  --> $DIR/promote-ref-mut-in-let-issue-46557.rs:21:11
+   |
+LL |     match (123443,) {
+   |           ^^^^^^^^^ creates a temporary which is freed while still in use
+...
+LL | }
+   | -- borrow later used here
+   | |
+   | temporary value is freed at the end of this statement
+   |
+   = note: consider using a `let` binding to create a longer lived value
+
+error[E0716]: temporary value dropped while borrowed
+  --> $DIR/promote-ref-mut-in-let-issue-46557.rs:27:10
    |
 LL |     &mut 1234543
-   |     ^^^^^-------
-   |     |    |
-   |     |    temporary value created here
-   |     returns a reference to data owned by the current function
+   |          ^^^^^^^ creates a temporary which is freed while still in use
+LL | }
+   | -- borrow later used here
+   | |
+   | temporary value is freed at the end of this statement
+   |
+   = note: consider using a `let` binding to create a longer lived value
 
 error: aborting due to 5 previous errors
 
-For more information about this error, try `rustc --explain E0515`.
+For more information about this error, try `rustc --explain E0716`.

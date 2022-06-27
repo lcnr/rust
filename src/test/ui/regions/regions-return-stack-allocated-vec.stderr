@@ -1,12 +1,15 @@
-error[E0515]: cannot return reference to temporary value
-  --> $DIR/regions-return-stack-allocated-vec.rs:4:5
+error[E0716]: temporary value dropped while borrowed
+  --> $DIR/regions-return-stack-allocated-vec.rs:4:6
    |
 LL |     &[x]
-   |     ^---
-   |     ||
-   |     |temporary value created here
-   |     returns a reference to data owned by the current function
+   |      ^^^ creates a temporary which is freed while still in use
+LL | }
+   | -- borrow later used here
+   | |
+   | temporary value is freed at the end of this statement
+   |
+   = note: consider using a `let` binding to create a longer lived value
 
 error: aborting due to previous error
 
-For more information about this error, try `rustc --explain E0515`.
+For more information about this error, try `rustc --explain E0716`.

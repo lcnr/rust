@@ -1,11 +1,16 @@
-error[E0515]: cannot return value referencing temporary value
-  --> $DIR/borrowck-borrow-from-temporary.rs:10:5
+error[E0716]: temporary value dropped while borrowed
+  --> $DIR/borrowck-borrow-from-temporary.rs:9:24
    |
 LL |     let &Foo(ref x) = &id(Foo(3));
-   |                        ---------- temporary value created here
+   |                        ^^^^^^^^^^ creates a temporary which is freed while still in use
 LL |     x
-   |     ^ returns a value referencing data owned by the current function
+LL | }
+   | -- borrow later used here
+   | |
+   | temporary value is freed at the end of this statement
+   |
+   = note: consider using a `let` binding to create a longer lived value
 
 error: aborting due to previous error
 
-For more information about this error, try `rustc --explain E0515`.
+For more information about this error, try `rustc --explain E0716`.

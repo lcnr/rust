@@ -1,29 +1,28 @@
 error[E0597]: `x` does not live long enough
   --> $DIR/generic-slice.rs:15:9
    |
-LL | impl<'a, T: 'static> Generic<'a, T> {
-   |      -- lifetime `'a` defined here
-...
-LL |         &x
-   |         ^^
-   |         |
-   |         borrowed value does not live long enough
-   |         using this value as a constant requires that `x` is borrowed for `'a`
-LL |
-LL |     };
-   |     - `x` dropped here while still borrowed
+LL | /     const EMPTY_SLICE_REF: &'a &'static [T] = {
+LL | |         let x: &'static [T] = &[];
+LL | |         &x
+   | |         ^^ borrowed value does not live long enough
+LL | |
+LL | |     };
+   | |_____-- borrow later used here
+   |       |
+   |       `x` dropped here while still borrowed
 
 error[E0597]: `x` does not live long enough
   --> $DIR/generic-slice.rs:27:5
    |
-LL |     &x
-   |     ^^
-   |     |
-   |     borrowed value does not live long enough
-   |     using this value as a static requires that `x` is borrowed for `'static`
-LL |
-LL | };
-   | - `x` dropped here while still borrowed
+LL | / static mut INTERIOR_MUT_AND_DROP_REF: &'static &'static [std::cell::RefCell<Vec<i32>>] = {
+LL | |     let x: &[_] = &[];
+LL | |     &x
+   | |     ^^ borrowed value does not live long enough
+LL | |
+LL | | };
+   | |_-- borrow later used here
+   |   |
+   |   `x` dropped here while still borrowed
 
 error: aborting due to 2 previous errors
 

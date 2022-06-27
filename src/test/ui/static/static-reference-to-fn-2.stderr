@@ -31,19 +31,19 @@ LL |     self_.statefn = &id(finished as StateMachineFunc);
    |     |                creates a temporary which is freed while still in use
    |     assignment requires that borrow lasts for `'1`
 
-error[E0515]: cannot return value referencing temporary value
-  --> $DIR/static-reference-to-fn-2.rs:40:5
+error[E0716]: temporary value dropped while borrowed
+  --> $DIR/static-reference-to-fn-2.rs:42:19
    |
-LL | /     StateMachineIter {
-LL | |
-LL | |         statefn: &id(state1 as StateMachineFunc)
-   | |                   ------------------------------ temporary value created here
-LL | |     }
-   | |_____^ returns a value referencing data owned by the current function
+LL |         statefn: &id(state1 as StateMachineFunc)
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ creates a temporary which is freed while still in use
+LL |     }
+LL | }
+   | -- borrow later used here
+   | |
+   | temporary value is freed at the end of this statement
    |
-   = help: use `.collect()` to allocate the iterator
+   = note: consider using a `let` binding to create a longer lived value
 
 error: aborting due to 4 previous errors
 
-Some errors have detailed explanations: E0515, E0716.
-For more information about an error, try `rustc --explain E0515`.
+For more information about this error, try `rustc --explain E0716`.

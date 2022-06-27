@@ -1,9 +1,15 @@
-error[E0515]: cannot return reference to function parameter `x`
+error[E0597]: `x` does not live long enough
   --> $DIR/borrowck-local-borrow-outlives-fn.rs:2:5
    |
 LL |     &x
-   |     ^^ returns a reference to data owned by the current function
+   |     ^^ borrowed value does not live long enough
+LL |
+LL | }
+   |  -
+   |  |
+   |  `x` dropped here while still borrowed
+   |  borrow later used here
 
 error: aborting due to previous error
 
-For more information about this error, try `rustc --explain E0515`.
+For more information about this error, try `rustc --explain E0597`.

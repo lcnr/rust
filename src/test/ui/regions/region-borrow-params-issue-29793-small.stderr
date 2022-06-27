@@ -1,74 +1,58 @@
-error[E0373]: closure may outlive the current function, but it borrows `x`, which is owned by the current function
-  --> $DIR/region-borrow-params-issue-29793-small.rs:9:17
+error[E0597]: `x` does not live long enough
+  --> $DIR/region-borrow-params-issue-29793-small.rs:9:34
    |
 LL |         let f = |t: bool| if t { x } else { y }; // (separate errors for `x` vs `y`)
-   |                 ^^^^^^^^^        - `x` is borrowed here
+   |                 ---------        ^ borrowed value does not live long enough
    |                 |
-   |                 may outlive borrowed value `x`
-   |
-note: closure is returned here
-  --> $DIR/region-borrow-params-issue-29793-small.rs:12:16
-   |
-LL |         return f;
-   |                ^
-help: to force the closure to take ownership of `x` (and any other referenced variables), use the `move` keyword
-   |
-LL |         let f = move |t: bool| if t { x } else { y }; // (separate errors for `x` vs `y`)
-   |                 ++++
+   |                 value captured here
+...
+LL |     };
+   |      -
+   |      |
+   |      `x` dropped here while still borrowed
+   |      borrow later used here
 
-error[E0373]: closure may outlive the current function, but it borrows `y`, which is owned by the current function
-  --> $DIR/region-borrow-params-issue-29793-small.rs:9:17
+error[E0597]: `y` does not live long enough
+  --> $DIR/region-borrow-params-issue-29793-small.rs:9:45
    |
 LL |         let f = |t: bool| if t { x } else { y }; // (separate errors for `x` vs `y`)
-   |                 ^^^^^^^^^                   - `y` is borrowed here
+   |                 ---------                   ^ borrowed value does not live long enough
    |                 |
-   |                 may outlive borrowed value `y`
-   |
-note: closure is returned here
-  --> $DIR/region-borrow-params-issue-29793-small.rs:12:16
-   |
-LL |         return f;
-   |                ^
-help: to force the closure to take ownership of `y` (and any other referenced variables), use the `move` keyword
-   |
-LL |         let f = move |t: bool| if t { x } else { y }; // (separate errors for `x` vs `y`)
-   |                 ++++
+   |                 value captured here
+...
+LL |     };
+   |      -
+   |      |
+   |      `y` dropped here while still borrowed
+   |      borrow later used here
 
-error[E0373]: closure may outlive the current function, but it borrows `x`, which is owned by the current function
-  --> $DIR/region-borrow-params-issue-29793-small.rs:24:17
+error[E0597]: `x` does not live long enough
+  --> $DIR/region-borrow-params-issue-29793-small.rs:24:34
    |
 LL |         let f = |t: bool| if t { x } else { y }; // (separate errors for `x` vs `y`)
-   |                 ^^^^^^^^^        - `x` is borrowed here
+   |                 ---------        ^ borrowed value does not live long enough
    |                 |
-   |                 may outlive borrowed value `x`
-   |
-note: closure is returned here
-  --> $DIR/region-borrow-params-issue-29793-small.rs:27:9
-   |
-LL |         f
-   |         ^
-help: to force the closure to take ownership of `x` (and any other referenced variables), use the `move` keyword
-   |
-LL |         let f = move |t: bool| if t { x } else { y }; // (separate errors for `x` vs `y`)
-   |                 ++++
+   |                 value captured here
+...
+LL |     };
+   |      -
+   |      |
+   |      `x` dropped here while still borrowed
+   |      borrow later used here
 
-error[E0373]: closure may outlive the current function, but it borrows `y`, which is owned by the current function
-  --> $DIR/region-borrow-params-issue-29793-small.rs:24:17
+error[E0597]: `y` does not live long enough
+  --> $DIR/region-borrow-params-issue-29793-small.rs:24:45
    |
 LL |         let f = |t: bool| if t { x } else { y }; // (separate errors for `x` vs `y`)
-   |                 ^^^^^^^^^                   - `y` is borrowed here
+   |                 ---------                   ^ borrowed value does not live long enough
    |                 |
-   |                 may outlive borrowed value `y`
-   |
-note: closure is returned here
-  --> $DIR/region-borrow-params-issue-29793-small.rs:27:9
-   |
-LL |         f
-   |         ^
-help: to force the closure to take ownership of `y` (and any other referenced variables), use the `move` keyword
-   |
-LL |         let f = move |t: bool| if t { x } else { y }; // (separate errors for `x` vs `y`)
-   |                 ++++
+   |                 value captured here
+...
+LL |     };
+   |      -
+   |      |
+   |      `y` dropped here while still borrowed
+   |      borrow later used here
 
 error[E0373]: closure may outlive the current function, but it borrows `x`, which is owned by the current function
   --> $DIR/region-borrow-params-issue-29793-small.rs:55:17
@@ -360,4 +344,5 @@ LL |             let f = move |t: bool| if t { x } else { y }; // (separate erro
 
 error: aborting due to 20 previous errors
 
-For more information about this error, try `rustc --explain E0373`.
+Some errors have detailed explanations: E0373, E0597.
+For more information about an error, try `rustc --explain E0373`.
