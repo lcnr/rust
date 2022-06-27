@@ -79,7 +79,6 @@ fn inline<'tcx>(tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>) -> bool {
     let hir_id = tcx.hir().local_def_id_to_hir_id(def_id);
     let param_env = rustc_trait_selection::traits::normalize_param_env_or_error(
         tcx,
-        def_id.to_def_id(),
         param_env,
         ObligationCause::misc(body.span, hir_id),
     );

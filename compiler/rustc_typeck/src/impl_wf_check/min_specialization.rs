@@ -164,7 +164,7 @@ fn get_impl_substs<'tcx>(
 
     // Conservatively use an empty `ParamEnv`.
     let outlives_env = OutlivesEnvironment::new(ty::ParamEnv::empty());
-    infcx.resolve_regions_and_report_errors(impl1_def_id, &outlives_env);
+    infcx.resolve_regions_and_report_errors(&outlives_env);
     let Ok(impl2_substs) = infcx.fully_resolve(impl2_substs) else {
         tcx.sess.emit_err(SubstsOnOverriddenImpl { span });
         return None;
