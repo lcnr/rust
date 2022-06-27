@@ -1,3 +1,5 @@
+// check-pass
+//
 // Issue 22443: Reject code using non-regular types that would
 // otherwise cause dropck to loop infinitely.
 //
@@ -5,6 +7,10 @@
 // wrapper around the non-regular type. (It also demonstrates how the
 // error messages will report different types depending on which type
 // dropck is analyzing.)
+//
+// This only emits an error during codegen as we don't call
+// `dropck_outlives` for locals which don't contain regions
+// local to the current function.
 
 use std::marker::PhantomData;
 
@@ -29,8 +35,6 @@ enum Wrapper<T:'static> {
 }
 
 fn main() {
-    let w = //~ ERROR overflow while adding drop-check rules for Option
+    let w =
         Some(Wrapper::Simple::<u32>);
-    //~^ ERROR overflow while adding drop-check rules for Option
-    //~| ERROR overflow while adding drop-check rules for Wrapper
 }

@@ -1,5 +1,11 @@
+// check-pass
+//
 // Issue 22443: Reject code using non-regular types that would
 // otherwise cause dropck to loop infinitely.
+//
+// This only emits an error during codegen as we don't call
+// `dropck_outlives` for locals which don't contain regions
+// local to the current function.
 
 use std::marker::PhantomData;
 
@@ -20,7 +26,6 @@ enum FingerTree<T:'static> {
 }
 
 fn main() {
-    let ft = //~ ERROR overflow while adding drop-check rules for FingerTree
+    let ft =
         FingerTree::Single(1);
-    //~^ ERROR overflow while adding drop-check rules for FingerTree
 }
