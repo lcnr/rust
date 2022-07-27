@@ -590,6 +590,10 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                         let const_val = self.tcx.valtree_to_const_val((ty, valtree));
                         self.const_val_to_op(const_val, ty, layout)
                     }
+                    // FIXME(julianknodt): this actually can be evaluated for
+                    // most constants, by recursively calling const_to_op,
+                    // just not sure if we want to do that.
+                    ty::ConstKind::Expr(_) => throw_inval!(TooGeneric),
                 }
             }
             mir::ConstantKind::Val(val, ty) => self.const_val_to_op(val, ty, layout),
