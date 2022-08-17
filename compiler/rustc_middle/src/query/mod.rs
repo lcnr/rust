@@ -765,11 +765,10 @@ rustc_queries! {
         desc { |tcx| "processing `{}`", tcx.def_path_str(key.to_def_id()) }
     }
 
-    /// Returns the types assumed to be well formed while "inside" of the given item.
+    /// Returns the types assumed to be well formed inside of the given item.
     ///
-    /// Note that we've liberated the late bound regions of function signatures, so
-    /// this can not be used to check whether these types are well formed.
-    query assumed_wf_types(key: DefId) -> &'tcx ty::List<Ty<'tcx>> {
+    /// For functions the binder contains the late-bound lifetimes.
+    query assumed_wf_types(key: DefId) -> ty::Binder<'tcx, &'tcx ty::List<Ty<'tcx>>> {
         desc { |tcx| "computing the implied bounds of {}", tcx.def_path_str(key) }
     }
 

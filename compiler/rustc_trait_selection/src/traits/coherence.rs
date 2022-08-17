@@ -6,18 +6,16 @@
 
 use crate::infer::outlives::env::OutlivesEnvironment;
 use crate::infer::{CombinedSnapshot, InferOk};
-use crate::traits::outlives_bounds::InferCtxtExt as _;
 use crate::traits::select::IntercrateAmbiguityCause;
 use crate::traits::util::impl_subject_and_oblig;
 use crate::traits::SkipLeakCheck;
 use crate::traits::{
-    self, Normalized, Obligation, ObligationCause, ObligationCtxt, PredicateObligation,
-    PredicateObligations, SelectionContext,
+    self, Normalized, Obligation, ObligationCause, PredicateObligation, PredicateObligations,
+    SelectionContext,
 };
 use rustc_data_structures::fx::FxIndexSet;
 use rustc_errors::Diagnostic;
-use rustc_hir::def_id::{DefId, CRATE_DEF_ID, LOCAL_CRATE};
-use rustc_hir::CRATE_HIR_ID;
+use rustc_hir::def_id::{DefId, LOCAL_CRATE};
 use rustc_infer::infer::{InferCtxt, TyCtxtInferExt};
 use rustc_infer::traits::util;
 use rustc_middle::traits::specialization_graph::OverlapMode;
@@ -396,22 +394,8 @@ fn resolve_negative_obligation<'cx, 'tcx>(
         return false;
     }
 
-    let (body_id, body_def_id) = if let Some(body_def_id) = body_def_id.as_local() {
-        (tcx.hir().local_def_id_to_hir_id(body_def_id), body_def_id)
-    } else {
-        (CRATE_HIR_ID, CRATE_DEF_ID)
-    };
-
-    let ocx = ObligationCtxt::new(&infcx);
-    let wf_tys = ocx.assumed_wf_types(param_env, DUMMY_SP, body_def_id);
-    let outlives_env = OutlivesEnvironment::with_bounds(
-        param_env,
-        Some(&infcx),
-        infcx.implied_bounds_tys(param_env, body_id, wf_tys),
-    );
-
+    let outlives_env = OutlivesEnvironment::new(param_env);
     infcx.process_registered_region_obligations(outlives_env.region_bound_pairs(), param_env);
-
     infcx.resolve_regions(&outlives_env).is_empty()
 }
 

@@ -1,6 +1,9 @@
 use crate::traits::query::evaluate_obligation::InferCtxtExt as _;
+use crate::traits::query::type_op::{self, TypeOp, TypeOpOutput};
+use crate::traits::query::{NoSolution, OutlivesBound};
 use crate::traits::{self, TraitEngine, TraitEngineExt};
 
+use rustc_hir as hir;
 use rustc_hir::def_id::DefId;
 use rustc_hir::lang_items::LangItem;
 use rustc_infer::traits::ObligationCause;
@@ -51,6 +54,14 @@ pub trait InferCtxtExt<'tcx> {
         params: SubstsRef<'tcx>,
         param_env: ty::ParamEnv<'tcx>,
     ) -> traits::EvaluationResult;
+
+    // FIXME: This shouldn't be here.
+    fn implied_outlives_bounds(
+        &self,
+        param_env: ty::ParamEnv<'tcx>,
+        body_id: hir::HirId,
+        ty: Ty<'tcx>,
+    ) -> Vec<OutlivesBound<'tcx>>;
 }
 impl<'cx, 'tcx> InferCtxtExt<'tcx> for InferCtxt<'cx, 'tcx> {
     fn type_is_copy_modulo_regions(
@@ -118,6 +129,58 @@ impl<'cx, 'tcx> InferCtxtExt<'tcx> for InferCtxt<'cx, 'tcx> {
             predicate: ty::Binder::dummy(trait_ref).without_const().to_predicate(self.tcx),
         };
         self.evaluate_obligation(&obligation).unwrap_or(traits::EvaluationResult::EvaluatedToErr)
+    }
+
+    #[instrument(level = "debug", skip(self, param_env, body_id))]
+    fn implied_outlives_bounds(
+        &self,
+        param_env: ty::ParamEnv<'tcx>,
+        body_id: hir::HirId,
+        ty: Ty<'tcx>,
+    ) -> Vec<OutlivesBound<'tcx>> {
+        let span = self.tcx.hir().span(body_id);
+        let result = param_env
+            .and(type_op::implied_outlives_bounds::ImpliedOutlivesBounds { ty })
+            .fully_perform(self);
+        let result = match result {
+            Ok(r) => r,
+            Err(NoSolution) => {
+                self.tcx.sess.delay_span_bug(
+                    span,
+                    "implied_outlives_bounds failed to solve all obligations",
+                );
+                return vec![];
+            }
+        };
+
+        let TypeOpOutput { output, constraints, .. } = result;
+
+        if let Some(constraints) = constraints {
+            // Instantiation may have produced new inference variables and constraints on those
+            // variables. Process these constraints.
+            let mut fulfill_cx = <dyn TraitEngine<'tcx>>::new(self.tcx);
+            let cause = ObligationCause::misc(span, body_id);
+            for &constraint in &constraints.outlives {
+                let obligation = self.query_outlives_constraint_to_obligation(
+                    constraint,
+                    cause.clone(),
+                    param_env,
+                );
+                fulfill_cx.register_predicate_obligation(self, obligation);
+            }
+            if !constraints.member_constraints.is_empty() {
+                span_bug!(span, "{:#?}", constraints.member_constraints);
+            }
+            let errors = fulfill_cx.select_all_or_error(self);
+            if !errors.is_empty() {
+                self.tcx.sess.delay_span_bug(
+                    span,
+                    "implied_outlives_bounds failed to solve obligations from instantiation",
+                );
+            }
+        };
+
+        output
     }
 }
 

@@ -215,8 +215,11 @@ fn param_env(tcx: TyCtxt<'_>, def_id: DefId) -> ty::ParamEnv<'_> {
         _ => hir::CRATE_HIR_ID,
     };
 
+    let assumed_wf_types = tcx.assumed_wf_types(def_id);
+    let assumed_wf_types = tcx.liberate_late_bound_regions(def_id, assumed_wf_types);
+
     let cause = traits::ObligationCause::misc(tcx.def_span(def_id), body_id);
-    traits::normalize_param_env_or_error(tcx, unnormalized_env, cause)
+    traits::normalize_param_env_or_error(tcx, unnormalized_env, assumed_wf_types, cause)
 }
 
 /// Elaborate the environment.

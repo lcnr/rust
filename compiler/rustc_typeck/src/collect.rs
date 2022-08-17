@@ -39,6 +39,7 @@ use rustc_middle::ty::query::Providers;
 use rustc_middle::ty::subst::InternalSubsts;
 use rustc_middle::ty::util::Discr;
 use rustc_middle::ty::util::IntTypeExt;
+use rustc_middle::ty::TypeVisitable;
 use rustc_middle::ty::{self, AdtKind, Const, DefIdTree, IsSuggestable, Ty, TyCtxt};
 use rustc_middle::ty::{ReprOptions, ToPredicate};
 use rustc_session::lint;
@@ -2066,6 +2067,17 @@ fn predicates_defined_on(tcx: TyCtxt<'_>, def_id: DefId) -> ty::GenericPredicate
 /// `Self: Trait` predicates for traits.
 fn predicates_of(tcx: TyCtxt<'_>, def_id: DefId) -> ty::GenericPredicates<'_> {
     let mut result = tcx.predicates_defined_on(def_id);
+
+    let implied_wf_bounds = tcx
+        .assumed_wf_types(def_id)
+        .skip_binder()
+        .iter()
+        .filter(|ty| !ty.has_escaping_bound_vars())
+        .map(|ty| ty::Binder::dummy(ty::PredicateKind::WellFormed(ty.into())).to_predicate(tcx));
+    let span = tcx.def_span(def_id);
+    result.predicates = tcx.arena.alloc_from_iter(
+        result.predicates.iter().copied().chain(implied_wf_bounds.map(|wf| (wf, span))),
+    );
 
     if tcx.is_trait(def_id) {
         // For traits, add `Self: Trait` predicate. This is

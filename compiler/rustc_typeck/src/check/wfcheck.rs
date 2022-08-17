@@ -21,7 +21,6 @@ use rustc_span::symbol::{sym, Ident, Symbol};
 use rustc_span::{Span, DUMMY_SP};
 use rustc_trait_selection::autoderef::Autoderef;
 use rustc_trait_selection::traits::error_reporting::InferCtxtExt;
-use rustc_trait_selection::traits::outlives_bounds::InferCtxtExt as _;
 use rustc_trait_selection::traits::query::evaluate_obligation::InferCtxtExt as _;
 use rustc_trait_selection::traits::{
     self, ObligationCause, ObligationCauseCode, ObligationCtxt, WellFormedLoc,
@@ -92,8 +91,6 @@ pub(super) fn enter_wf_checking_ctxt<'tcx, F>(
     tcx.infer_ctxt().enter(|ref infcx| {
         let ocx = ObligationCtxt::new(infcx);
 
-        let assumed_wf_types = ocx.assumed_wf_types(param_env, span, body_def_id);
-
         let mut wfcx = WfCheckingCtxt { ocx, span, body_id, param_env };
 
         if !tcx.features().trivial_bounds {
@@ -106,10 +103,7 @@ pub(super) fn enter_wf_checking_ctxt<'tcx, F>(
             return;
         }
 
-        let implied_bounds = infcx.implied_bounds_tys(param_env, body_id, assumed_wf_types);
-        let outlives_environment =
-            OutlivesEnvironment::with_bounds(param_env, Some(infcx), implied_bounds);
-
+        let outlives_environment = OutlivesEnvironment::new(param_env);
         infcx.check_region_obligations_and_report_errors(body_def_id, &outlives_environment);
     })
 }
@@ -370,7 +364,6 @@ fn check_gat_where_clauses(tcx: TyCtxt<'_>, associated_items: &[hir::TraitItemRe
                     continue;
                 }
 
-                let item_hir_id = item.id.hir_id();
                 let param_env = tcx.param_env(item_def_id);
 
                 let item_required_bounds = match item.kind {
@@ -386,11 +379,7 @@ fn check_gat_where_clauses(tcx: TyCtxt<'_>, associated_items: &[hir::TraitItemRe
                         gather_gat_bounds(
                             tcx,
                             param_env,
-                            item_hir_id,
                             sig.inputs_and_output,
-                            // We also assume that all of the function signature's parameter types
-                            // are well formed.
-                            &sig.inputs().iter().copied().collect(),
                             gat_def_id,
                             gat_generics,
                         )
@@ -408,12 +397,10 @@ fn check_gat_where_clauses(tcx: TyCtxt<'_>, associated_items: &[hir::TraitItemRe
                         gather_gat_bounds(
                             tcx,
                             param_env,
-                            item_hir_id,
                             tcx.explicit_item_bounds(item_def_id)
                                 .iter()
                                 .copied()
                                 .collect::<Vec<_>>(),
-                            &FxHashSet::default(),
                             gat_def_id,
                             gat_generics,
                         )
@@ -457,16 +444,15 @@ fn check_gat_where_clauses(tcx: TyCtxt<'_>, associated_items: &[hir::TraitItemRe
         let gat_item_hir = tcx.hir().expect_trait_item(gat_def_id);
         debug!(?required_bounds);
         let param_env = tcx.param_env(gat_def_id);
-        let gat_hir = gat_item_hir.hir_id();
 
         let mut unsatisfied_bounds: Vec<_> = required_bounds
             .into_iter()
             .filter(|clause| match clause.kind().skip_binder() {
                 ty::PredicateKind::RegionOutlives(ty::OutlivesPredicate(a, b)) => {
-                    !region_known_to_outlive(tcx, gat_hir, param_env, &FxHashSet::default(), a, b)
+                    !region_known_to_outlive(tcx, param_env, a, b)
                 }
                 ty::PredicateKind::TypeOutlives(ty::OutlivesPredicate(a, b)) => {
-                    !ty_known_to_outlive(tcx, gat_hir, param_env, &FxHashSet::default(), a, b)
+                    !ty_known_to_outlive(tcx, param_env, a, b)
                 }
                 _ => bug!("Unexpected PredicateKind"),
             })
@@ -546,9 +532,7 @@ fn augment_param_env<'tcx>(
 fn gather_gat_bounds<'tcx, T: TypeFoldable<'tcx>>(
     tcx: TyCtxt<'tcx>,
     param_env: ty::ParamEnv<'tcx>,
-    item_hir: hir::HirId,
     to_check: T,
-    wf_tys: &FxHashSet<Ty<'tcx>>,
     gat_def_id: LocalDefId,
     gat_generics: &'tcx ty::Generics,
 ) -> Option<FxHashSet<ty::Predicate<'tcx>>> {
@@ -579,7 +563,7 @@ fn gather_gat_bounds<'tcx, T: TypeFoldable<'tcx>>(
         // reflected in a where clause on the GAT itself.
         for (ty, ty_idx) in &types {
             // In our example, requires that `Self: 'a`
-            if ty_known_to_outlive(tcx, item_hir, param_env, &wf_tys, *ty, *region_a) {
+            if ty_known_to_outlive(tcx, param_env, *ty, *region_a) {
                 debug!(?ty_idx, ?region_a_idx);
                 debug!("required clause: {ty} must outlive {region_a}");
                 // Translate into the generic parameters of the GAT. In
@@ -616,7 +600,7 @@ fn gather_gat_bounds<'tcx, T: TypeFoldable<'tcx>>(
             if ty::ReStatic == **region_b || region_a == region_b {
                 continue;
             }
-            if region_known_to_outlive(tcx, item_hir, param_env, &wf_tys, *region_a, *region_b) {
+            if region_known_to_outlive(tcx, param_env, *region_a, *region_b) {
                 debug!(?region_a_idx, ?region_b_idx);
                 debug!("required clause: {region_a} must outlive {region_b}");
                 // Translate into the generic parameters of the GAT.
@@ -653,13 +637,11 @@ fn gather_gat_bounds<'tcx, T: TypeFoldable<'tcx>>(
 /// `ty` outlives `region`.
 fn ty_known_to_outlive<'tcx>(
     tcx: TyCtxt<'tcx>,
-    id: hir::HirId,
     param_env: ty::ParamEnv<'tcx>,
-    wf_tys: &FxHashSet<Ty<'tcx>>,
     ty: Ty<'tcx>,
     region: ty::Region<'tcx>,
 ) -> bool {
-    resolve_regions_with_wf_tys(tcx, id, param_env, &wf_tys, |infcx, region_bound_pairs| {
+    resolve_regions_with_wf_tys(tcx, param_env, |infcx, region_bound_pairs| {
         let origin = infer::RelateParamBound(DUMMY_SP, ty, None);
         let outlives = &mut TypeOutlives::new(infcx, tcx, region_bound_pairs, None, param_env);
         outlives.type_must_outlive(origin, ty, region);
@@ -670,13 +652,11 @@ fn ty_known_to_outlive<'tcx>(
 /// `region_a` outlives `region_b`
 fn region_known_to_outlive<'tcx>(
     tcx: TyCtxt<'tcx>,
-    id: hir::HirId,
     param_env: ty::ParamEnv<'tcx>,
-    wf_tys: &FxHashSet<Ty<'tcx>>,
     region_a: ty::Region<'tcx>,
     region_b: ty::Region<'tcx>,
 ) -> bool {
-    resolve_regions_with_wf_tys(tcx, id, param_env, &wf_tys, |mut infcx, _| {
+    resolve_regions_with_wf_tys(tcx, param_env, |mut infcx, _| {
         use rustc_infer::infer::outlives::obligations::TypeOutlivesDelegate;
         let origin = infer::RelateRegionParamBound(DUMMY_SP);
         // `region_a: region_b` -> `region_b <= region_a`
@@ -689,20 +669,14 @@ fn region_known_to_outlive<'tcx>(
 /// to be tested), then resolve region and return errors
 fn resolve_regions_with_wf_tys<'tcx>(
     tcx: TyCtxt<'tcx>,
-    id: hir::HirId,
     param_env: ty::ParamEnv<'tcx>,
-    wf_tys: &FxHashSet<Ty<'tcx>>,
     add_constraints: impl for<'a> FnOnce(&'a InferCtxt<'a, 'tcx>, &'a RegionBoundPairs<'tcx>),
 ) -> bool {
     // Unfortunately, we have to use a new `InferCtxt` each call, because
     // region constraints get added and solved there and we need to test each
     // call individually.
     tcx.infer_ctxt().enter(|infcx| {
-        let outlives_environment = OutlivesEnvironment::with_bounds(
-            param_env,
-            Some(&infcx),
-            infcx.implied_bounds_tys(param_env, id, wf_tys.clone()),
-        );
+        let outlives_environment = OutlivesEnvironment::new(param_env);
         let region_bound_pairs = outlives_environment.region_bound_pairs();
 
         add_constraints(&infcx, region_bound_pairs);

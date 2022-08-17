@@ -6,29 +6,30 @@ pub fn provide(providers: &mut ty::query::Providers) {
     *providers = ty::query::Providers { assumed_wf_types, ..*providers };
 }
 
-fn assumed_wf_types<'tcx>(tcx: TyCtxt<'tcx>, def_id: DefId) -> &'tcx ty::List<Ty<'tcx>> {
+fn assumed_wf_types<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    def_id: DefId,
+) -> ty::Binder<'tcx, &'tcx ty::List<Ty<'tcx>>> {
     match tcx.def_kind(def_id) {
-        DefKind::Fn => {
-            let sig = tcx.fn_sig(def_id);
-            let liberated_sig = tcx.liberate_late_bound_regions(def_id, sig);
-            liberated_sig.inputs_and_output
-        }
-        DefKind::AssocFn => {
-            let sig = tcx.fn_sig(def_id);
-            let liberated_sig = tcx.liberate_late_bound_regions(def_id, sig);
-            let mut assumed_wf_types: Vec<_> =
-                tcx.assumed_wf_types(tcx.parent(def_id)).as_slice().into();
-            assumed_wf_types.extend(liberated_sig.inputs_and_output);
+        DefKind::Fn => tcx.fn_sig(def_id).inputs_and_output(),
+        DefKind::AssocFn => tcx.fn_sig(def_id).map_bound(|fn_sig| {
+            let mut assumed_wf_types: Vec<_> = tcx
+                .assumed_wf_types(tcx.parent(def_id))
+                .no_bound_vars()
+                .expect("bound vars for impl")
+                .as_slice()
+                .into();
+            assumed_wf_types.extend(fn_sig.inputs_and_output);
             tcx.intern_type_list(&assumed_wf_types)
-        }
-        DefKind::Impl => match tcx.impl_trait_ref(def_id) {
+        }),
+        DefKind::Impl => ty::Binder::dummy(match tcx.impl_trait_ref(def_id) {
             Some(trait_ref) => {
                 let types: Vec<_> = trait_ref.substs.types().collect();
                 tcx.intern_type_list(&types)
             }
             // Only the impl self type
             None => tcx.intern_type_list(&[tcx.type_of(def_id)]),
-        },
+        }),
         DefKind::AssocConst | DefKind::AssocTy => tcx.assumed_wf_types(tcx.parent(def_id)),
         DefKind::Mod
         | DefKind::Struct
@@ -55,6 +56,6 @@ fn assumed_wf_types<'tcx>(tcx: TyCtxt<'tcx>, def_id: DefId) -> &'tcx ty::List<Ty
         | DefKind::LifetimeParam
         | DefKind::GlobalAsm
         | DefKind::Closure
-        | DefKind::Generator => ty::List::empty(),
+        | DefKind::Generator => ty::Binder::dummy(ty::List::empty()),
     }
 }

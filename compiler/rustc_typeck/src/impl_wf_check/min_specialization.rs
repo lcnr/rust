@@ -78,7 +78,6 @@ use rustc_middle::ty::trait_def::TraitSpecializationKind;
 use rustc_middle::ty::{self, TyCtxt, TypeVisitable};
 use rustc_span::Span;
 use rustc_trait_selection::traits::error_reporting::InferCtxtExt;
-use rustc_trait_selection::traits::outlives_bounds::InferCtxtExt as _;
 use rustc_trait_selection::traits::{self, translate_substs, wf, ObligationCtxt};
 
 pub(super) fn check_min_specialization(tcx: TyCtxt<'_>, impl_def_id: LocalDefId) {
@@ -142,10 +141,6 @@ fn get_impl_substs<'tcx>(
     tcx.infer_ctxt().enter(|ref infcx| {
         let ocx = ObligationCtxt::new(infcx);
         let param_env = tcx.param_env(impl1_def_id);
-        let impl1_hir_id = tcx.hir().local_def_id_to_hir_id(impl1_def_id);
-
-        let assumed_wf_types =
-            ocx.assumed_wf_types(param_env, tcx.def_span(impl1_def_id), impl1_def_id);
 
         let impl1_substs = InternalSubsts::identity_for_item(tcx, impl1_def_id.to_def_id());
         let impl2_substs =
@@ -157,8 +152,7 @@ fn get_impl_substs<'tcx>(
             return None;
         }
 
-        let implied_bounds = infcx.implied_bounds_tys(param_env, impl1_hir_id, assumed_wf_types);
-        let outlives_env = OutlivesEnvironment::with_bounds(param_env, Some(infcx), implied_bounds);
+        let outlives_env = OutlivesEnvironment::new(param_env);
         infcx.check_region_obligations_and_report_errors(impl1_def_id, &outlives_env);
         let Ok(impl2_substs) = infcx.fully_resolve(impl2_substs) else {
             let span = tcx.def_span(impl1_def_id);
@@ -288,7 +282,8 @@ fn check_predicates<'tcx>(
     impl2_substs: SubstsRef<'tcx>,
     span: Span,
 ) {
-    let instantiated = tcx.predicates_of(impl1_def_id).instantiate(tcx, impl1_substs);
+    // We do not care about implied bounds for specialization.
+    let instantiated = tcx.predicates_defined_on(impl1_def_id).instantiate(tcx, impl1_substs);
     let impl1_predicates: Vec<_> = traits::elaborate_predicates_with_span(
         tcx,
         std::iter::zip(

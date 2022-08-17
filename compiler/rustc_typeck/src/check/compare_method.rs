@@ -1,6 +1,5 @@
 use super::potentially_plural_count;
 use crate::errors::LifetimesOrBoundsMismatchOnTrait;
-use rustc_data_structures::fx::FxHashSet;
 use rustc_errors::{pluralize, struct_span_err, Applicability, DiagnosticId, ErrorGuaranteed};
 use rustc_hir as hir;
 use rustc_hir::def::{DefKind, Res};
@@ -16,7 +15,6 @@ use rustc_middle::ty::{self, DefIdTree};
 use rustc_middle::ty::{GenericParamDefKind, ToPredicate, TyCtxt};
 use rustc_span::Span;
 use rustc_trait_selection::traits::error_reporting::InferCtxtExt;
-use rustc_trait_selection::traits::outlives_bounds::InferCtxtExt as _;
 use rustc_trait_selection::traits::{
     self, ObligationCause, ObligationCauseCode, ObligationCtxt, Reveal,
 };
@@ -174,6 +172,7 @@ fn compare_predicate_entailment<'tcx>(
     let trait_m_generics = tcx.generics_of(trait_m.def_id);
     let impl_m_predicates = tcx.predicates_of(impl_m.def_id);
     let trait_m_predicates = tcx.predicates_of(trait_m.def_id);
+    let impl_def_id = impl_m_predicates.parent.unwrap();
 
     // Check region bounds.
     check_region_bounds_on_impl_item(tcx, impl_m, trait_m, &trait_m_generics, &impl_m_generics)?;
@@ -183,7 +182,7 @@ fn compare_predicate_entailment<'tcx>(
     // environment. We can't just use `impl_env.caller_bounds`,
     // however, because we want to replace all late-bound regions with
     // region variables.
-    let impl_predicates = tcx.predicates_of(impl_m_predicates.parent.unwrap());
+    let impl_predicates = tcx.predicates_of(impl_def_id);
     let mut hybrid_preds = impl_predicates.instantiate_identity(tcx);
 
     debug!("compare_impl_method: impl_bounds={:?}", hybrid_preds);
@@ -208,7 +207,17 @@ fn compare_predicate_entailment<'tcx>(
         Reveal::UserFacing,
         hir::Constness::NotConst,
     );
-    let param_env = traits::normalize_param_env_or_error(tcx, param_env, normalize_cause);
+    let trait_m_types = ty::EarlyBinder(tcx.assumed_wf_types(trait_m.def_id))
+        .subst(tcx, trait_to_placeholder_substs);
+    let trait_m_types = tcx.liberate_late_bound_regions(impl_m.def_id, trait_m_types);
+    let impl_types =
+        tcx.assumed_wf_types(impl_def_id).no_bound_vars().expect("bound vars for impl");
+
+    let assumed_wf_types = impl_types.iter().chain(trait_m_types).collect::<Vec<_>>();
+    let assumed_wf_types = tcx.intern_type_list(&assumed_wf_types);
+
+    let param_env =
+        traits::normalize_param_env_or_error(tcx, param_env, assumed_wf_types, normalize_cause);
 
     tcx.infer_ctxt().enter(|ref infcx| {
         let ocx = ObligationCtxt::new(infcx);
@@ -251,8 +260,6 @@ fn compare_predicate_entailment<'tcx>(
         // Compute placeholder form of impl and trait method tys.
         let tcx = infcx.tcx;
 
-        let mut wf_tys = FxHashSet::default();
-
         let impl_sig = infcx.replace_bound_vars_with_fresh_vars(
             impl_m_span,
             infer::HigherRankedType,
@@ -266,14 +273,8 @@ fn compare_predicate_entailment<'tcx>(
 
         let trait_sig = tcx.bound_fn_sig(trait_m.def_id).subst(tcx, trait_to_placeholder_substs);
         let trait_sig = tcx.liberate_late_bound_regions(impl_m.def_id, trait_sig);
-        // Next, add all inputs and output as well-formed tys. Importantly,
-        // we have to do this before normalization, since the normalized ty may
-        // not contain the input parameters. See issue #87748.
-        wf_tys.extend(trait_sig.inputs_and_output.iter());
         let trait_sig = ocx.normalize(norm_cause, param_env, trait_sig);
-        // We also have to add the normalized trait signature
-        // as we don't normalize during implied bounds computation.
-        wf_tys.extend(trait_sig.inputs_and_output.iter());
+
         let trait_fty = tcx.mk_fn_ptr(ty::Binder::dummy(trait_sig));
 
         debug!("compare_impl_method: trait_fty={:?}", trait_fty);
@@ -401,11 +402,7 @@ fn compare_predicate_entailment<'tcx>(
 
         // Finally, resolve all regions. This catches wily misuses of
         // lifetime parameters.
-        let outlives_environment = OutlivesEnvironment::with_bounds(
-            param_env,
-            Some(infcx),
-            infcx.implied_bounds_tys(param_env, impl_m_hir_id, wf_tys),
-        );
+        let outlives_environment = OutlivesEnvironment::new(param_env);
         infcx.check_region_obligations_and_report_errors(
             impl_m.def_id.expect_local(),
             &outlives_environment,
@@ -1246,7 +1243,12 @@ fn compare_type_predicate_entailment<'tcx>(
         Reveal::UserFacing,
         hir::Constness::NotConst,
     );
-    let param_env = traits::normalize_param_env_or_error(tcx, param_env, normalize_cause);
+    // FIXME: We do not assume any types to be well formed. This is actually wrong but replicates
+    // the existing behavior, so to make any progress on implied bounds, keeping this around
+    // was easier for now.
+    let assumed_wf_types = ty::List::empty();
+    let param_env =
+        traits::normalize_param_env_or_error(tcx, param_env, assumed_wf_types, normalize_cause);
     tcx.infer_ctxt().enter(|infcx| {
         let ocx = ObligationCtxt::new(&infcx);
 
@@ -1455,9 +1457,6 @@ pub fn check_type_bounds<'tcx>(
     tcx.infer_ctxt().enter(move |infcx| {
         let ocx = ObligationCtxt::new(&infcx);
 
-        let assumed_wf_types =
-            ocx.assumed_wf_types(param_env, impl_ty_span, impl_ty.def_id.expect_local());
-
         let mut selcx = traits::SelectionContext::new(&infcx);
         let normalize_cause = ObligationCause::new(
             impl_ty_span,
@@ -1514,9 +1513,7 @@ pub fn check_type_bounds<'tcx>(
 
         // Finally, resolve all regions. This catches wily misuses of
         // lifetime parameters.
-        let implied_bounds = infcx.implied_bounds_tys(param_env, impl_ty_hir_id, assumed_wf_types);
-        let outlives_environment =
-            OutlivesEnvironment::with_bounds(param_env, Some(&infcx), implied_bounds);
+        let outlives_environment = OutlivesEnvironment::new(param_env);
 
         infcx.check_region_obligations_and_report_errors(
             impl_ty.def_id.expect_local(),

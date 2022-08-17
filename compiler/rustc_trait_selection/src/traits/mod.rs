@@ -25,13 +25,15 @@ pub mod wf;
 
 use crate::errors::DumpVTableEntries;
 use crate::infer::outlives::env::OutlivesEnvironment;
-use crate::infer::{InferCtxt, TyCtxtInferExt};
+use crate::infer::{InferCtxt, InferCtxtExt, TyCtxtInferExt};
 use crate::traits::error_reporting::InferCtxtExt as _;
 use crate::traits::query::evaluate_obligation::InferCtxtExt as _;
+use rustc_data_structures::fx::FxHashSet;
 use rustc_errors::ErrorGuaranteed;
 use rustc_hir as hir;
 use rustc_hir::def_id::DefId;
 use rustc_hir::lang_items::LangItem;
+use rustc_infer::traits::query::OutlivesBound;
 use rustc_infer::traits::TraitEngineExt as _;
 use rustc_middle::ty::fold::TypeFoldable;
 use rustc_middle::ty::subst::{InternalSubsts, SubstsRef};
@@ -255,11 +257,9 @@ fn do_normalize_predicates<'tcx>(
         // the normalized predicates.
         let errors = infcx.resolve_regions(&outlives_env);
         if !errors.is_empty() {
-            tcx.sess.delay_span_bug(
+            span_bug!(
                 span,
-                format!(
-                    "failed region resolution while normalizing {elaborated_env:?}: {errors:?}"
-                ),
+                "failed region resolution while normalizing {elaborated_env:?}: {errors:?}",
             );
         }
 
@@ -291,6 +291,7 @@ fn do_normalize_predicates<'tcx>(
 pub fn normalize_param_env_or_error<'tcx>(
     tcx: TyCtxt<'tcx>,
     unnormalized_env: ty::ParamEnv<'tcx>,
+    assumed_wf_types: &'tcx ty::List<Ty<'tcx>>,
     cause: ObligationCause<'tcx>,
 ) -> ty::ParamEnv<'tcx> {
     // I'm not wild about reporting errors here; I'd prefer to
@@ -338,7 +339,7 @@ pub fn normalize_param_env_or_error<'tcx>(
     //
     // This works fairly well because trait matching  does not actually care about param-env
     // TypeOutlives predicates - these are normally used by regionck.
-    let outlives_predicates: Vec<_> = predicates
+    let mut outlives_predicates: Vec<_> = predicates
         .drain_filter(|predicate| {
             matches!(predicate.kind().skip_binder(), ty::PredicateKind::TypeOutlives(..))
         })
@@ -371,6 +372,15 @@ pub fn normalize_param_env_or_error<'tcx>(
         unnormalized_env.reveal(),
         unnormalized_env.constness(),
     );
+
+    let Ok(implied_bounds) = compute_implied_bounds(tcx, &cause, outlives_env, assumed_wf_types) else {
+        // An unnormalized env is better than nothing.
+        debug!("normalize_param_env_or_error: errored when computing implied bounds");
+        return elaborated_env;
+    };
+
+    outlives_predicates.extend(implied_bounds);
+
     let Ok(outlives_predicates) = do_normalize_predicates(
         tcx,
         cause,
@@ -385,12 +395,82 @@ pub fn normalize_param_env_or_error<'tcx>(
 
     let mut predicates = non_outlives_predicates;
     predicates.extend(outlives_predicates);
+
+    let mut seen = FxHashSet::default();
+    predicates.retain(|&p| seen.insert(p));
     debug!("normalize_param_env_or_error: final predicates={:?}", predicates);
     ty::ParamEnv::new(
         tcx.intern_predicates(&predicates),
         unnormalized_env.reveal(),
         unnormalized_env.constness(),
     )
+}
+
+fn compute_implied_bounds<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    cause: &ObligationCause<'tcx>,
+    param_env: ty::ParamEnv<'tcx>,
+    assumed_wf_types: &'tcx ty::List<Ty<'tcx>>,
+) -> Result<Vec<ty::Predicate<'tcx>>, ErrorGuaranteed> {
+    tcx.infer_ctxt().ignoring_regions().enter(|infcx| {
+        let ocx = ObligationCtxt::new(&infcx);
+        let mut predicates = Vec::new();
+
+        let wf_types = assumed_wf_types
+            .iter()
+            .flat_map(|ty| [ty, ocx.normalize(cause.clone(), param_env, ty)]).collect::<Vec<_>>();
+
+        let errors = ocx.select_all_or_error();
+        if !errors.is_empty() {
+            let reported = infcx.report_fulfillment_errors(&errors, None, false);
+            return Err(reported);
+        }
+
+        for ty in wf_types {
+            let bounds = infcx.implied_outlives_bounds(param_env, hir::CRATE_HIR_ID, ty);
+            for bound in bounds {
+                let predicate = match bound {
+                    OutlivesBound::RegionSubRegion(r_b, r_a) => {
+                        ty::PredicateKind::RegionOutlives(ty::OutlivesPredicate(r_a, r_b))
+                    }
+                    OutlivesBound::RegionSubParam(r_b, p_a) => {
+                        ty::PredicateKind::TypeOutlives(ty::OutlivesPredicate(p_a.to_ty(tcx), r_b))
+                    }
+                    OutlivesBound::RegionSubProjection(r_b, p_a) => {
+                        ty::PredicateKind::TypeOutlives(ty::OutlivesPredicate(
+                            tcx.mk_projection(p_a.item_def_id, p_a.substs),
+                            r_b,
+                        ))
+                    }
+                };
+
+                predicates.push(ty::Binder::dummy(predicate).to_predicate(tcx));
+            }
+        }
+
+        // FIXME: It's very weird that we ignore region obligations but apparently
+        // still need to use `resolve_regions` as we need the resolved regions in
+        // the normalized predicates.
+        let outlives_env = OutlivesEnvironment::new(param_env);
+        let errors = infcx.resolve_regions(&outlives_env);
+        if !errors.is_empty() {
+            span_bug!(
+                cause.span,
+                "failed region resolution while computing implied bounds for {assumed_wf_types:?}: {errors:?}",
+            );
+        }
+
+        match infcx.fully_resolve(predicates) {
+            Ok(predicates) => Ok(predicates),
+            Err(fixup_err) => {
+                span_bug!(
+                    cause.span,
+                    "inference variables in normalized parameter environment: {}",
+                    fixup_err
+                )
+            }
+        }
+    })
 }
 
 /// Normalize a type and process all resulting obligations, returning any errors
