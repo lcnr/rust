@@ -1,5 +1,8 @@
 //! A subset of a mir body used for const evaluatability checking.
-use crate::ty::{self, Const, EarlyBinder, FallibleTypeFolder, GenericArg, TyCtxt, TypeFoldable};
+use crate::ty::{
+    self, Const, EarlyBinder, FallibleTypeFolder, GenericArg, TyCtxt, TypeFoldable,
+    TypeSuperFoldable,
+};
 use rustc_errors::ErrorGuaranteed;
 use rustc_hir::def_id::DefId;
 
@@ -50,7 +53,6 @@ impl<'tcx> TyCtxt<'tcx> {
             self.thir_abstract_const(def.did)
         }
     }
-
     pub fn expand_bound_abstract_const(
         self,
         ct: BoundAbstractConst<'tcx>,
@@ -102,5 +104,44 @@ impl<'tcx> TyCtxt<'tcx> {
         };
         let ac = ac.subst(self, substs);
         Ok(Some(ac.try_fold_with(&mut Expander { tcx: self })?))
+    }
+
+    pub fn expand_abstract_const<T: TypeFoldable<'tcx>>(
+        self,
+        ac: T,
+    ) -> Result<Option<T>, ErrorGuaranteed> {
+        struct Expander<'tcx> {
+            tcx: TyCtxt<'tcx>,
+            first: bool,
+        }
+
+        impl<'tcx> FallibleTypeFolder<'tcx> for Expander<'tcx> {
+            type Error = Option<ErrorGuaranteed>;
+            fn tcx(&self) -> TyCtxt<'tcx> {
+                self.tcx
+            }
+            fn try_fold_const(&mut self, c: Const<'tcx>) -> Result<Const<'tcx>, Self::Error> {
+                let ct = match c.kind() {
+                    ty::ConstKind::Unevaluated(uv) => {
+                        if let Some(bac) = self.tcx.bound_abstract_const(uv.def)? {
+                            let substs = self.tcx.erase_regions(uv.substs);
+                            bac.subst(self.tcx, substs)
+                        } else if self.first {
+                            return Err(None);
+                        } else {
+                            c
+                        }
+                    }
+                    _ => c,
+                };
+                self.first = false;
+                ct.try_super_fold_with(self)
+            }
+        }
+        match ac.try_fold_with(&mut Expander { tcx: self, first: true }) {
+            Ok(c) => Ok(Some(c)),
+            Err(None) => Ok(None),
+            Err(Some(e)) => Err(e),
+        }
     }
 }

@@ -29,8 +29,20 @@ pub fn is_const_evaluatable<'tcx>(
     let tcx = infcx.tcx;
     let uv = match ct.kind() {
         ty::ConstKind::Unevaluated(uv) => uv,
-        // should be recursivee fixes.
-        ty::ConstKind::Expr(..) => todo!(),
+        ty::ConstKind::Expr(e) => {
+            return match e {
+                ty::Expr::Binop(_, l, r) => is_const_evaluatable(infcx, l, param_env, span)
+                    .and(is_const_evaluatable(infcx, r, param_env, span)),
+                ty::Expr::UnOp(_, v) => is_const_evaluatable(infcx, v, param_env, span),
+                ty::Expr::Cast(_, v, _) => is_const_evaluatable(infcx, v, param_env, span),
+                ty::Expr::FunctionCall(func, args) => {
+                    is_const_evaluatable(infcx, func, param_env, span).and(
+                        args.iter()
+                            .try_fold((), |(), v| is_const_evaluatable(infcx, v, param_env, span)),
+                    )
+                }
+            };
+        }
         ty::ConstKind::Param(_)
         | ty::ConstKind::Bound(_, _)
         | ty::ConstKind::Placeholder(_)
@@ -88,9 +100,10 @@ pub fn is_const_evaluatable<'tcx>(
           // const exprs, AND it would've passed if that expression had been evaluated with
           // generic const exprs, then suggest using generic const exprs.
           Err(_) if tcx.sess.is_nightly_build()
-            && let Ok(Some(ct)) =
-            tcx.expand_bound_abstract_const(tcx.bound_abstract_const(uv.def), substs)
-            && let ty::ConstKind::Expr(_expr) = ct.kind()
+            //&& let Ok(Some(ct)) = tcx.expand_abstract_const(ct)
+            //&& let Ok(Some(ct)) = tcx.expand_abstract_const(ct)
+            && let Ok(Some(ct)) = tcx.expand_bound_abstract_const(tcx.bound_abstract_const(uv.def), substs)
+            && let ty::ConstKind::Expr(_) = ct.kind()
             && satisfied_from_param_env(tcx, infcx, ct, param_env) == Ok(true) => {
               tcx.sess
                   .struct_span_fatal(
@@ -140,14 +153,12 @@ fn satisfied_from_param_env<'tcx>(
 ) -> Result<bool, NotConstEvaluatable> {
     for pred in param_env.caller_bounds() {
         match pred.kind().skip_binder() {
-            ty::PredicateKind::ConstEvaluatable(uv) => {
-                let ty::ConstKind::Unevaluated(uv) = uv.kind() else {
+            ty::PredicateKind::ConstEvaluatable(ce) => {
+                let ty::ConstKind::Unevaluated(_) = ce.kind() else {
                     continue
                 };
-                let substs = tcx.erase_regions(uv.substs);
-                let Some(b_ct) =
-                tcx.expand_bound_abstract_const(tcx.bound_abstract_const(uv.def), substs)? else {
-                    return Ok(false);
+                let Some(b_ct) = tcx.expand_abstract_const(ce)? else {
+                    continue
                 };
 
                 // Try to unify with each subtree in the AbstractConst to allow for

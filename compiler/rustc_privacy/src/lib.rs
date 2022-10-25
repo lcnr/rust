@@ -287,7 +287,7 @@ where
         self.visit_ty(c.ty())?;
         let tcx = self.def_id_visitor.tcx();
         if let ty::ConstKind::Unevaluated(uv) = c.kind() &&
-           let Ok(Some(ct)) = tcx.expand_bound_abstract_const(tcx.bound_abstract_const(uv.def),
+         let Ok(Some(ct)) = tcx.expand_bound_abstract_const(tcx.bound_abstract_const(uv.def),
            uv.substs) {
             ct.visit_with(self)?;
         }

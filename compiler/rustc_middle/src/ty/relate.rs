@@ -632,7 +632,12 @@ pub fn super_relate_consts<'tcx, R: TypeRelation<'tcx>>(
             if let (Ok(Some(a)), Ok(Some(b))) = (
                 tcx.expand_bound_abstract_const(tcx.bound_abstract_const(au.def), au.substs),
                 tcx.expand_bound_abstract_const(tcx.bound_abstract_const(bu.def), bu.substs),
-            ) && a.ty() == b.ty() {
+            )
+            /*
+            if let (Ok(a), Ok(b)) = (
+                tcx.expand_abstract_const(a),
+                tcx.expand_abstract_const(b),
+            )*/ && a.ty() == b.ty() {
                 return relation.consts(a, b);
             } else {
                 false
