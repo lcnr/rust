@@ -52,10 +52,7 @@ pub fn is_const_evaluatable<'tcx>(
     };
 
     if tcx.features().generic_const_exprs {
-        let substs = tcx.erase_regions(uv.substs);
-        if let Some(ct) =
-            tcx.expand_bound_abstract_const(tcx.bound_abstract_const(uv.def), substs)?
-        {
+        if let Some(ct) = tcx.expand_abstract_const(ct)? {
             if satisfied_from_param_env(tcx, infcx, ct, param_env)? {
                 return Ok(());
             }
