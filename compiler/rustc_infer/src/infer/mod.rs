@@ -1617,7 +1617,7 @@ impl<'tcx> InferCtxt<'tcx> {
             match ac {
                 Ok(None) => {
                     substs = InternalSubsts::identity_for_item(tcx, unevaluated.def.did);
-                    param_env = self.tcx.param_env(unevaluated.def.did);
+                    param_env = tcx.param_env(unevaluated.def.did);
                 }
                 Ok(Some(ct)) => {
                     if ct.has_non_region_infer() || ct.has_non_region_param() {

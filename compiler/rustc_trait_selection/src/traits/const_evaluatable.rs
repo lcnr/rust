@@ -93,18 +93,14 @@ pub fn is_const_evaluatable<'tcx>(
         //
         // See #74595 for more details about this.
         let concrete = infcx.const_eval_resolve(param_env, uv, Some(span));
-
-        let substs = tcx.erase_regions(uv.substs);
         match concrete {
           // If we're evaluating a foreign constant, under a nightly compiler without generic
           // const exprs, AND it would've passed if that expression had been evaluated with
           // generic const exprs, then suggest using generic const exprs.
           Err(_) if tcx.sess.is_nightly_build()
-            //&& let Ok(Some(ct)) = tcx.expand_abstract_const(ct)
-            //&& let Ok(Some(ct)) = tcx.expand_abstract_const(ct)
-            && let Ok(Some(ct)) = tcx.expand_bound_abstract_const(tcx.bound_abstract_const(uv.def), substs)
-            && let ty::ConstKind::Expr(_) = ct.kind()
-            && satisfied_from_param_env(tcx, infcx, ct, param_env) == Ok(true) => {
+            && let Ok(Some(ac)) = tcx.expand_abstract_const(ct)
+            && let ty::ConstKind::Expr(_) = ac.kind()
+            && satisfied_from_param_env(tcx, infcx, ac, param_env) == Ok(true) => {
               tcx.sess
                   .struct_span_fatal(
                       // Slightly better span than just using `span` alone

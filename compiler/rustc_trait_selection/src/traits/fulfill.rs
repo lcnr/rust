@@ -516,14 +516,8 @@ impl<'a, 'tcx> ObligationProcessor for FulfillProcessor<'a, 'tcx> {
                                 );
                             }
                             if let (Ok(Some(a)), Ok(Some(b))) = (
-                                    tcx.expand_bound_abstract_const(
-                                        tcx.bound_abstract_const(a.def),
-                                        a.substs,
-                                    ),
-                                    tcx.expand_bound_abstract_const(
-                                        tcx.bound_abstract_const(b.def),
-                                        b.substs,
-                                    ),
+                                    tcx.expand_abstract_const(c1),
+                                    tcx.expand_abstract_const(c2),
                                 ) && a.ty() == b.ty() &&
                                   let Ok(new_obligations) = infcx
                                       .at(&obligation.cause, obligation.param_env)
