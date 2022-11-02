@@ -1,9 +1,9 @@
-//! A subset of a mir body used for const evaluatability checking.
-use crate::ty::{
-    self, Const, EarlyBinder, FallibleTypeFolder, GenericArg, TyCtxt, TypeFoldable,
-    TypeSuperFoldable,
-};
+//! A subset of the thir used for const evaluatability checking.
+use crate::mir::interpret::ErrorHandled;
+use crate::ty::{self, EarlyBinder, Ty, TyCtxt};
+use crate::ty::{TypeFoldable, TypeFolder, TypeSuperFoldable, TypeVisitable};
 use rustc_errors::ErrorGuaranteed;
+use rustc_hir::def::DefKind;
 use rustc_hir::def_id::DefId;
 
 #[derive(Hash, Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
@@ -38,110 +38,71 @@ impl<'tcx> TyCtxt<'tcx> {
     /// Returns a const with substs applied by
     pub fn bound_abstract_const(
         self,
-        uv: ty::WithOptConstParam<DefId>,
-    ) -> BoundAbstractConst<'tcx> {
-        self.thir_abstract_const_opt_const_arg(uv).map(|ac| ac.map(|ac| EarlyBinder(ac)))
-    }
-    #[inline]
-    pub fn thir_abstract_const_opt_const_arg(
-        self,
         def: ty::WithOptConstParam<DefId>,
-    ) -> Result<Option<ty::Const<'tcx>>, ErrorGuaranteed> {
+    ) -> BoundAbstractConst<'tcx> {
         if let Some((did, param_did)) = def.as_const_arg() {
             self.thir_abstract_const_of_const_arg((did, param_did))
         } else {
             self.thir_abstract_const(def.did)
         }
+        .map(|ac| ac.map(|ac| EarlyBinder(ac)))
     }
-    pub fn expand_bound_abstract_const(
-        self,
-        ct: BoundAbstractConst<'tcx>,
-        substs: &[GenericArg<'tcx>],
-    ) -> Result<Option<Const<'tcx>>, ErrorGuaranteed> {
+
+    pub fn expand_abstract_consts<T: TypeFoldable<'tcx>>(self, value: T) -> T {
         struct Expander<'tcx> {
             tcx: TyCtxt<'tcx>,
         }
-        impl<'tcx> FallibleTypeFolder<'tcx> for Expander<'tcx> {
-            type Error = ErrorGuaranteed;
+
+        impl<'tcx> TypeFolder<'tcx> for Expander<'tcx> {
             fn tcx(&self) -> TyCtxt<'tcx> {
                 self.tcx
             }
-            fn try_fold_const(&mut self, c: Const<'tcx>) -> Result<Const<'tcx>, ErrorGuaranteed> {
-                use ty::ConstKind::*;
-                let uv = match c.kind() {
-                    Unevaluated(uv) => uv,
-                    Param(..) | Infer(..) | Bound(..) | Placeholder(..) | Value(..) | Error(..) => {
-                        return Ok(c);
-                    }
-                    Expr(e) => {
-                        let new_expr = match e {
-                            ty::Expr::Binop(op, l, r) => {
-                                ty::Expr::Binop(op, l.try_fold_with(self)?, r.try_fold_with(self)?)
-                            }
-                            ty::Expr::UnOp(op, v) => ty::Expr::UnOp(op, v.try_fold_with(self)?),
-                            ty::Expr::Cast(k, c, t) => {
-                                ty::Expr::Cast(k, c.try_fold_with(self)?, t.try_fold_with(self)?)
-                            }
-                            ty::Expr::FunctionCall(func, args) => ty::Expr::FunctionCall(
-                                func.try_fold_with(self)?,
-                                args.try_fold_with(self)?,
-                            ),
-                        };
-                        return Ok(self.tcx().mk_const(ty::ConstS {
-                            kind: ty::ConstKind::Expr(new_expr),
-                            ty: c.ty(),
-                        }));
-                    }
-                };
-                let bac = self.tcx.bound_abstract_const(uv.def);
-                let ac = self.tcx.expand_bound_abstract_const(bac, uv.substs);
-                if let Ok(Some(ac)) = ac { ac.try_fold_with(self) } else { Ok(c) }
+            fn fold_ty(&mut self, ty: Ty<'tcx>) -> Ty<'tcx> {
+                if ty.has_type_flags(ty::TypeFlags::HAS_CT_PROJECTION) {
+                    ty.super_fold_with(self)
+                } else {
+                    ty
+                }
             }
-        }
-
-        let Some(ac) = ct? else {
-            return Ok(None);
-        };
-        let ac = ac.subst(self, substs);
-        Ok(Some(ac.try_fold_with(&mut Expander { tcx: self })?))
-    }
-
-    pub fn expand_abstract_const<T: TypeFoldable<'tcx>>(
-        self,
-        ac: T,
-    ) -> Result<Option<T>, ErrorGuaranteed> {
-        struct Expander<'tcx> {
-            tcx: TyCtxt<'tcx>,
-            first: bool,
-        }
-
-        impl<'tcx> FallibleTypeFolder<'tcx> for Expander<'tcx> {
-            type Error = Option<ErrorGuaranteed>;
-            fn tcx(&self) -> TyCtxt<'tcx> {
-                self.tcx
-            }
-            fn try_fold_const(&mut self, c: Const<'tcx>) -> Result<Const<'tcx>, Self::Error> {
-                let ct = match c.kind() {
-                    ty::ConstKind::Unevaluated(uv) => {
-                        if let Some(bac) = self.tcx.bound_abstract_const(uv.def)? {
-                            let substs = self.tcx.erase_regions(uv.substs);
-                            bac.subst(self.tcx, substs)
-                        } else if self.first {
-                            return Err(None);
-                        } else {
-                            c
+            fn fold_const(&mut self, ct: ty::Const<'tcx>) -> ty::Const<'tcx> {
+                let tcx = self.tcx;
+                let ct = match ct.kind() {
+                    ty::ConstKind::Unevaluated(uv) => match tcx.bound_abstract_const(uv.def) {
+                        Ok(Some(ac)) => ac.subst(tcx, uv.substs),
+                        Ok(None) if tcx.def_kind(uv.def.did) == DefKind::AnonConst => {
+                            let substs = ty::InternalSubsts::identity_for_item(tcx, uv.def.did);
+                            let eval_result = self.tcx.const_eval_resolve_for_typeck(
+                                tcx.param_env(uv.def.did),
+                                ty::UnevaluatedConst { def: uv.def, substs },
+                                None,
+                            );
+                            match eval_result {
+                                Ok(Some(value)) => ty::Const::from_value(tcx, value, ct.ty()),
+                                Ok(None) => bug!(
+                                    "FIXME(adt_const_params): deal with non-valtree consts for {uv:?}"
+                                ),
+                                Err(ErrorHandled::TooGeneric) => tcx.const_error_with_message(
+                                    ct.ty(),
+                                    tcx.def_span(uv.def.did),
+                                    "Missing value for constant, but no error reported?",
+                                ),
+                                Err(ErrorHandled::Linted | ErrorHandled::Reported(..)) => tcx
+                                    .const_error_with_message(
+                                        ct.ty(),
+                                        tcx.def_span(uv.def.did),
+                                        "failed to evaluate concrete constant",
+                                    ),
+                            }
                         }
-                    }
-                    _ => c,
+                        Ok(None) => ct,
+                        Err(_err_guaranteed) => tcx.const_error(ct.ty()),
+                    },
+                    _ => ct,
                 };
-                self.first = false;
-                ct.try_super_fold_with(self)
+                ct.super_fold_with(self)
             }
         }
-        match ac.try_fold_with(&mut Expander { tcx: self, first: true }) {
-            Ok(c) => Ok(Some(c)),
-            Err(None) => Ok(None),
-            Err(Some(e)) => Err(e),
-        }
+
+        value.fold_with(&mut Expander { tcx: self })
     }
 }

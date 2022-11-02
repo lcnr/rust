@@ -2,11 +2,29 @@ error[E0308]: mismatched types
   --> $DIR/issue-83249.rs:17:21
    |
 LL |     let _: u8 = foo([0; 1]);
+   |                     ^^^^^^ expected `<u8 as Foo>::N`, found `1`
+   |
+   = note: expected constant `<u8 as Foo>::N`
+              found constant `1`
+
+error[E0308]: mismatched types
+  --> $DIR/issue-83249.rs:17:21
+   |
+LL |     let _: u8 = foo([0; 1]);
    |                     ^^^^^^ expected `<_ as Foo>::N`, found `<u8 as Foo>::N`
    |
    = note: expected constant `<_ as Foo>::N`
               found constant `<u8 as Foo>::N`
 
-error: aborting due to previous error
+error[E0308]: mismatched types
+  --> $DIR/issue-83249.rs:20:17
+   |
+LL |     let _ = foo([0; 1]);
+   |                 ^^^^^^ expected `<_ as Foo>::N`, found `1`
+   |
+   = note: expected constant `<_ as Foo>::N`
+              found constant `1`
+
+error: aborting due to 3 previous errors
 
 For more information about this error, try `rustc --explain E0308`.

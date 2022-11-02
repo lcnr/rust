@@ -16,11 +16,20 @@ error[E0308]: mismatched types
   --> $DIR/invariant.rs:31:28
    |
 LL |     let y = covariant(&Foo([], PhantomData));
+   |                            ^^ expected `<for<'a> fn(&'a ()) as SadBee>::ASSOC`, found `0`
+   |
+   = note: expected constant `<for<'a> fn(&'a ()) as SadBee>::ASSOC`
+              found constant `0`
+
+error[E0308]: mismatched types
+  --> $DIR/invariant.rs:31:28
+   |
+LL |     let y = covariant(&Foo([], PhantomData));
    |                            ^^ expected `<_ as SadBee>::ASSOC`, found `<for<'a> fn(&'a ()) as SadBee>::ASSOC`
    |
    = note: expected constant `<_ as SadBee>::ASSOC`
               found constant `<for<'a> fn(&'a ()) as SadBee>::ASSOC`
 
-error: aborting due to previous error; 1 warning emitted
+error: aborting due to 2 previous errors; 1 warning emitted
 
 For more information about this error, try `rustc --explain E0308`.

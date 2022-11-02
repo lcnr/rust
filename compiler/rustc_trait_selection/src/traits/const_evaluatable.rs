@@ -15,7 +15,7 @@ use rustc_middle::traits::ObligationCause;
 use rustc_middle::ty::abstract_const::NotConstEvaluatable;
 use rustc_middle::ty::{self, TyCtxt, TypeVisitable, TypeVisitor};
 
-use rustc_span::Span;
+use rustc_span::{Span, DUMMY_SP};
 use std::ops::ControlFlow;
 
 /// Check if a given constant can be evaluated.
@@ -29,20 +29,7 @@ pub fn is_const_evaluatable<'tcx>(
     let tcx = infcx.tcx;
     let uv = match ct.kind() {
         ty::ConstKind::Unevaluated(uv) => uv,
-        ty::ConstKind::Expr(e) => {
-            return match e {
-                ty::Expr::Binop(_, l, r) => is_const_evaluatable(infcx, l, param_env, span)
-                    .and(is_const_evaluatable(infcx, r, param_env, span)),
-                ty::Expr::UnOp(_, v) => is_const_evaluatable(infcx, v, param_env, span),
-                ty::Expr::Cast(_, v, _) => is_const_evaluatable(infcx, v, param_env, span),
-                ty::Expr::FunctionCall(func, args) => {
-                    is_const_evaluatable(infcx, func, param_env, span).and(
-                        args.iter()
-                            .try_fold((), |(), v| is_const_evaluatable(infcx, v, param_env, span)),
-                    )
-                }
-            };
-        }
+        ty::ConstKind::Expr(_) => bug!("unexpected expr in `is_const_evaluatable: {ct:?}"),
         ty::ConstKind::Param(_)
         | ty::ConstKind::Bound(_, _)
         | ty::ConstKind::Placeholder(_)
@@ -52,33 +39,34 @@ pub fn is_const_evaluatable<'tcx>(
     };
 
     if tcx.features().generic_const_exprs {
-        if let Some(ct) = tcx.expand_abstract_const(ct)? {
-            if satisfied_from_param_env(tcx, infcx, ct, param_env)? {
-                return Ok(());
+        let ct = tcx.expand_abstract_consts(ct);
+        if ct.references_error() {
+            let guard = tcx.sess.delay_span_bug(span, "ct references error");
+            Err(NotConstEvaluatable::Error(guard))
+        } else if satisfied_from_param_env(tcx, infcx, ct, param_env)? {
+            Ok(())
+        } else if ct.has_non_region_infer() {
+            Err(NotConstEvaluatable::MentionsInfer)
+        } else if ct.has_non_region_param() {
+            Err(NotConstEvaluatable::MentionsParam)
+        } else {
+            let concrete = infcx.const_eval_resolve(param_env, uv, Some(span));
+            match concrete {
+                Err(ErrorHandled::TooGeneric) => {
+                    Err(NotConstEvaluatable::Error(infcx.tcx.sess.delay_span_bug(
+                        span,
+                        "Missing value for constant, but no error reported?",
+                    )))
+                }
+                Err(ErrorHandled::Linted) => {
+                    let reported = tcx
+                        .sess
+                        .delay_span_bug(span, "constant in type had error reported as lint");
+                    Err(NotConstEvaluatable::Error(reported))
+                }
+                Err(ErrorHandled::Reported(e)) => Err(NotConstEvaluatable::Error(e)),
+                Ok(_) => Ok(()),
             }
-            if ct.has_non_region_infer() {
-                return Err(NotConstEvaluatable::MentionsInfer);
-            } else if ct.has_non_region_param() {
-                return Err(NotConstEvaluatable::MentionsParam);
-            }
-        }
-        let concrete = infcx.const_eval_resolve(param_env, uv, Some(span));
-        match concrete {
-            Err(ErrorHandled::TooGeneric) => Err(NotConstEvaluatable::Error(
-                infcx
-                    .tcx
-                    .sess
-                    .delay_span_bug(span, "Missing value for constant, but no error reported?"),
-            )),
-            Err(ErrorHandled::Linted) => {
-                let reported = infcx
-                    .tcx
-                    .sess
-                    .delay_span_bug(span, "constant in type had error reported as lint");
-                Err(NotConstEvaluatable::Error(reported))
-            }
-            Err(ErrorHandled::Reported(e)) => Err(NotConstEvaluatable::Error(e)),
-            Ok(_) => Ok(()),
         }
     } else {
         // FIXME: We should only try to evaluate a given constant here if it is fully concrete
@@ -91,13 +79,11 @@ pub fn is_const_evaluatable<'tcx>(
         // See #74595 for more details about this.
         let concrete = infcx.const_eval_resolve(param_env, uv, Some(span));
         match concrete {
-          // If we're evaluating a foreign constant, under a nightly compiler without generic
-          // const exprs, AND it would've passed if that expression had been evaluated with
-          // generic const exprs, then suggest using generic const exprs.
+          // If we're evaluating a generic foreign constant, under a nightly compiler while
+          // the current crate does not enable `feature(generic_const_exprs)`, abort
+          // compilation with a useful error.
           Err(_) if tcx.sess.is_nightly_build()
-            && let Ok(Some(ac)) = tcx.expand_abstract_const(ct)
-            && let ty::ConstKind::Expr(_) = ac.kind()
-            && satisfied_from_param_env(tcx, infcx, ac, param_env) == Ok(true) => {
+            && let ty::ConstKind::Expr(_) = tcx.expand_abstract_consts(ct).kind() => {
               tcx.sess
                   .struct_span_fatal(
                       // Slightly better span than just using `span` alone
@@ -144,46 +130,44 @@ fn satisfied_from_param_env<'tcx>(
     ct: ty::Const<'tcx>,
     param_env: ty::ParamEnv<'tcx>,
 ) -> Result<bool, NotConstEvaluatable> {
+    // Try to unify with each subtree in the AbstractConst to allow for
+    // `N + 1` being const evaluatable even if theres only a `ConstEvaluatable`
+    // predicate for `(N + 1) * 2`
+    struct Visitor<'a, 'tcx> {
+        ct: ty::Const<'tcx>,
+        param_env: ty::ParamEnv<'tcx>,
+        infcx: &'a InferCtxt<'tcx>,
+    }
+    impl<'a, 'tcx> TypeVisitor<'tcx> for Visitor<'a, 'tcx> {
+        type BreakTy = ();
+        fn visit_const(&mut self, c: ty::Const<'tcx>) -> ControlFlow<Self::BreakTy> {
+            if c.ty() == self.ct.ty()
+                && let Ok(_nested_obligations) = self
+                    .infcx
+                    .at(&ObligationCause::dummy(), self.param_env)
+                    .eq(c, self.ct)
+            {
+                //let obligations = nested_obligations.into_obligations();
+                return ControlFlow::BREAK;
+            } else if let ty::ConstKind::Expr(e) = c.kind() {
+                e.visit_with(self)
+            } else {
+                ControlFlow::CONTINUE
+            }
+        }
+    }
+
     for pred in param_env.caller_bounds() {
         match pred.kind().skip_binder() {
             ty::PredicateKind::ConstEvaluatable(ce) => {
-                let ty::ConstKind::Unevaluated(_) = ce.kind() else {
-                    continue
-                };
-                let Some(b_ct) = tcx.expand_abstract_const(ce)? else {
-                    continue
-                };
-
-                // Try to unify with each subtree in the AbstractConst to allow for
-                // `N + 1` being const evaluatable even if theres only a `ConstEvaluatable`
-                // predicate for `(N + 1) * 2`
-                struct Visitor<'a, 'tcx> {
-                    ct: ty::Const<'tcx>,
-                    param_env: ty::ParamEnv<'tcx>,
-
-                    infcx: &'a InferCtxt<'tcx>,
-                }
-                impl<'a, 'tcx> TypeVisitor<'tcx> for Visitor<'a, 'tcx> {
-                    type BreakTy = ();
-                    fn visit_const(&mut self, c: ty::Const<'tcx>) -> ControlFlow<Self::BreakTy> {
-                        if c.ty() == self.ct.ty()
-                            && let Ok(_nested_obligations) = self
-                                .infcx
-                                .at(&ObligationCause::dummy(), self.param_env)
-                                .eq(c, self.ct)
-                        {
-                            //let obligations = nested_obligations.into_obligations();
-                            ControlFlow::BREAK
-                        } else if let ty::ConstKind::Expr(e) = c.kind() {
-                            e.visit_with(self)
-                        } else {
-                            ControlFlow::CONTINUE
-                        }
-                    }
+                let ce = tcx.expand_abstract_consts(ce);
+                if ce.references_error() {
+                    let guard = tcx.sess.delay_span_bug(DUMMY_SP, "ct references error");
+                    return Err(NotConstEvaluatable::Error(guard));
                 }
 
                 let mut v = Visitor { ct, infcx, param_env };
-                let result = b_ct.visit_with(&mut v);
+                let result = ce.visit_with(&mut v);
 
                 if let ControlFlow::Break(()) = result {
                     debug!("is_const_evaluatable: abstract_const ~~> ok");

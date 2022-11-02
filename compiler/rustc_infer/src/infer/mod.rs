@@ -1609,24 +1609,21 @@ impl<'tcx> InferCtxt<'tcx> {
         // variables
         let tcx = self.tcx;
         if substs.has_non_region_infer() {
-            let substs_erased = tcx.erase_regions(unevaluated.substs);
-            let ac = tcx.expand_bound_abstract_const(
-                tcx.bound_abstract_const(unevaluated.def),
-                substs_erased,
-            );
-            match ac {
-                Ok(None) => {
-                    substs = InternalSubsts::identity_for_item(tcx, unevaluated.def.did);
-                    param_env = tcx.param_env(unevaluated.def.did);
+            if let Some(ct) = tcx.bound_abstract_const(unevaluated.def)? {
+                let ct = tcx.expand_abstract_consts(ct.subst(tcx, substs));
+                if ct.references_error() {
+                    let guard = tcx
+                        .sess
+                        .delay_span_bug(span.unwrap_or(DUMMY_SP), "ct already references error");
+                    return Err(ErrorHandled::Reported(guard));
+                } else if ct.has_non_region_infer() || ct.has_non_region_param() {
+                    return Err(ErrorHandled::TooGeneric);
+                } else {
+                    substs = replace_param_and_infer_substs_with_placeholder(tcx, substs);
                 }
-                Ok(Some(ct)) => {
-                    if ct.has_non_region_infer() || ct.has_non_region_param() {
-                        return Err(ErrorHandled::TooGeneric);
-                    } else {
-                        substs = replace_param_and_infer_substs_with_placeholder(tcx, substs);
-                    }
-                }
-                Err(guar) => return Err(ErrorHandled::Reported(guar)),
+            } else {
+                substs = InternalSubsts::identity_for_item(tcx, unevaluated.def.did);
+                param_env = tcx.param_env(unevaluated.def.did);
             }
         }
 

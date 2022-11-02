@@ -502,32 +502,30 @@ impl<'a, 'tcx> ObligationProcessor for FulfillProcessor<'a, 'tcx> {
                     //
                     // Let's just see where this breaks :shrug:
                     match (c1.kind(), c2.kind()) {
-                        (ty::ConstKind::Unevaluated(a), ty::ConstKind::Unevaluated(b)) => {
-                            if tcx.def_kind(a.def.did) == DefKind::AssocConst
-                                || tcx.def_kind(b.def.did) == DefKind::AssocConst
-                            {
-                                // Two different constants using generic parameters ~> error.
-                                let expected_found = ExpectedFound::new(true, c1, c2);
-                                return ProcessResult::Error(
-                                    FulfillmentErrorCode::CodeConstEquateError(
-                                        expected_found,
-                                        TypeError::ConstMismatch(expected_found),
-                                    ),
-                                );
-                            }
-                            if let (Ok(Some(a)), Ok(Some(b))) = (
-                                    tcx.expand_abstract_const(c1),
-                                    tcx.expand_abstract_const(c2),
-                                ) && a.ty() == b.ty() &&
-                                  let Ok(new_obligations) = infcx
-                                      .at(&obligation.cause, obligation.param_env)
-                                      .eq(a, b) {
-                                            return ProcessResult::Changed(mk_pending(
-                                                new_obligations.into_obligations(),
-                                            ));
-                                }
+                        (ty::ConstKind::Unevaluated(ct), _)
+                        | (_, ty::ConstKind::Unevaluated(ct))
+                            if tcx.def_kind(ct.def.did) == DefKind::AssocConst =>
+                        {
+                            let expected_found = ExpectedFound::new(true, c1, c2);
+                            return ProcessResult::Error(
+                                FulfillmentErrorCode::CodeConstEquateError(
+                                    expected_found,
+                                    TypeError::ConstMismatch(expected_found),
+                                ),
+                            );
                         }
                         _ => {}
+                    }
+
+                    let expanded_c1 = tcx.expand_abstract_consts(c1);
+                    let expanded_c2 = tcx.expand_abstract_consts(c2);
+                    if expanded_c1 != c1 || expanded_c2 != c2 {
+                        if let Ok(infer_ok) = infcx
+                            .at(&obligation.cause, obligation.param_env)
+                            .eq(expanded_c1, expanded_c2)
+                        {
+                            return ProcessResult::Changed(mk_pending(infer_ok.into_obligations()));
+                        }
                     }
 
                     let stalled_on = &mut pending_obligation.stalled_on;
@@ -566,7 +564,9 @@ impl<'a, 'tcx> ObligationProcessor for FulfillProcessor<'a, 'tcx> {
                                 .at(&obligation.cause, obligation.param_env)
                                 .eq(c1, c2)
                             {
-                                Ok(_) => ProcessResult::Changed(vec![]),
+                                Ok(infer_ok) => {
+                                    ProcessResult::Changed(mk_pending(infer_ok.into_obligations()))
+                                }
                                 Err(err) => ProcessResult::Error(
                                     FulfillmentErrorCode::CodeConstEquateError(
                                         ExpectedFound::new(true, c1, c2),

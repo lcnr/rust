@@ -284,13 +284,7 @@ where
     }
 
     fn visit_const(&mut self, c: Const<'tcx>) -> ControlFlow<Self::BreakTy> {
-        self.visit_ty(c.ty())?;
-        let tcx = self.def_id_visitor.tcx();
-        if let Ok(Some(ct)) = tcx.expand_abstract_const(c) &&
-          let ty::ConstKind::Expr(e) = ct.kind() {
-            e.visit_with(self)?;
-        }
-        ControlFlow::CONTINUE
+        self.def_id_visitor.tcx().expand_abstract_consts(c).super_visit_with(self)
     }
 }
 

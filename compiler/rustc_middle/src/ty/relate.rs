@@ -605,7 +605,7 @@ pub fn super_relate_consts<'tcx, R: TypeRelation<'tcx>>(
     // an unnormalized (i.e. unevaluated) const in the param-env.
     // FIXME(generic_const_exprs): Once we always lazily unify unevaluated constants
     // these `eval` calls can be removed.
-    if !relation.tcx().features().generic_const_exprs {
+    if !tcx.features().generic_const_exprs {
         a = a.eval(tcx, relation.param_env());
         b = b.eval(tcx, relation.param_env());
     }
@@ -629,10 +629,11 @@ pub fn super_relate_consts<'tcx, R: TypeRelation<'tcx>>(
         (ty::ConstKind::Unevaluated(_au), ty::ConstKind::Unevaluated(_bu))
             if tcx.features().generic_const_exprs =>
         {
-            if let (Ok(Some(a)), Ok(Some(b))) = (
-                tcx.expand_abstract_const(a),
-                tcx.expand_abstract_const(b),
-            ) && a.ty() == b.ty() {
+            // FIXME(generic_const_exprs): This isn't quite right and ideally
+            // shouldn't be needed.
+            let expanded_a = tcx.expand_abstract_consts(a);
+            let expanded_b = tcx.expand_abstract_consts(b);
+            if expanded_a != a || expanded_b != b {
                 return relation.consts(a, b);
             } else {
                 false

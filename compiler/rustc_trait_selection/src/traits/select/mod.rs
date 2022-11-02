@@ -683,29 +683,19 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                     );
                     debug!(?c1, ?c2, "evaluate_predicate_recursively: equating consts");
 
-                    // FIXME: we probably should only try to unify abstract constants
-                    // if the constants depend on generic parameters.
-                    //
-                    // Let's just see where this breaks :shrug:
-                    if let (ty::ConstKind::Unevaluated(_), ty::ConstKind::Unevaluated(_)) =
-                        (c1.kind(), c2.kind())
-                    {
-                        if let (Ok(Some(a)), Ok(Some(b))) = (
-                          tcx.expand_abstract_const(c1),
-                          tcx.expand_abstract_const(c2),
-                        ) && a.ty() == b.ty() && let Ok(new_obligations) =
-                                    self.infcx.at(&obligation.cause, obligation.param_env).eq(a, b)
-                                {
-                                    let mut obligations = new_obligations.obligations;
-                                    self.add_depth(
-                                        obligations.iter_mut(),
-                                        obligation.recursion_depth,
-                                    );
-                                    return self.evaluate_predicates_recursively(
-                                        previous_stack,
-                                        obligations.into_iter(),
-                                    );
-                                }
+                    let expanded_c1 = tcx.expand_abstract_consts(c1);
+                    let expanded_c2 = tcx.expand_abstract_consts(c2);
+                    if expanded_c1 != c1 || expanded_c2 != c2 {
+                        if let Ok(infer_ok) = self
+                            .infcx
+                            .at(&obligation.cause, obligation.param_env)
+                            .eq(expanded_c1, expanded_c2)
+                        {
+                            return self.evaluate_predicates_recursively(
+                                previous_stack,
+                                infer_ok.into_obligations(),
+                            );
+                        }
                     }
 
                     let evaluate = |c: ty::Const<'tcx>| {
@@ -731,7 +721,10 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                                 .at(&obligation.cause, obligation.param_env)
                                 .eq(c1, c2)
                             {
-                                Ok(_) => Ok(EvaluatedToOk),
+                                Ok(infer_ok) => self.evaluate_predicates_recursively(
+                                    previous_stack,
+                                    infer_ok.into_obligations(),
+                                ),
                                 Err(_) => Ok(EvaluatedToErr),
                             }
                         }
