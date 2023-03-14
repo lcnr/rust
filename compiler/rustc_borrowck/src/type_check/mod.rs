@@ -137,7 +137,6 @@ pub(crate) fn type_check<'mir, 'tcx>(
     elements: &Rc<RegionValueElements>,
     upvars: &[Upvar<'tcx>],
     use_polonius: bool,
-    defining_use_anchor: DefiningAnchor,
 ) -> MirTypeckResults<'tcx> {
     let implicit_region_bound = infcx.tcx.mk_re_var(universal_regions.fr_fn_body);
     let mut constraints = MirTypeckRegionConstraints {
@@ -184,7 +183,6 @@ pub(crate) fn type_check<'mir, 'tcx>(
         &region_bound_pairs,
         implicit_region_bound,
         &mut borrowck_context,
-        defining_use_anchor,
     );
 
     let errors_reported = {
@@ -882,7 +880,6 @@ struct TypeChecker<'a, 'tcx> {
     implicit_region_bound: ty::Region<'tcx>,
     reported_errors: FxIndexSet<(Ty<'tcx>, Span)>,
     borrowck_context: &'a mut BorrowCheckContext<'a, 'tcx>,
-    defining_use_anchor: DefiningAnchor,
 }
 
 struct BorrowCheckContext<'a, 'tcx> {
@@ -1031,7 +1028,6 @@ impl<'a, 'tcx> TypeChecker<'a, 'tcx> {
         region_bound_pairs: &'a RegionBoundPairs<'tcx>,
         implicit_region_bound: ty::Region<'tcx>,
         borrowck_context: &'a mut BorrowCheckContext<'a, 'tcx>,
-        defining_use_anchor: DefiningAnchor,
     ) -> Self {
         let mut checker = Self {
             infcx,
@@ -1043,7 +1039,6 @@ impl<'a, 'tcx> TypeChecker<'a, 'tcx> {
             implicit_region_bound,
             borrowck_context,
             reported_errors: Default::default(),
-            defining_use_anchor,
         };
         checker.check_user_type_annotations();
         checker
@@ -1051,6 +1046,10 @@ impl<'a, 'tcx> TypeChecker<'a, 'tcx> {
 
     fn body(&self) -> &Body<'tcx> {
         self.body
+    }
+
+    fn defining_use_anchor(&self) -> DefiningAnchor {
+        DefiningAnchor::Bind(self.body.source.def_id().expect_local())
     }
 
     fn unsized_feature_enabled(&self) -> bool {

@@ -571,7 +571,7 @@ impl<'tcx> LivenessContext<'_, '_, '_, 'tcx> {
         let param_env = typeck.param_env;
         let TypeOpOutput { output, constraints, .. } = param_env
             .and(DropckOutlives::new(dropped_ty))
-            .fully_perform(typeck.infcx, typeck.defining_use_anchor)
+            .fully_perform(typeck.infcx, typeck.defining_use_anchor())
             .unwrap();
 
         DropData { dropck_result: output, region_constraint_data: constraints }

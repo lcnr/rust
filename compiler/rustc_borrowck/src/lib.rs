@@ -26,7 +26,7 @@ use rustc_hir::def_id::LocalDefId;
 use rustc_index::bit_set::ChunkedBitSet;
 use rustc_index::vec::IndexVec;
 use rustc_infer::infer::{
-    DefiningAnchor, InferCtxt, NllRegionVariableOrigin, RegionVariableOrigin, TyCtxtInferExt,
+    InferCtxt, NllRegionVariableOrigin, RegionVariableOrigin, TyCtxtInferExt,
 };
 use rustc_macros::fluent_messages;
 use rustc_middle::mir::{
@@ -149,19 +149,10 @@ fn mir_borrowck(tcx: TyCtxt<'_>, def: ty::WithOptConstParam<LocalDefId>) -> &Bor
         return tcx.arena.alloc(result);
     }
 
-    let hir_owner = tcx.hir().local_def_id_to_hir_id(def.did).owner;
-
     let infcx = tcx.infer_ctxt().build();
     let input_body: &Body<'_> = &input_body.borrow();
     let promoted: &IndexVec<_, _> = &promoted.borrow();
-    let opt_closure_req = do_mir_borrowck(
-        &infcx,
-        input_body,
-        promoted,
-        false,
-        DefiningAnchor::Bind(hir_owner.def_id),
-    )
-    .0;
+    let opt_closure_req = do_mir_borrowck(&infcx, input_body, promoted, false).0;
     debug!("mir_borrowck done");
 
     tcx.arena.alloc(opt_closure_req)
@@ -178,7 +169,6 @@ fn do_mir_borrowck<'tcx>(
     input_body: &Body<'tcx>,
     input_promoted: &IndexVec<Promoted, Body<'tcx>>,
     return_body_with_facts: bool,
-    defining_use_anchor: DefiningAnchor,
 ) -> (BorrowCheckResult<'tcx>, Option<Box<BodyWithBorrowckFacts<'tcx>>>) {
     let def = input_body.source.with_opt_param().as_local().unwrap();
     debug!(?def);
@@ -281,7 +271,6 @@ fn do_mir_borrowck<'tcx>(
         &borrow_set,
         &upvars,
         use_polonius,
-        defining_use_anchor,
     );
 
     // Dump MIR results into a file, if that is enabled. This let us
