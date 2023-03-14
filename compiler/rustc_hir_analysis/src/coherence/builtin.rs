@@ -9,7 +9,7 @@ use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_hir::lang_items::LangItem;
 use rustc_hir::ItemKind;
 use rustc_infer::infer::outlives::env::OutlivesEnvironment;
-use rustc_infer::infer::{self, RegionResolutionError};
+use rustc_infer::infer::{self, RegionResolutionError, DefiningAnchor};
 use rustc_infer::infer::{DefiningAnchor, TyCtxtInferExt};
 use rustc_middle::ty::adjustment::CoerceUnsizedInfo;
 use rustc_middle::ty::{self, suggest_constraining_type_params, Ty, TyCtxt, TypeVisitableExt};
@@ -346,7 +346,7 @@ fn visit_implementation_of_dispatch_from_dyn(tcx: TyCtxt<'_>, impl_did: LocalDef
                             [field.ty(tcx, substs_a), field.ty(tcx, substs_b)],
                         )
                     }),
-                    infer::DefiningAnchor::Error,
+                    DefiningAnchor::Error,
                 );
                 if !errors.is_empty() {
                     infcx.err_ctxt().report_fulfillment_errors(&errors);
@@ -587,7 +587,7 @@ pub fn coerce_unsized_info<'tcx>(tcx: TyCtxt<'tcx>, impl_did: DefId) -> CoerceUn
     let cause = traits::ObligationCause::misc(span, impl_did);
     let predicate =
         predicate_for_trait_def(tcx, param_env, cause, trait_def_id, 0, [source, target]);
-    let errors = traits::fully_solve_obligation(&infcx, predicate, infer::DefiningAnchor::Error);
+    let errors = traits::fully_solve_obligation(&infcx, predicate, DefiningAnchor::Error);
     if !errors.is_empty() {
         infcx.err_ctxt().report_fulfillment_errors(&errors);
     }

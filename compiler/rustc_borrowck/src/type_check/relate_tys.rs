@@ -1,5 +1,5 @@
 use rustc_infer::infer::nll_relate::{TypeRelating, TypeRelatingDelegate};
-use rustc_infer::infer::NllRegionVariableOrigin;
+use rustc_infer::infer::{NllRegionVariableOrigin, DefiningAnchor};
 use rustc_infer::traits::PredicateObligations;
 use rustc_middle::mir::ConstraintCategory;
 use rustc_middle::ty::relate::TypeRelation;
@@ -87,7 +87,7 @@ impl<'tcx> TypeRelatingDelegate<'tcx> for NllTypeRelatingDelegate<'_, '_, 'tcx> 
         self.locations.span(self.type_checker.body)
     }
 
-    fn defining_use_anchor(&self) -> rustc_infer::infer::DefiningAnchor {
+    fn defining_use_anchor(&self) -> DefiningAnchor {
         self.type_checker.defining_use_anchor()
     }
 
