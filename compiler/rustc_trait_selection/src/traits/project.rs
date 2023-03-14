@@ -28,6 +28,7 @@ use rustc_hir::def::DefKind;
 use rustc_hir::lang_items::LangItem;
 use rustc_infer::infer::at::At;
 use rustc_infer::infer::resolve::OpportunisticRegionResolver;
+use rustc_infer::infer::DefiningAnchor;
 use rustc_infer::traits::ImplSourceBuiltinData;
 use rustc_middle::traits::select::OverflowError;
 use rustc_middle::ty::fold::{TypeFoldable, TypeFolder, TypeSuperFoldable};
@@ -57,7 +58,7 @@ pub trait NormalizeExt<'tcx> {
 
 impl<'tcx> NormalizeExt<'tcx> for At<'_, 'tcx> {
     fn normalize<T: TypeFoldable<TyCtxt<'tcx>>>(&self, value: T) -> InferOk<'tcx, T> {
-        let mut selcx = SelectionContext::new(self.infcx);
+        let mut selcx = SelectionContext::new(self.infcx, DefiningAnchor::Error);
         let Normalized { value, obligations } =
             normalize_with_depth(&mut selcx, self.param_env, self.cause.clone(), 0, value);
         InferOk { value, obligations }
@@ -282,13 +283,13 @@ fn project_and_unify_type<'cx, 'tcx>(
             obligation.cause.body_id,
             obligation.cause.span,
             obligation.param_env,
+            selcx.defining_use_anchor(),
         );
     obligations.extend(new);
 
     match infcx
-        .at(&obligation.cause, obligation.param_env)
-        // This is needed to support nested opaque types like `impl Fn() -> impl Trait`
-        .define_opaque_types(true)
+        // This anchor is needed to support nested opaque types like `impl Fn() -> impl Trait`
+        .at(&obligation.cause, obligation.param_env, selcx.defining_use_anchor())
         .eq(normalized, actual)
     {
         Ok(InferOk { obligations: inferred_obligations, value: () }) => {
@@ -2064,7 +2065,10 @@ fn confirm_param_env_candidate<'cx, 'tcx>(
 
     debug!(?cache_projection, ?obligation_projection);
 
-    match infcx.at(cause, param_env).eq(cache_projection, obligation_projection) {
+    match infcx
+        .at(cause, param_env, DefiningAnchor::Error)
+        .eq(cache_projection, obligation_projection)
+    {
         Ok(InferOk { value: _, obligations }) => {
             nested_obligations.extend(obligations);
             assoc_ty_own_obligations(selcx, obligation, &mut nested_obligations);

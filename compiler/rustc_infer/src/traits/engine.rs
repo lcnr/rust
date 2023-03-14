@@ -1,4 +1,4 @@
-use crate::infer::InferCtxt;
+use crate::infer::{DefiningAnchor, InferCtxt};
 use crate::traits::Obligation;
 use rustc_hir::def_id::DefId;
 use rustc_middle::ty::{self, ToPredicate, Ty};
@@ -49,6 +49,8 @@ pub trait TraitEngine<'tcx>: 'tcx {
         &mut self,
         infcx: &InferCtxt<'tcx>,
     ) -> Vec<PredicateObligation<'tcx>>;
+
+    fn defining_use_anchor(&self) -> DefiningAnchor;
 }
 
 pub trait TraitEngineExt<'tcx> {

@@ -269,7 +269,7 @@ pub(crate) fn extract_tupled_inputs_and_output_from_callable<'tcx>(
 /// additional step of eagerly folding the associated types in the where
 /// clauses of the impl. In this example, that means replacing
 /// `<Self as Foo>::Bar` with `Ty` in the first impl.
-pub(crate) fn predicates_for_object_candidate<'tcx>(
+pub(in super::super) fn predicates_for_object_candidate<'tcx>(
     ecx: &EvalCtxt<'_, 'tcx>,
     param_env: ty::ParamEnv<'tcx>,
     trait_ref: ty::TraitRef<'tcx>,

@@ -313,9 +313,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     where
         T: TypeFoldable<TyCtxt<'tcx>>,
     {
-        self.register_infer_ok_obligations(
-            self.at(&self.misc(span), self.param_env).normalize(value),
-        )
+        self.register_infer_ok_obligations(self.at(&self.misc(span)).normalize(value))
     }
 
     pub fn require_type_meets(
@@ -557,7 +555,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             // Unify `interior` with `witness` and collect all the resulting obligations.
             let span = self.tcx.hir().body(body_id).value.span;
             let ok = self
-                .at(&self.misc(span), self.param_env)
+                .at(&self.misc(span))
                 .eq(interior, witness)
                 .expect("Failed to unify generator interior type");
             let mut obligations = ok.obligations;
@@ -734,7 +732,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 if let ty::subst::GenericArgKind::Type(ty) = ty.unpack()
                     && let ty::Alias(ty::Opaque, ty::AliasTy { def_id, .. }) = *ty.kind()
                     && let Some(def_id) = def_id.as_local()
-                    && self.opaque_type_origin(def_id).is_some() {
+                    && self.opaque_type_origin(def_id, self.defining_use_anchor()).is_some() {
                     return None;
                 }
             }
@@ -742,7 +740,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
         let expect_args = self
             .fudge_inference_if_ok(|| {
-                let ocx = ObligationCtxt::new_in_snapshot(self);
+                let ocx = ObligationCtxt::new_in_snapshot(self, self.defining_use_anchor());
 
                 // Attempt to apply a subtyping relationship between the formal
                 // return type (likely containing type variables if the function
@@ -1315,7 +1313,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             // This also occurs for an enum variant on a type alias.
             let impl_ty = self.normalize(span, tcx.type_of(impl_def_id).subst(tcx, substs));
             let self_ty = self.normalize(span, self_ty);
-            match self.at(&self.misc(span), self.param_env).eq(impl_ty, self_ty) {
+            match self.at(&self.misc(span)).eq(impl_ty, self_ty) {
                 Ok(ok) => self.register_infer_ok_obligations(ok),
                 Err(_) => {
                     self.tcx.sess.delay_span_bug(
@@ -1456,6 +1454,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             self.param_env,
             original_values,
             query_result,
+            self.defining_use_anchor(),
         )
     }
 

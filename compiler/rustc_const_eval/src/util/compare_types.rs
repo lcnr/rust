@@ -41,10 +41,9 @@ pub fn is_subtype<'tcx>(
         return true;
     }
 
-    let mut builder =
-        tcx.infer_ctxt().ignoring_regions().with_opaque_type_inference(DefiningAnchor::Bubble);
+    let mut builder = tcx.infer_ctxt().ignoring_regions();
     let infcx = builder.build();
-    let ocx = ObligationCtxt::new(&infcx);
+    let ocx = ObligationCtxt::new(&infcx, DefiningAnchor::Bubble);
     let cause = ObligationCause::dummy();
     let src = ocx.normalize(&cause, param_env, src);
     let dest = ocx.normalize(&cause, param_env, dest);

@@ -38,6 +38,7 @@ use rustc_data_structures::stack::ensure_sufficient_stack;
 use rustc_errors::Diagnostic;
 use rustc_hir as hir;
 use rustc_hir::def_id::DefId;
+use rustc_infer::infer::DefiningAnchor;
 use rustc_infer::infer::LateBoundRegionConversionTime;
 use rustc_infer::traits::TraitEngine;
 use rustc_infer::traits::TraitEngineExt;
@@ -126,6 +127,8 @@ pub struct SelectionContext<'cx, 'tcx> {
     /// policy. In essence, canonicalized queries need their errors propagated
     /// rather than immediately reported because we do not have accurate spans.
     query_mode: TraitQueryMode,
+
+    defining_use_anchor: DefiningAnchor,
 }
 
 // A stack that walks back up the stack frame.
@@ -207,21 +210,26 @@ enum BuiltinImplConditions<'tcx> {
 }
 
 impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
-    pub fn new(infcx: &'cx InferCtxt<'tcx>) -> SelectionContext<'cx, 'tcx> {
+    pub fn new(
+        infcx: &'cx InferCtxt<'tcx>,
+        defining_use_anchor: impl Into<DefiningAnchor>,
+    ) -> SelectionContext<'cx, 'tcx> {
         SelectionContext {
             infcx,
             freshener: infcx.freshener_keep_static(),
             intercrate_ambiguity_causes: None,
             query_mode: TraitQueryMode::Standard,
+            defining_use_anchor: defining_use_anchor.into(),
         }
     }
 
-    pub fn with_query_mode(
-        infcx: &'cx InferCtxt<'tcx>,
-        query_mode: TraitQueryMode,
-    ) -> SelectionContext<'cx, 'tcx> {
-        debug!(?query_mode, "with_query_mode");
-        SelectionContext { query_mode, ..SelectionContext::new(infcx) }
+    pub fn new_in_canonical_query(infcx: &'cx InferCtxt<'tcx>) -> SelectionContext<'cx, 'tcx> {
+        SelectionContext {
+            query_mode: TraitQueryMode::Canonical,
+            // This bubble is required for this tests to pass:
+            // impl-trait/issue99642.rs
+            ..SelectionContext::new(infcx, DefiningAnchor::Bubble)
+        }
     }
 
     /// Enables tracking of intercrate ambiguity causes. See
@@ -613,7 +621,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         &mut self,
         predicates: impl IntoIterator<Item = PredicateObligation<'tcx>>,
     ) -> Result<EvaluationResult, OverflowError> {
-        let mut fulfill_cx = crate::solve::FulfillmentCtxt::new();
+        let mut fulfill_cx = crate::solve::FulfillmentCtxt::new(DefiningAnchor::Bubble);
         fulfill_cx.register_predicate_obligations(self.infcx, predicates);
         // True errors
         if !fulfill_cx.select_where_possible(self.infcx).is_empty() {
@@ -910,7 +918,11 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                             {
                                 if let Ok(new_obligations) = self
                                     .infcx
-                                    .at(&obligation.cause, obligation.param_env)
+                                    .at(
+                                        &obligation.cause,
+                                        obligation.param_env,
+                                        DefiningAnchor::Error,
+                                    )
                                     .trace(c1, c2)
                                     .eq(a.substs, b.substs)
                                 {
@@ -929,7 +941,11 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                             (_, _) => {
                                 if let Ok(new_obligations) = self
                                     .infcx
-                                    .at(&obligation.cause, obligation.param_env)
+                                    .at(
+                                        &obligation.cause,
+                                        obligation.param_env,
+                                        DefiningAnchor::Error,
+                                    )
                                     .eq(c1, c2)
                                 {
                                     let mut obligations = new_obligations.obligations;
@@ -964,7 +980,10 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
                     match (evaluate(c1), evaluate(c2)) {
                         (Ok(c1), Ok(c2)) => {
-                            match self.infcx.at(&obligation.cause, obligation.param_env).eq(c1, c2)
+                            match self
+                                .infcx
+                                .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
+                                .eq(c1, c2)
                             {
                                 Ok(inf_ok) => self.evaluate_predicates_recursively(
                                     previous_stack,
@@ -993,7 +1012,11 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 }
                 ty::PredicateKind::Ambiguous => Ok(EvaluatedToAmbig),
                 ty::PredicateKind::Clause(ty::Clause::ConstArgHasType(ct, ty)) => {
-                    match self.infcx.at(&obligation.cause, obligation.param_env).eq(ct.ty(), ty) {
+                    match self
+                        .infcx
+                        .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
+                        .eq(ct.ty(), ty)
+                    {
                         Ok(inf_ok) => self.evaluate_predicates_recursively(
                             previous_stack,
                             inf_ok.into_obligations(),
@@ -1750,7 +1773,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             )
         });
         self.infcx
-            .at(&obligation.cause, obligation.param_env)
+            .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
             .sup(ty::Binder::dummy(placeholder_trait_ref), trait_bound)
             .map(|InferOk { obligations: _, value: () }| {
                 // This method is called within a probe, so we can't have
@@ -1812,7 +1835,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
         let is_match = self
             .infcx
-            .at(&obligation.cause, obligation.param_env)
+            .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
             .sup(obligation.predicate, infer_projection)
             .map_or(false, |InferOk { obligations, value: () }| {
                 self.evaluate_predicates_recursively(
@@ -2533,7 +2556,7 @@ impl<'tcx> SelectionContext<'_, 'tcx> {
 
         let InferOk { obligations, .. } = self
             .infcx
-            .at(&cause, obligation.param_env)
+            .at(&cause, obligation.param_env, DefiningAnchor::Error)
             .eq(placeholder_obligation_trait_ref, impl_trait_ref)
             .map_err(|e| {
                 debug!("match_impl: failed eq_trait_refs due to `{}`", e.to_string(self.tcx()))
@@ -2583,7 +2606,7 @@ impl<'tcx> SelectionContext<'_, 'tcx> {
         poly_trait_ref: ty::PolyTraitRef<'tcx>,
     ) -> Result<Vec<PredicateObligation<'tcx>>, ()> {
         self.infcx
-            .at(&obligation.cause, obligation.param_env)
+            .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
             .sup(obligation.predicate.to_poly_trait_ref(), poly_trait_ref)
             .map(|InferOk { obligations, .. }| obligations)
             .map_err(|_| ())
@@ -2705,6 +2728,10 @@ impl<'tcx> SelectionContext<'_, 'tcx> {
         }
 
         obligations
+    }
+
+    pub fn defining_use_anchor(&self) -> DefiningAnchor {
+        self.defining_use_anchor
     }
 }
 

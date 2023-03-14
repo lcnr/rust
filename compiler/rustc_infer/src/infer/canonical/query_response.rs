@@ -14,7 +14,7 @@ use crate::infer::canonical::{
 };
 use crate::infer::nll_relate::{TypeRelating, TypeRelatingDelegate};
 use crate::infer::region_constraints::{Constraint, RegionConstraintData};
-use crate::infer::{InferCtxt, InferOk, InferResult, NllRegionVariableOrigin};
+use crate::infer::{DefiningAnchor, InferCtxt, InferOk, InferResult, NllRegionVariableOrigin};
 use crate::traits::query::{Fallible, NoSolution};
 use crate::traits::{Obligation, ObligationCause, PredicateObligation};
 use crate::traits::{PredicateObligations, TraitEngine, TraitEngineExt};
@@ -116,7 +116,7 @@ impl<'tcx> InferCtxt<'tcx> {
 
         if !true_errors.is_empty() {
             // FIXME -- we don't indicate *why* we failed to solve
-            debug!("make_query_response: true_errors={:#?}", true_errors);
+            debug!("true_errors={:#?}", true_errors);
             return Err(NoSolution);
         }
 
@@ -188,12 +188,18 @@ impl<'tcx> InferCtxt<'tcx> {
         param_env: ty::ParamEnv<'tcx>,
         original_values: &OriginalQueryValues<'tcx>,
         query_response: &Canonical<'tcx, QueryResponse<'tcx, R>>,
+        defining_use_anchor: DefiningAnchor,
     ) -> InferResult<'tcx, R>
     where
         R: Debug + TypeFoldable<TyCtxt<'tcx>>,
     {
-        let InferOk { value: result_subst, mut obligations } =
-            self.query_response_substitution(cause, param_env, original_values, query_response)?;
+        let InferOk { value: result_subst, mut obligations } = self.query_response_substitution(
+            cause,
+            param_env,
+            original_values,
+            query_response,
+            defining_use_anchor,
+        )?;
 
         obligations.extend(self.query_outlives_constraints_into_obligations(
             cause,
@@ -250,12 +256,19 @@ impl<'tcx> InferCtxt<'tcx> {
         original_values: &OriginalQueryValues<'tcx>,
         query_response: &Canonical<'tcx, QueryResponse<'tcx, R>>,
         output_query_region_constraints: &mut QueryRegionConstraints<'tcx>,
+        defining_use_anchor: DefiningAnchor,
     ) -> InferResult<'tcx, R>
     where
         R: Debug + TypeFoldable<TyCtxt<'tcx>>,
     {
         let InferOk { value: result_subst, mut obligations } = self
-            .query_response_substitution_guess(cause, param_env, original_values, query_response)?;
+            .query_response_substitution_guess(
+                cause,
+                param_env,
+                original_values,
+                query_response,
+                defining_use_anchor,
+            )?;
 
         // Compute `QueryOutlivesConstraint` values that unify each of
         // the original values `v_o` that was canonicalized into a
@@ -364,6 +377,7 @@ impl<'tcx> InferCtxt<'tcx> {
         param_env: ty::ParamEnv<'tcx>,
         original_values: &OriginalQueryValues<'tcx>,
         query_response: &Canonical<'tcx, QueryResponse<'tcx, R>>,
+        defining_use_anchor: DefiningAnchor,
     ) -> InferResult<'tcx, CanonicalVarValues<'tcx>>
     where
         R: Debug + TypeFoldable<TyCtxt<'tcx>>,
@@ -378,6 +392,7 @@ impl<'tcx> InferCtxt<'tcx> {
             param_env,
             original_values,
             query_response,
+            defining_use_anchor,
         )?;
 
         value.obligations.extend(
@@ -410,6 +425,7 @@ impl<'tcx> InferCtxt<'tcx> {
         param_env: ty::ParamEnv<'tcx>,
         original_values: &OriginalQueryValues<'tcx>,
         query_response: &Canonical<'tcx, QueryResponse<'tcx, R>>,
+        defining_use_anchor: DefiningAnchor,
     ) -> InferResult<'tcx, CanonicalVarValues<'tcx>>
     where
         R: Debug + TypeFoldable<TyCtxt<'tcx>>,
@@ -510,7 +526,7 @@ impl<'tcx> InferCtxt<'tcx> {
             let b = substitute_value(self.tcx, &result_subst, b);
             debug!(?a, ?b, "constrain opaque type");
             obligations
-                .extend(self.at(cause, param_env).define_opaque_types(true).eq(a, b)?.obligations);
+                .extend(self.at(cause, param_env, defining_use_anchor).eq(a, b)?.obligations);
         }
 
         Ok(InferOk { value: result_subst, obligations })
@@ -603,8 +619,11 @@ impl<'tcx> InferCtxt<'tcx> {
 
                 match (value1.unpack(), value2.unpack()) {
                     (GenericArgKind::Type(v1), GenericArgKind::Type(v2)) => {
-                        obligations
-                            .extend(self.at(cause, param_env).eq(v1, v2)?.into_obligations());
+                        obligations.extend(
+                            self.at(cause, param_env, DefiningAnchor::Error)
+                                .eq(v1, v2)?
+                                .into_obligations(),
+                        );
                     }
                     (GenericArgKind::Lifetime(re1), GenericArgKind::Lifetime(re2))
                         if re1.is_erased() && re2.is_erased() =>
@@ -612,11 +631,14 @@ impl<'tcx> InferCtxt<'tcx> {
                         // no action needed
                     }
                     (GenericArgKind::Lifetime(v1), GenericArgKind::Lifetime(v2)) => {
-                        obligations
-                            .extend(self.at(cause, param_env).eq(v1, v2)?.into_obligations());
+                        obligations.extend(
+                            self.at(cause, param_env, DefiningAnchor::Error)
+                                .eq(v1, v2)?
+                                .into_obligations(),
+                        );
                     }
                     (GenericArgKind::Const(v1), GenericArgKind::Const(v2)) => {
-                        let ok = self.at(cause, param_env).eq(v1, v2)?;
+                        let ok = self.at(cause, param_env, DefiningAnchor::Error).eq(v1, v2)?;
                         obligations.extend(ok.into_obligations());
                     }
                     _ => {
@@ -685,6 +707,10 @@ impl<'tcx> TypeRelatingDelegate<'tcx> for QueryTypeRelatingDelegate<'_, 'tcx> {
 
     fn param_env(&self) -> ty::ParamEnv<'tcx> {
         self.param_env
+    }
+
+    fn defining_use_anchor(&self) -> DefiningAnchor {
+        DefiningAnchor::Bubble
     }
 
     fn create_next_universe(&mut self) -> ty::UniverseIndex {

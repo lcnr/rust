@@ -11,7 +11,7 @@ use rustc_hir::intravisit;
 use rustc_hir::{GenericParamKind, ImplItemKind};
 use rustc_infer::infer::outlives::env::OutlivesEnvironment;
 use rustc_infer::infer::type_variable::{TypeVariableOrigin, TypeVariableOriginKind};
-use rustc_infer::infer::{self, InferCtxt, TyCtxtInferExt};
+use rustc_infer::infer::{self, DefiningAnchor, InferCtxt, TyCtxtInferExt};
 use rustc_infer::traits::util;
 use rustc_middle::ty::error::{ExpectedFound, TypeError};
 use rustc_middle::ty::util::ExplicitSelf;
@@ -202,7 +202,7 @@ fn compare_method_predicate_entailment<'tcx>(
     let param_env = traits::normalize_param_env_or_error(tcx, param_env, normalize_cause);
 
     let infcx = &tcx.infer_ctxt().build();
-    let ocx = ObligationCtxt::new(infcx);
+    let ocx = ObligationCtxt::new(infcx, DefiningAnchor::Error);
 
     debug!("compare_impl_method: caller_bounds={:?}", param_env.caller_bounds());
 
@@ -237,8 +237,6 @@ fn compare_method_predicate_entailment<'tcx>(
     // type.
 
     // Compute placeholder form of impl and trait method tys.
-    let tcx = infcx.tcx;
-
     let mut wf_tys = FxIndexSet::default();
 
     let unnormalized_impl_sig = infcx.instantiate_binder_with_fresh_vars(
@@ -620,7 +618,7 @@ pub(super) fn collect_return_position_impl_trait_in_trait_tys<'tcx>(
         impl_to_placeholder_substs.rebase_onto(tcx, impl_m.container_id(tcx), trait_to_impl_substs);
 
     let infcx = &tcx.infer_ctxt().build();
-    let ocx = ObligationCtxt::new(infcx);
+    let ocx = ObligationCtxt::new(infcx, DefiningAnchor::Error);
 
     // Normalize the impl signature with fresh variables for lifetime inference.
     let norm_cause = ObligationCause::misc(return_span, impl_m_def_id);
@@ -1653,7 +1651,7 @@ pub(super) fn compare_impl_const_raw(
 
     let infcx = tcx.infer_ctxt().build();
     let param_env = tcx.param_env(impl_const_item_def.to_def_id());
-    let ocx = ObligationCtxt::new(&infcx);
+    let ocx = ObligationCtxt::new(&infcx, DefiningAnchor::Error);
 
     // The below is for the most part highly similar to the procedure
     // for methods above. It is simpler in many respects, especially
@@ -1807,7 +1805,7 @@ fn compare_type_predicate_entailment<'tcx>(
     );
     let param_env = traits::normalize_param_env_or_error(tcx, param_env, normalize_cause);
     let infcx = tcx.infer_ctxt().build();
-    let ocx = ObligationCtxt::new(&infcx);
+    let ocx = ObligationCtxt::new(&infcx, DefiningAnchor::Error);
 
     debug!("compare_type_predicate_entailment: caller_bounds={:?}", param_env.caller_bounds());
 
@@ -1993,7 +1991,7 @@ pub(super) fn check_type_bounds<'tcx>(
     let rebased_substs = impl_ty_substs.rebase_onto(tcx, container_id, impl_trait_ref.substs);
 
     let infcx = tcx.infer_ctxt().build();
-    let ocx = ObligationCtxt::new(&infcx);
+    let ocx = ObligationCtxt::new(&infcx, DefiningAnchor::Error);
 
     // A synthetic impl Trait for RPITIT desugaring has no HIR, which we currently use to get the
     // span for an impl's associated type. Instead, for these, use the def_span for the synthesized

@@ -164,8 +164,10 @@ where
     T: fmt::Debug + TypeFoldable<TyCtxt<'tcx>> + Lift<'tcx>,
 {
     let (param_env, Normalize { value }) = key.into_parts();
-    let Normalized { value, obligations } =
-        ocx.infcx.at(&ObligationCause::dummy(), param_env).query_normalize(value)?;
+    let Normalized { value, obligations } = ocx
+        .infcx
+        .at(&ObligationCause::dummy(), param_env, DefiningAnchor::Error)
+        .query_normalize(value)?;
     ocx.register_obligations(obligations);
     Ok(value)
 }
@@ -212,15 +214,10 @@ fn type_op_prove_predicate<'tcx>(
     tcx: TyCtxt<'tcx>,
     canonicalized: Canonical<'tcx, ParamEnvAnd<'tcx, ProvePredicate<'tcx>>>,
 ) -> Result<&'tcx Canonical<'tcx, QueryResponse<'tcx, ()>>, NoSolution> {
-    // HACK This bubble is required for this test to pass:
-    // impl-trait/issue-99642.rs
-    tcx.infer_ctxt().with_opaque_type_inference(DefiningAnchor::Bubble).enter_canonical_trait_query(
-        &canonicalized,
-        |ocx, key| {
-            type_op_prove_predicate_with_cause(ocx, key, ObligationCause::dummy());
-            Ok(())
-        },
-    )
+    tcx.infer_ctxt().enter_canonical_trait_query(&canonicalized, |ocx, key| {
+        type_op_prove_predicate_with_cause(ocx, key, ObligationCause::dummy());
+        Ok(())
+    })
 }
 
 /// The core of the `type_op_prove_predicate` query: for diagnostics purposes in NLL HRTB errors,

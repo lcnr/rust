@@ -76,17 +76,14 @@ impl<'tcx> Inherited<'tcx> {
     pub fn new(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> Self {
         let hir_owner = tcx.hir().local_def_id_to_hir_id(def_id).owner;
 
-        let infcx = tcx
-            .infer_ctxt()
-            .ignoring_regions()
-            .with_opaque_type_inference(DefiningAnchor::Bind(hir_owner.def_id))
-            .build();
+        let infcx = tcx.infer_ctxt().ignoring_regions().build();
         let typeck_results = RefCell::new(ty::TypeckResults::new(hir_owner));
 
+        let defining_use_anchor = DefiningAnchor::Bind(def_id);
         Inherited {
             typeck_results,
             infcx,
-            fulfillment_cx: RefCell::new(<dyn TraitEngine<'_>>::new(tcx)),
+            fulfillment_cx: RefCell::new(<dyn TraitEngine<'_>>::new(tcx, defining_use_anchor)),
             locals: RefCell::new(Default::default()),
             deferred_sized_obligations: RefCell::new(Vec::new()),
             deferred_call_resolutions: RefCell::new(Default::default()),
@@ -97,6 +94,10 @@ impl<'tcx> Inherited<'tcx> {
             diverging_type_vars: RefCell::new(Default::default()),
             infer_var_info: RefCell::new(Default::default()),
         }
+    }
+
+    pub fn defining_use_anchor(&self) -> DefiningAnchor {
+        self.fulfillment_cx.borrow().defining_use_anchor()
     }
 
     #[instrument(level = "debug", skip(self))]

@@ -102,7 +102,7 @@ use rustc_errors::ErrorGuaranteed;
 use rustc_errors::{DiagnosticMessage, SubdiagnosticMessage};
 use rustc_hir as hir;
 use rustc_hir::Node;
-use rustc_infer::infer::{InferOk, TyCtxtInferExt};
+use rustc_infer::infer::{DefiningAnchor, InferOk, TyCtxtInferExt};
 use rustc_macros::fluent_messages;
 use rustc_middle::middle;
 use rustc_middle::ty::query::Providers;
@@ -165,8 +165,12 @@ fn require_same_types<'tcx>(
 ) -> bool {
     let infcx = &tcx.infer_ctxt().build();
     let param_env = ty::ParamEnv::empty();
-    let errors = match infcx.at(cause, param_env).eq(expected, actual) {
-        Ok(InferOk { obligations, .. }) => traits::fully_solve_obligations(infcx, obligations),
+    let errors = match infcx.at(cause, param_env, DefiningAnchor::Error).eq(expected, actual) {
+        Ok(InferOk { obligations, .. }) => traits::fully_solve_obligations(
+            infcx,
+            obligations,
+            rustc_infer::infer::DefiningAnchor::Error,
+        ),
         Err(err) => {
             infcx.err_ctxt().report_mismatched_types(cause, expected, actual, err).emit();
             return false;
@@ -313,7 +317,7 @@ fn check_main_fn_ty(tcx: TyCtxt<'_>, main_def_id: DefId) {
             main_diagnostics_def_id,
             ObligationCauseCode::MainFunctionType,
         );
-        let ocx = traits::ObligationCtxt::new(&infcx);
+        let ocx = traits::ObligationCtxt::new(&infcx, DefiningAnchor::Error);
         let norm_return_ty = ocx.normalize(&cause, param_env, return_ty);
         ocx.register_bound(cause, param_env, norm_return_ty, term_did);
         let errors = ocx.select_all_or_error();

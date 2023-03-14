@@ -19,7 +19,7 @@ use std::mem;
 
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::canonical::{Canonical, CanonicalVarValues};
-use rustc_infer::infer::{InferCtxt, InferOk, TyCtxtInferExt};
+use rustc_infer::infer::{DefiningAnchor, InferCtxt, InferOk, TyCtxtInferExt};
 use rustc_infer::traits::query::NoSolution;
 use rustc_middle::traits::solve::{
     CanonicalGoal, CanonicalResponse, Certainty, ExternalConstraints, ExternalConstraintsData,
@@ -31,6 +31,7 @@ use rustc_middle::ty::{
 };
 use rustc_span::DUMMY_SP;
 
+use crate::solve::eval_ctxt::EvalCtxt;
 use crate::solve::search_graph::OverflowHandler;
 use crate::traits::ObligationCause;
 
@@ -42,7 +43,6 @@ mod project_goals;
 mod search_graph;
 mod trait_goals;
 
-pub use eval_ctxt::EvalCtxt;
 pub use fulfill::FulfillmentCtxt;
 
 trait CanonicalResponseExt {
@@ -267,7 +267,7 @@ impl<'a, 'tcx> EvalCtxt<'a, 'tcx> {
         } else {
             let InferOk { value: (), obligations } = self
                 .infcx
-                .at(&ObligationCause::dummy(), goal.param_env)
+                .at(&ObligationCause::dummy(), goal.param_env, DefiningAnchor::Error)
                 .sub(goal.predicate.a, goal.predicate.b)?;
             self.evaluate_all_and_make_canonical_response(
                 obligations.into_iter().map(|pred| pred.into()).collect(),

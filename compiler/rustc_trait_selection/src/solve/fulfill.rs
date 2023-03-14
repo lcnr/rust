@@ -1,6 +1,6 @@
 use std::mem;
 
-use rustc_infer::infer::InferCtxt;
+use rustc_infer::infer::{DefiningAnchor, InferCtxt};
 use rustc_infer::traits::{
     query::NoSolution, FulfillmentError, FulfillmentErrorCode, MismatchedProjectionTypes,
     PredicateObligation, SelectionError, TraitEngine,
@@ -26,7 +26,9 @@ pub struct FulfillmentCtxt<'tcx> {
 }
 
 impl<'tcx> FulfillmentCtxt<'tcx> {
-    pub fn new() -> FulfillmentCtxt<'tcx> {
+    pub fn new(defining_use_anchor: impl Into<DefiningAnchor>) -> FulfillmentCtxt<'tcx> {
+        // FIXME: add opaque types support to the new solver.
+        let _: DefiningAnchor = defining_use_anchor.into();
         FulfillmentCtxt { obligations: Vec::new() }
     }
 }
@@ -150,5 +152,10 @@ impl<'tcx> TraitEngine<'tcx> for FulfillmentCtxt<'tcx> {
         _: &InferCtxt<'tcx>,
     ) -> Vec<PredicateObligation<'tcx>> {
         std::mem::take(&mut self.obligations)
+    }
+
+    fn defining_use_anchor(&self) -> DefiningAnchor {
+        // FIXME: opaque type support
+        DefiningAnchor::Error
     }
 }

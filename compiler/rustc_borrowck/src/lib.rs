@@ -151,11 +151,17 @@ fn mir_borrowck(tcx: TyCtxt<'_>, def: ty::WithOptConstParam<LocalDefId>) -> &Bor
 
     let hir_owner = tcx.hir().local_def_id_to_hir_id(def.did).owner;
 
-    let infcx =
-        tcx.infer_ctxt().with_opaque_type_inference(DefiningAnchor::Bind(hir_owner.def_id)).build();
+    let infcx = tcx.infer_ctxt().build();
     let input_body: &Body<'_> = &input_body.borrow();
     let promoted: &IndexVec<_, _> = &promoted.borrow();
-    let opt_closure_req = do_mir_borrowck(&infcx, input_body, promoted, false).0;
+    let opt_closure_req = do_mir_borrowck(
+        &infcx,
+        input_body,
+        promoted,
+        false,
+        DefiningAnchor::Bind(hir_owner.def_id),
+    )
+    .0;
     debug!("mir_borrowck done");
 
     tcx.arena.alloc(opt_closure_req)
@@ -172,6 +178,7 @@ fn do_mir_borrowck<'tcx>(
     input_body: &Body<'tcx>,
     input_promoted: &IndexVec<Promoted, Body<'tcx>>,
     return_body_with_facts: bool,
+    defining_use_anchor: DefiningAnchor,
 ) -> (BorrowCheckResult<'tcx>, Option<Box<BodyWithBorrowckFacts<'tcx>>>) {
     let def = input_body.source.with_opt_param().as_local().unwrap();
     debug!(?def);
@@ -274,6 +281,7 @@ fn do_mir_borrowck<'tcx>(
         &borrow_set,
         &upvars,
         use_polonius,
+        defining_use_anchor,
     );
 
     // Dump MIR results into a file, if that is enabled. This let us

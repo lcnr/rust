@@ -28,7 +28,7 @@ use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_hir::intravisit::Visitor;
 use rustc_hir::{GenericParam, Item, Node};
 use rustc_infer::infer::error_reporting::TypeErrCtxt;
-use rustc_infer::infer::{InferOk, TypeTrace};
+use rustc_infer::infer::{DefiningAnchor, InferOk, TypeTrace};
 use rustc_middle::traits::select::OverflowError;
 use rustc_middle::ty::abstract_const::NotConstEvaluatable;
 use rustc_middle::ty::error::{ExpectedFound, TypeError};
@@ -365,7 +365,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
                     param_env,
                     ty.rebind(ty::TraitPredicate { trait_ref, constness, polarity }),
                 );
-                let ocx = ObligationCtxt::new_in_snapshot(self);
+                let ocx = ObligationCtxt::new_in_snapshot(self, DefiningAnchor::Error);
                 ocx.register_obligation(obligation);
                 if ocx.select_all_or_error().is_empty() {
                     return Ok((
@@ -1703,7 +1703,7 @@ impl<'tcx> InferCtxtPrivExt<'tcx> for TypeErrCtxt<'_, 'tcx> {
         }
 
         self.probe(|_| {
-            let ocx = ObligationCtxt::new_in_snapshot(self);
+            let ocx = ObligationCtxt::new_in_snapshot(self, DefiningAnchor::Error);
 
             // try to find the mismatched types to report the error with.
             //
@@ -2131,7 +2131,7 @@ impl<'tcx> InferCtxtPrivExt<'tcx> for TypeErrCtxt<'_, 'tcx> {
             .map(|ImplCandidate { trait_ref, similarity }| {
                 // FIXME(compiler-errors): This should be using `NormalizeExt::normalize`
                 let normalized = self
-                    .at(&ObligationCause::dummy(), ty::ParamEnv::empty())
+                    .at(&ObligationCause::dummy(), ty::ParamEnv::empty(), DefiningAnchor::Error)
                     .query_normalize(trait_ref)
                     .map_or(trait_ref, |normalized| normalized.value);
                 (similarity, normalized)
@@ -2312,7 +2312,7 @@ impl<'tcx> InferCtxtPrivExt<'tcx> for TypeErrCtxt<'_, 'tcx> {
                 };
 
                 let obligation = obligation.with(self.tcx, trait_ref);
-                let mut selcx = SelectionContext::new(&self);
+                let mut selcx = SelectionContext::new(&self, DefiningAnchor::Bubble);
                 match selcx.select_from_obligation(&obligation) {
                     Ok(None) => {
                         let ambiguities =
@@ -2712,8 +2712,10 @@ impl<'tcx> InferCtxtPrivExt<'tcx> for TypeErrCtxt<'_, 'tcx> {
             let cleaned_pred =
                 pred.fold_with(&mut ParamToVarFolder { infcx: self, var_map: Default::default() });
 
-            let InferOk { value: cleaned_pred, .. } =
-                self.infcx.at(&ObligationCause::dummy(), param_env).normalize(cleaned_pred);
+            let InferOk { value: cleaned_pred, .. } = self
+                .infcx
+                .at(&ObligationCause::dummy(), param_env, DefiningAnchor::Error)
+                .normalize(cleaned_pred);
 
             let obligation =
                 Obligation::new(self.tcx, ObligationCause::dummy(), param_env, cleaned_pred);

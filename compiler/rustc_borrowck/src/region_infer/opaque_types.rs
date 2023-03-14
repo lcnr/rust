@@ -273,12 +273,11 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
         // This logic duplicates most of `check_opaque_meets_bounds`.
         // FIXME(oli-obk): Also do region checks here and then consider removing `check_opaque_meets_bounds` entirely.
         let param_env = self.tcx.param_env(def_id);
+        let infcx = self.tcx.infer_ctxt().build();
         // HACK This bubble is required for this tests to pass:
         // nested-return-type2-tait2.rs
         // nested-return-type2-tait3.rs
-        let infcx =
-            self.tcx.infer_ctxt().with_opaque_type_inference(DefiningAnchor::Bubble).build();
-        let ocx = ObligationCtxt::new(&infcx);
+        let ocx = ObligationCtxt::new(&infcx, DefiningAnchor::Bubble);
         // Require the hidden type to be well-formed with only the generics of the opaque type.
         // Defining use functions may have more bounds than the opaque type, which is ok, as long as the
         // hidden type is well formed even without those bounds.

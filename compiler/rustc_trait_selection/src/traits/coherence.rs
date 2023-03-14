@@ -95,9 +95,8 @@ pub fn overlapping_impls(
         return None;
     }
 
-    let infcx =
-        tcx.infer_ctxt().with_opaque_type_inference(DefiningAnchor::Bubble).intercrate().build();
-    let selcx = &mut SelectionContext::new(&infcx);
+    let infcx = tcx.infer_ctxt().intercrate().build();
+    let selcx = &mut SelectionContext::new(&infcx, DefiningAnchor::Error);
     let overlaps =
         overlap(selcx, skip_leak_check, impl1_def_id, impl2_def_id, overlap_mode).is_some();
     if !overlaps {
@@ -107,9 +106,8 @@ pub fn overlapping_impls(
     // In the case where we detect an error, run the check again, but
     // this time tracking intercrate ambiguity causes for better
     // diagnostics. (These take time and can lead to false errors.)
-    let infcx =
-        tcx.infer_ctxt().with_opaque_type_inference(DefiningAnchor::Bubble).intercrate().build();
-    let selcx = &mut SelectionContext::new(&infcx);
+    let infcx = tcx.infer_ctxt().intercrate().build();
+    let selcx = &mut SelectionContext::new(&infcx, DefiningAnchor::Error);
     selcx.enable_tracking_intercrate_ambiguity_causes();
     Some(overlap(selcx, skip_leak_check, impl1_def_id, impl2_def_id, overlap_mode).unwrap())
 }
@@ -129,8 +127,10 @@ fn with_fresh_ty_vars<'cx, 'tcx>(
         predicates: tcx.predicates_of(impl_def_id).instantiate(tcx, impl_substs).predicates,
     };
 
-    let InferOk { value: mut header, obligations } =
-        selcx.infcx.at(&ObligationCause::dummy(), param_env).normalize(header);
+    let InferOk { value: mut header, obligations } = selcx
+        .infcx
+        .at(&ObligationCause::dummy(), param_env, DefiningAnchor::Error)
+        .normalize(header);
 
     header.predicates.extend(obligations.into_iter().map(|o| o.predicate));
     header
@@ -216,8 +216,8 @@ fn equate_impl_headers<'cx, 'tcx>(
     debug!("equate_impl_headers(impl1_header={:?}, impl2_header={:?}", impl1_header, impl2_header);
     selcx
         .infcx
-        .at(&ObligationCause::dummy(), ty::ParamEnv::empty())
-        .define_opaque_types(true)
+        .at(&ObligationCause::dummy(), ty::ParamEnv::empty(), DefiningAnchor::Error)
+        .define_opaque_types(DefiningAnchor::Bubble)
         .eq_impl_headers(impl1_header, impl2_header)
         .map(|infer_ok| infer_ok.obligations)
         .ok()
@@ -307,7 +307,7 @@ fn negative_impl(tcx: TyCtxt<'_>, impl1_def_id: DefId, impl2_def_id: DefId) -> b
     };
 
     // Attempt to prove that impl2 applies, given all of the above.
-    let selcx = &mut SelectionContext::new(&infcx);
+    let selcx = &mut SelectionContext::new(&infcx, DefiningAnchor::Error);
     let impl2_substs = infcx.fresh_substs_for_item(DUMMY_SP, impl2_def_id);
     let (subject2, obligations) =
         impl_subject_and_oblig(selcx, impl_env, impl2_def_id, impl2_substs);
@@ -325,7 +325,7 @@ fn equate<'tcx>(
 ) -> bool {
     // do the impls unify? If not, not disjoint.
     let Ok(InferOk { obligations: more_obligations, .. }) =
-        infcx.at(&ObligationCause::dummy(), impl_env).eq(subject1, subject2)
+        infcx.at(&ObligationCause::dummy(), impl_env, DefiningAnchor::Error).eq(subject1, subject2)
     else {
         debug!("explicit_disjoint: {:?} does not unify with {:?}", subject1, subject2);
         return true;
@@ -378,13 +378,13 @@ fn resolve_negative_obligation<'tcx>(
     };
 
     let param_env = o.param_env;
-    if !super::fully_solve_obligation(&infcx, o).is_empty() {
+    if !super::fully_solve_obligation(&infcx, o, DefiningAnchor::Error).is_empty() {
         return false;
     }
 
     let body_def_id = body_def_id.as_local().unwrap_or(CRATE_DEF_ID);
 
-    let ocx = ObligationCtxt::new(&infcx);
+    let ocx = ObligationCtxt::new(&infcx, DefiningAnchor::Error);
     let wf_tys = ocx.assumed_wf_types(param_env, DUMMY_SP, body_def_id);
     let outlives_env = OutlivesEnvironment::with_bounds(
         param_env,

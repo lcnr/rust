@@ -89,7 +89,7 @@ impl<'tcx> AutoTraitFinder<'tcx> {
         let trait_ref = tcx.mk_trait_ref(trait_did, [ty]);
 
         let infcx = tcx.infer_ctxt().build();
-        let mut selcx = SelectionContext::new(&infcx);
+        let mut selcx = SelectionContext::new(&infcx, DefiningAnchor::Error);
         for polarity in [true, false] {
             let result = selcx.select(&Obligation::new(
                 tcx,
@@ -256,7 +256,7 @@ impl<'tcx> AutoTraitFinder<'tcx> {
             fresh_preds.insert(self.clean_pred(infcx, predicate));
         }
 
-        let mut select = SelectionContext::new(&infcx);
+        let mut select = SelectionContext::new(&infcx, DefiningAnchor::Error);
 
         let mut already_visited = FxHashSet::default();
         let mut predicates = VecDeque::new();
@@ -814,7 +814,7 @@ impl<'tcx> AutoTraitFinder<'tcx> {
 
                     match (evaluate(c1), evaluate(c2)) {
                         (Ok(c1), Ok(c2)) => {
-                            match selcx.infcx.at(&obligation.cause, obligation.param_env).eq(c1, c2)
+                            match selcx.infcx.at(&obligation.cause, obligation.param_env, DefiningAnchor::Error).eq(c1, c2)
                             {
                                 Ok(_) => (),
                                 Err(_) => return false,

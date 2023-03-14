@@ -11,7 +11,7 @@ use rustc_infer::infer::at::ToTrace;
 use rustc_infer::infer::canonical::{
     Canonical, CanonicalQueryResponse, CanonicalVarValues, QueryResponse,
 };
-use rustc_infer::infer::{InferCtxt, InferOk};
+use rustc_infer::infer::{DefiningAnchor, InferCtxt, InferOk};
 use rustc_infer::traits::query::Fallible;
 use rustc_infer::traits::{
     FulfillmentError, Obligation, ObligationCause, PredicateObligation, TraitEngineExt as _,
@@ -25,24 +25,34 @@ use rustc_session::config::TraitSolver;
 use rustc_span::Span;
 
 pub trait TraitEngineExt<'tcx> {
-    fn new(tcx: TyCtxt<'tcx>) -> Box<Self>;
-    fn new_in_snapshot(tcx: TyCtxt<'tcx>) -> Box<Self>;
+    fn new(tcx: TyCtxt<'tcx>, defining_use_anchor: impl Into<DefiningAnchor>) -> Box<Self>;
+    fn new_in_snapshot(
+        tcx: TyCtxt<'tcx>,
+        defining_use_anchor: impl Into<DefiningAnchor>,
+    ) -> Box<Self>;
 }
 
 impl<'tcx> TraitEngineExt<'tcx> for dyn TraitEngine<'tcx> {
-    fn new(tcx: TyCtxt<'tcx>) -> Box<Self> {
+    fn new(tcx: TyCtxt<'tcx>, defining_use_anchor: impl Into<DefiningAnchor>) -> Box<Self> {
         match tcx.sess.opts.unstable_opts.trait_solver {
-            TraitSolver::Classic => Box::new(FulfillmentContext::new()),
-            TraitSolver::Chalk => Box::new(ChalkFulfillmentContext::new()),
-            TraitSolver::Next => Box::new(NextFulfillmentCtxt::new()),
+            TraitSolver::Classic => Box::new(FulfillmentContext::new(defining_use_anchor)),
+            TraitSolver::Chalk => Box::new(ChalkFulfillmentContext::new(defining_use_anchor)),
+            TraitSolver::Next => Box::new(NextFulfillmentCtxt::new(defining_use_anchor)),
         }
     }
 
-    fn new_in_snapshot(tcx: TyCtxt<'tcx>) -> Box<Self> {
+    fn new_in_snapshot(
+        tcx: TyCtxt<'tcx>,
+        defining_use_anchor: impl Into<DefiningAnchor>,
+    ) -> Box<Self> {
         match tcx.sess.opts.unstable_opts.trait_solver {
-            TraitSolver::Classic => Box::new(FulfillmentContext::new_in_snapshot()),
-            TraitSolver::Chalk => Box::new(ChalkFulfillmentContext::new_in_snapshot()),
-            TraitSolver::Next => Box::new(NextFulfillmentCtxt::new()),
+            TraitSolver::Classic => {
+                Box::new(FulfillmentContext::new_in_snapshot(defining_use_anchor))
+            }
+            TraitSolver::Chalk => {
+                Box::new(ChalkFulfillmentContext::new_in_snapshot(defining_use_anchor))
+            }
+            TraitSolver::Next => Box::new(NextFulfillmentCtxt::new(defining_use_anchor)),
         }
     }
 }
@@ -55,12 +65,24 @@ pub struct ObligationCtxt<'a, 'tcx> {
 }
 
 impl<'a, 'tcx> ObligationCtxt<'a, 'tcx> {
-    pub fn new(infcx: &'a InferCtxt<'tcx>) -> Self {
-        Self { infcx, engine: RefCell::new(<dyn TraitEngine<'_>>::new(infcx.tcx)) }
+    pub fn new(infcx: &'a InferCtxt<'tcx>, defining_use_anchor: impl Into<DefiningAnchor>) -> Self {
+        Self {
+            infcx,
+            engine: RefCell::new(<dyn TraitEngine<'_>>::new(infcx.tcx, defining_use_anchor)),
+        }
     }
 
-    pub fn new_in_snapshot(infcx: &'a InferCtxt<'tcx>) -> Self {
-        Self { infcx, engine: RefCell::new(<dyn TraitEngine<'_>>::new_in_snapshot(infcx.tcx)) }
+    pub fn new_in_snapshot(
+        infcx: &'a InferCtxt<'tcx>,
+        defining_use_anchor: impl Into<DefiningAnchor>,
+    ) -> Self {
+        Self {
+            infcx,
+            engine: RefCell::new(<dyn TraitEngine<'_>>::new_in_snapshot(
+                infcx.tcx,
+                defining_use_anchor,
+            )),
+        }
     }
 
     pub fn register_obligation(&self, obligation: PredicateObligation<'tcx>) {
@@ -110,7 +132,7 @@ impl<'a, 'tcx> ObligationCtxt<'a, 'tcx> {
         param_env: ty::ParamEnv<'tcx>,
         value: T,
     ) -> T {
-        let infer_ok = self.infcx.at(&cause, param_env).normalize(value);
+        let infer_ok = self.infcx.at(&cause, param_env, DefiningAnchor::Error).normalize(value);
         self.register_infer_ok_obligations(infer_ok)
     }
 
@@ -127,8 +149,8 @@ impl<'a, 'tcx> ObligationCtxt<'a, 'tcx> {
         T: ToTrace<'tcx>,
     {
         self.infcx
-            .at(cause, param_env)
-            .define_opaque_types(true)
+            .at(cause, param_env, DefiningAnchor::Error)
+            .define_opaque_types(self.defining_use_anchor())
             .eq_exp(a_is_expected, a, b)
             .map(|infer_ok| self.register_infer_ok_obligations(infer_ok))
     }
@@ -141,8 +163,8 @@ impl<'a, 'tcx> ObligationCtxt<'a, 'tcx> {
         actual: T,
     ) -> Result<(), TypeError<'tcx>> {
         self.infcx
-            .at(cause, param_env)
-            .define_opaque_types(true)
+            .at(cause, param_env, DefiningAnchor::Error)
+            .define_opaque_types(self.defining_use_anchor())
             .eq(expected, actual)
             .map(|infer_ok| self.register_infer_ok_obligations(infer_ok))
     }
@@ -156,8 +178,8 @@ impl<'a, 'tcx> ObligationCtxt<'a, 'tcx> {
         actual: T,
     ) -> Result<(), TypeError<'tcx>> {
         self.infcx
-            .at(cause, param_env)
-            .define_opaque_types(true)
+            .at(cause, param_env, DefiningAnchor::Error)
+            .define_opaque_types(self.defining_use_anchor())
             .sub(expected, actual)
             .map(|infer_ok| self.register_infer_ok_obligations(infer_ok))
     }
@@ -171,8 +193,8 @@ impl<'a, 'tcx> ObligationCtxt<'a, 'tcx> {
         actual: T,
     ) -> Result<(), TypeError<'tcx>> {
         self.infcx
-            .at(cause, param_env)
-            .define_opaque_types(true)
+            .at(cause, param_env, DefiningAnchor::Error)
+            .define_opaque_types(self.defining_use_anchor())
             .sup(expected, actual)
             .map(|infer_ok| self.register_infer_ok_obligations(infer_ok))
     }
@@ -228,5 +250,9 @@ impl<'a, 'tcx> ObligationCtxt<'a, 'tcx> {
             answer,
             &mut **self.engine.borrow_mut(),
         )
+    }
+
+    pub fn defining_use_anchor(&self) -> DefiningAnchor {
+        self.engine.borrow().defining_use_anchor()
     }
 }

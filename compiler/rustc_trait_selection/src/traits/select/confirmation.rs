@@ -8,8 +8,8 @@
 //! https://rustc-dev-guide.rust-lang.org/traits/resolution.html#confirmation
 use rustc_data_structures::stack::ensure_sufficient_stack;
 use rustc_hir::lang_items::LangItem;
-use rustc_infer::infer::InferOk;
 use rustc_infer::infer::LateBoundRegionConversionTime::HigherRankedType;
+use rustc_infer::infer::{DefiningAnchor, InferOk};
 use rustc_middle::ty::{
     self, Binder, GenericParamDefKind, InternalSubsts, SubstsRef, ToPolyTraitRef, ToPredicate,
     TraitRef, Ty, TyCtxt, TypeVisitableExt,
@@ -176,7 +176,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
         obligations.extend(self.infcx.commit_if_ok(|_| {
             self.infcx
-                .at(&obligation.cause, obligation.param_env)
+                .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
                 .sup(placeholder_trait_predicate, candidate)
                 .map(|InferOk { obligations, .. }| obligations)
                 .map_err(|_| Unimplemented)
@@ -461,7 +461,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
         nested.extend(self.infcx.commit_if_ok(|_| {
             self.infcx
-                .at(&obligation.cause, obligation.param_env)
+                .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
                 .sup(obligation_trait_ref, upcast_trait_ref)
                 .map(|InferOk { obligations, .. }| obligations)
                 .map_err(|_| Unimplemented)
@@ -828,9 +828,9 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             });
 
         self.infcx
-            .at(&obligation.cause, obligation.param_env)
+            .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
             // needed for tests/ui/type-alias-impl-trait/assoc-projection-ice.rs
-            .define_opaque_types(true)
+            .define_opaque_types(self.defining_use_anchor())
             .sup(obligation_trait_ref, expected_trait_ref)
             .map(|InferOk { mut obligations, .. }| {
                 obligations.extend(nested);
@@ -895,7 +895,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 // only the **lifetime bound** is changed.
                 let InferOk { obligations, .. } = self
                     .infcx
-                    .at(&obligation.cause, obligation.param_env)
+                    .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
                     .sup(target, source_trait)
                     .map_err(|_| Unimplemented)?;
                 nested.extend(obligations);
@@ -994,7 +994,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 // only the **lifetime bound** is changed.
                 let InferOk { obligations, .. } = self
                     .infcx
-                    .at(&obligation.cause, obligation.param_env)
+                    .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
                     .sup(target, source_trait)
                     .map_err(|_| Unimplemented)?;
                 nested.extend(obligations);
@@ -1065,7 +1065,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             (&ty::Array(a, _), &ty::Slice(b)) => {
                 let InferOk { obligations, .. } = self
                     .infcx
-                    .at(&obligation.cause, obligation.param_env)
+                    .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
                     .eq(b, a)
                     .map_err(|_| Unimplemented)?;
                 nested.extend(obligations);
@@ -1113,7 +1113,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 let new_struct = tcx.mk_adt(def, substs);
                 let InferOk { obligations, .. } = self
                     .infcx
-                    .at(&obligation.cause, obligation.param_env)
+                    .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
                     .eq(target, new_struct)
                     .map_err(|_| Unimplemented)?;
                 nested.extend(obligations);
@@ -1143,7 +1143,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                     tcx.mk_tup_from_iter(a_mid.iter().copied().chain(iter::once(b_last)));
                 let InferOk { obligations, .. } = self
                     .infcx
-                    .at(&obligation.cause, obligation.param_env)
+                    .at(&obligation.cause, obligation.param_env, DefiningAnchor::Error)
                     .eq(target, new_tuple)
                     .map_err(|_| Unimplemented)?;
                 nested.extend(obligations);

@@ -29,14 +29,10 @@ pub fn codegen_select_candidate<'tcx>(
 
     // Do the initial selection for the obligation. This yields the
     // shallow result we are looking for -- that is, what specific impl.
-    let infcx = tcx
-        .infer_ctxt()
-        .ignoring_regions()
-        .with_opaque_type_inference(DefiningAnchor::Bubble)
-        .build();
-    //~^ HACK `Bubble` is required for
+    let infcx = tcx.infer_ctxt().ignoring_regions().build();
+    // HACK `Bubble` is required for
     // this test to pass: type-alias-impl-trait/assoc-projection-ice.rs
-    let mut selcx = SelectionContext::new(&infcx);
+    let mut selcx = SelectionContext::new(&infcx, DefiningAnchor::Bubble);
 
     let obligation_cause = ObligationCause::dummy();
     let obligation = Obligation::new(tcx, obligation_cause, param_env, trait_ref);
@@ -55,7 +51,7 @@ pub fn codegen_select_candidate<'tcx>(
     // Currently, we use a fulfillment context to completely resolve
     // all nested obligations. This is because they can inform the
     // inference of the impl's type parameters.
-    let mut fulfill_cx = <dyn TraitEngine<'tcx>>::new(tcx);
+    let mut fulfill_cx = <dyn TraitEngine<'tcx>>::new(tcx, DefiningAnchor::Bubble);
     let impl_source = selection.map(|predicate| {
         fulfill_cx.register_predicate_obligation(&infcx, predicate);
     });

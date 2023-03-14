@@ -26,6 +26,7 @@ use crate::infer::{InferCtxt, TyCtxtInferExt};
 use crate::traits::error_reporting::TypeErrCtxtExt as _;
 use crate::traits::query::evaluate_obligation::InferCtxtExt as _;
 use rustc_errors::ErrorGuaranteed;
+use rustc_infer::infer::DefiningAnchor;
 use rustc_middle::ty::fold::TypeFoldable;
 use rustc_middle::ty::visit::{TypeVisitable, TypeVisitableExt};
 use rustc_middle::ty::{self, ToPredicate, Ty, TyCtxt, TypeSuperVisitable};
@@ -171,7 +172,7 @@ fn pred_known_to_hold_modulo_regions<'tcx>(
         // The handling of regions in this area of the code is terrible,
         // see issue #29149. We should be able to improve on this with
         // NLL.
-        let errors = fully_solve_obligation(infcx, obligation);
+        let errors = fully_solve_obligation(infcx, obligation, DefiningAnchor::Error);
 
         match &errors[..] {
             [] => true,
@@ -374,7 +375,7 @@ pub fn fully_normalize<'tcx, T>(
 where
     T: TypeFoldable<TyCtxt<'tcx>>,
 {
-    let ocx = ObligationCtxt::new(infcx);
+    let ocx = ObligationCtxt::new(infcx, DefiningAnchor::Error);
     debug!(?value);
     let normalized_value = ocx.normalize(&cause, param_env, value);
     debug!(?normalized_value);
@@ -394,8 +395,9 @@ where
 pub fn fully_solve_obligation<'tcx>(
     infcx: &InferCtxt<'tcx>,
     obligation: PredicateObligation<'tcx>,
+    defining_use_anchor: DefiningAnchor,
 ) -> Vec<FulfillmentError<'tcx>> {
-    fully_solve_obligations(infcx, [obligation])
+    fully_solve_obligations(infcx, [obligation], defining_use_anchor)
 }
 
 /// Process a set of obligations (and any nested obligations that come from them)
@@ -403,8 +405,9 @@ pub fn fully_solve_obligation<'tcx>(
 pub fn fully_solve_obligations<'tcx>(
     infcx: &InferCtxt<'tcx>,
     obligations: impl IntoIterator<Item = PredicateObligation<'tcx>>,
+    defining_use_anchor: DefiningAnchor,
 ) -> Vec<FulfillmentError<'tcx>> {
-    let ocx = ObligationCtxt::new(infcx);
+    let ocx = ObligationCtxt::new(infcx, defining_use_anchor);
     ocx.register_obligations(obligations);
     ocx.select_all_or_error()
 }
@@ -423,7 +426,7 @@ pub fn fully_solve_bound<'tcx>(
     let trait_ref = tcx.mk_trait_ref(bound, [ty]);
     let obligation = Obligation::new(tcx, cause, param_env, ty::Binder::dummy(trait_ref));
 
-    fully_solve_obligation(infcx, obligation)
+    fully_solve_obligation(infcx, obligation, DefiningAnchor::Error)
 }
 
 /// Normalizes the predicates and checks whether they hold in an empty environment. If this
@@ -437,7 +440,7 @@ pub fn impossible_predicates<'tcx>(
 
     let infcx = tcx.infer_ctxt().build();
     let param_env = ty::ParamEnv::reveal_all();
-    let ocx = ObligationCtxt::new(&infcx);
+    let ocx = ObligationCtxt::new(&infcx, DefiningAnchor::Error);
     let predicates = ocx.normalize(&ObligationCause::dummy(), param_env, predicates);
     for predicate in predicates {
         let obligation = Obligation::new(tcx, ObligationCause::dummy(), param_env, predicate);

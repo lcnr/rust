@@ -5,6 +5,7 @@ use crate::infer::{InferCtxt, InferOk};
 use crate::traits::query::Fallible;
 use crate::traits::ObligationCause;
 use rustc_infer::infer::canonical::Certainty;
+use rustc_infer::infer::DefiningAnchor;
 use rustc_infer::traits::query::NoSolution;
 use rustc_infer::traits::PredicateObligations;
 use rustc_middle::ty::fold::TypeFoldable;
@@ -32,7 +33,11 @@ pub trait TypeOp<'tcx>: Sized + fmt::Debug {
     /// Processes the operation and all resulting obligations,
     /// returning the final result along with any region constraints
     /// (they will be given over to the NLL region solver).
-    fn fully_perform(self, infcx: &InferCtxt<'tcx>) -> Fallible<TypeOpOutput<'tcx, Self>>;
+    fn fully_perform(
+        self,
+        infcx: &InferCtxt<'tcx>,
+        defining_use_anchor: DefiningAnchor,
+    ) -> Fallible<TypeOpOutput<'tcx, Self>>;
 }
 
 /// The output from performing a type op
@@ -80,6 +85,7 @@ pub trait QueryTypeOp<'tcx>: fmt::Debug + Copy + TypeFoldable<TyCtxt<'tcx>> + 't
         query_key: ParamEnvAnd<'tcx, Self>,
         infcx: &InferCtxt<'tcx>,
         output_query_region_constraints: &mut QueryRegionConstraints<'tcx>,
+        defining_use_anchor: DefiningAnchor,
     ) -> Fallible<(
         Self::QueryResponse,
         Option<Canonical<'tcx, ParamEnvAnd<'tcx, Self>>>,
@@ -107,6 +113,7 @@ pub trait QueryTypeOp<'tcx>: fmt::Debug + Copy + TypeFoldable<TyCtxt<'tcx>> + 't
                 &canonical_var_values,
                 canonical_result,
                 output_query_region_constraints,
+                defining_use_anchor,
             )?;
 
         Ok((value, Some(canonical_self), obligations, canonical_result.value.certainty))
@@ -120,10 +127,14 @@ where
     type Output = Q::QueryResponse;
     type ErrorInfo = Canonical<'tcx, ParamEnvAnd<'tcx, Q>>;
 
-    fn fully_perform(self, infcx: &InferCtxt<'tcx>) -> Fallible<TypeOpOutput<'tcx, Self>> {
+    fn fully_perform(
+        self,
+        infcx: &InferCtxt<'tcx>,
+        defining_use_anchor: DefiningAnchor,
+    ) -> Fallible<TypeOpOutput<'tcx, Self>> {
         let mut region_constraints = QueryRegionConstraints::default();
         let (output, error_info, mut obligations, _) =
-            Q::fully_perform_into(self, infcx, &mut region_constraints)?;
+            Q::fully_perform_into(self, infcx, &mut region_constraints, defining_use_anchor)?;
 
         // Typically, instantiating NLL query results does not
         // create obligations. However, in some cases there
@@ -139,6 +150,7 @@ where
                     obligation.param_env.and(ProvePredicate::new(obligation.predicate)),
                     infcx,
                     &mut region_constraints,
+                    defining_use_anchor,
                 ) {
                     Ok(((), _, new, certainty)) => {
                         obligations.extend(new);

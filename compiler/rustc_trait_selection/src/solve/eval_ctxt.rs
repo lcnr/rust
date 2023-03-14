@@ -2,7 +2,7 @@ use rustc_hir::def_id::DefId;
 use rustc_infer::infer::at::ToTrace;
 use rustc_infer::infer::canonical::CanonicalVarValues;
 use rustc_infer::infer::type_variable::{TypeVariableOrigin, TypeVariableOriginKind};
-use rustc_infer::infer::{InferCtxt, InferOk, LateBoundRegionConversionTime};
+use rustc_infer::infer::{DefiningAnchor, InferCtxt, InferOk, LateBoundRegionConversionTime};
 use rustc_infer::traits::query::NoSolution;
 use rustc_infer::traits::ObligationCause;
 use rustc_middle::infer::unify_key::{ConstVariableOrigin, ConstVariableOriginKind};
@@ -16,7 +16,7 @@ use std::ops::ControlFlow;
 use super::search_graph::SearchGraph;
 use super::Goal;
 
-pub struct EvalCtxt<'a, 'tcx> {
+pub(super) struct EvalCtxt<'a, 'tcx> {
     // FIXME: should be private.
     pub(super) infcx: &'a InferCtxt<'tcx>,
     pub(super) var_values: CanonicalVarValues<'tcx>,
@@ -35,7 +35,7 @@ pub struct EvalCtxt<'a, 'tcx> {
 
     /// This field is used by a debug assertion in [`EvalCtxt::evaluate_goal`],
     /// see the comment in that method for more details.
-    pub in_projection_eq_hack: bool,
+    pub(super) in_projection_eq_hack: bool,
 }
 
 impl<'tcx> EvalCtxt<'_, 'tcx> {
@@ -143,7 +143,7 @@ impl<'tcx> EvalCtxt<'_, 'tcx> {
         rhs: T,
     ) -> Result<Vec<Goal<'tcx, ty::Predicate<'tcx>>>, NoSolution> {
         self.infcx
-            .at(&ObligationCause::dummy(), param_env)
+            .at(&ObligationCause::dummy(), param_env, DefiningAnchor::Error)
             .eq(lhs, rhs)
             .map(|InferOk { value: (), obligations }| {
                 obligations.into_iter().map(|o| o.into()).collect()

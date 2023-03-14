@@ -8,21 +8,28 @@ use crate::traits::{
     SelectionError, TraitEngine,
 };
 use rustc_data_structures::fx::FxIndexSet;
+use rustc_infer::infer::DefiningAnchor;
 use rustc_middle::ty::TypeVisitableExt;
 
 pub struct FulfillmentContext<'tcx> {
     obligations: FxIndexSet<PredicateObligation<'tcx>>,
 
     usable_in_snapshot: bool,
+
+    defining_use_anchor: DefiningAnchor,
 }
 
 impl FulfillmentContext<'_> {
-    pub(super) fn new() -> Self {
-        FulfillmentContext { obligations: FxIndexSet::default(), usable_in_snapshot: false }
+    pub(super) fn new(defining_use_anchor: impl Into<DefiningAnchor>) -> Self {
+        FulfillmentContext {
+            obligations: FxIndexSet::default(),
+            usable_in_snapshot: false,
+            defining_use_anchor: defining_use_anchor.into(),
+        }
     }
 
-    pub(crate) fn new_in_snapshot() -> Self {
-        FulfillmentContext { usable_in_snapshot: true, ..Self::new() }
+    pub(crate) fn new_in_snapshot(defining_use_anchor: impl Into<DefiningAnchor>) -> Self {
+        FulfillmentContext { usable_in_snapshot: true, ..Self::new(defining_use_anchor) }
     }
 }
 
@@ -90,6 +97,7 @@ impl<'tcx> TraitEngine<'tcx> for FulfillmentContext<'tcx> {
                                 obligation.param_env,
                                 &orig_values,
                                 &response,
+                                self.defining_use_anchor,
                             ) {
                                 Ok(infer_ok) => next_round.extend(
                                     infer_ok.obligations.into_iter().map(|obligation| {
@@ -144,5 +152,9 @@ impl<'tcx> TraitEngine<'tcx> for FulfillmentContext<'tcx> {
 
     fn pending_obligations(&self) -> Vec<PredicateObligation<'tcx>> {
         self.obligations.iter().cloned().collect()
+    }
+
+    fn defining_use_anchor(&self) -> DefiningAnchor {
+        self.defining_use_anchor
     }
 }

@@ -2,7 +2,7 @@ use crate::errors::AutoDerefReachedRecursionLimit;
 use crate::traits::query::evaluate_obligation::InferCtxtExt;
 use crate::traits::NormalizeExt;
 use crate::traits::{self, TraitEngine, TraitEngineExt};
-use rustc_infer::infer::InferCtxt;
+use rustc_infer::infer::{DefiningAnchor, InferCtxt};
 use rustc_middle::ty::TypeVisitableExt;
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_session::Limit;
@@ -30,6 +30,7 @@ pub struct Autoderef<'a, 'tcx> {
     span: Span,
     body_id: LocalDefId,
     param_env: ty::ParamEnv<'tcx>,
+    defining_use_anchor: DefiningAnchor,
 
     // Current state:
     state: AutoderefSnapshot<'tcx>,
@@ -99,6 +100,7 @@ impl<'a, 'tcx> Autoderef<'a, 'tcx> {
         body_def_id: LocalDefId,
         span: Span,
         base_ty: Ty<'tcx>,
+        defining_use_anchor: DefiningAnchor,
     ) -> Autoderef<'a, 'tcx> {
         Autoderef {
             infcx,
@@ -114,6 +116,7 @@ impl<'a, 'tcx> Autoderef<'a, 'tcx> {
             },
             include_raw_pointers: false,
             silence_errors: false,
+            defining_use_anchor,
         }
     }
 
@@ -140,9 +143,9 @@ impl<'a, 'tcx> Autoderef<'a, 'tcx> {
 
         let normalized_ty = self
             .infcx
-            .at(&cause, self.param_env)
+            .at(&cause, self.param_env, DefiningAnchor::Error)
             .normalize(tcx.mk_projection(tcx.lang_items().deref_target()?, trait_ref.substs));
-        let mut fulfillcx = <dyn TraitEngine<'tcx>>::new_in_snapshot(tcx);
+        let mut fulfillcx = <dyn TraitEngine<'tcx>>::new_in_snapshot(tcx, self.defining_use_anchor);
         let normalized_ty =
             normalized_ty.into_value_registering_obligations(self.infcx, &mut *fulfillcx);
         let errors = fulfillcx.select_where_possible(&self.infcx);

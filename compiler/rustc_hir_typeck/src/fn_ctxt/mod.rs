@@ -6,6 +6,7 @@ mod suggestions;
 
 pub use _impl::*;
 use rustc_errors::ErrorGuaranteed;
+use rustc_infer::infer::at::At;
 pub use suggestions::*;
 
 use crate::coercion::DynamicCoerceMany;
@@ -13,9 +14,9 @@ use crate::{Diverges, EnclosingBreakables, Inherited};
 use rustc_hir as hir;
 use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_hir_analysis::astconv::AstConv;
-use rustc_infer::infer;
 use rustc_infer::infer::error_reporting::TypeErrCtxt;
 use rustc_infer::infer::type_variable::{TypeVariableOrigin, TypeVariableOriginKind};
+use rustc_infer::infer::{self, DefiningAnchor};
 use rustc_middle::infer::unify_key::{ConstVariableOrigin, ConstVariableOriginKind};
 use rustc_middle::ty::subst::GenericArgKind;
 use rustc_middle::ty::{self, Const, Ty, TyCtxt, TypeVisitableExt};
@@ -145,6 +146,10 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         self.cause(span, ObligationCauseCode::MiscObligation)
     }
 
+    pub fn at(&'a self, cause: &'a ObligationCause<'tcx>) -> At<'a, 'tcx> {
+        self.infcx.at(cause, self.param_env, self.defining_use_anchor())
+    }
+
     pub fn sess(&self) -> &Session {
         &self.tcx.sess
     }
@@ -164,7 +169,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                     return fn_sig;
                 }
                 self.probe(|_| {
-                    let ocx = ObligationCtxt::new_in_snapshot(self);
+                    let ocx = ObligationCtxt::new_in_snapshot(self, DefiningAnchor::Error);
                     let normalized_fn_sig =
                         ocx.normalize(&ObligationCause::dummy(), self.param_env, fn_sig);
                     if ocx.select_all_or_error().is_empty() {

@@ -402,11 +402,8 @@ fn check_opaque_meets_bounds<'tcx>(
     };
     let param_env = tcx.param_env(defining_use_anchor);
 
-    let infcx = tcx
-        .infer_ctxt()
-        .with_opaque_type_inference(DefiningAnchor::Bind(defining_use_anchor))
-        .build();
-    let ocx = ObligationCtxt::new(&infcx);
+    let infcx = tcx.infer_ctxt().build();
+    let ocx = ObligationCtxt::new(&infcx, defining_use_anchor);
     let opaque_ty = tcx.mk_opaque(def_id.to_def_id(), substs);
 
     // `ReErased` regions appear in the "parent_substs" of closures/generators.
@@ -1533,15 +1530,14 @@ pub(super) fn check_generator_obligations(tcx: TyCtxt<'_>, def_id: LocalDefId) {
         // typeck writeback gives us predicates with their regions erased.
         // As borrowck already has checked lifetimes, we do not need to do it again.
         .ignoring_regions()
-        // Bind opaque types to `def_id` as they should have been checked by borrowck.
-        .with_opaque_type_inference(DefiningAnchor::Bind(def_id))
         .build();
 
-    let mut fulfillment_cx = <dyn TraitEngine<'_>>::new(infcx.tcx);
+    let mut fulfillment_cx = <dyn TraitEngine<'_>>::new(infcx.tcx, DefiningAnchor::Bind(def_id));
     for (predicate, cause) in generator_interior_predicates {
         let obligation = Obligation::new(tcx, cause.clone(), param_env, *predicate);
         fulfillment_cx.register_predicate_obligation(&infcx, obligation);
     }
+    // Bind opaque types to `def_id` as they should have been checked by borrowck.
     let errors = fulfillment_cx.select_all_or_error(&infcx);
     debug!(?errors);
     if !errors.is_empty() {

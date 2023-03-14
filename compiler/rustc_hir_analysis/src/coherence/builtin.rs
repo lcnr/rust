@@ -9,8 +9,8 @@ use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_hir::lang_items::LangItem;
 use rustc_hir::ItemKind;
 use rustc_infer::infer::outlives::env::OutlivesEnvironment;
-use rustc_infer::infer::TyCtxtInferExt;
 use rustc_infer::infer::{self, RegionResolutionError};
+use rustc_infer::infer::{DefiningAnchor, TyCtxtInferExt};
 use rustc_middle::ty::adjustment::CoerceUnsizedInfo;
 use rustc_middle::ty::{self, suggest_constraining_type_params, Ty, TyCtxt, TypeVisitableExt};
 use rustc_trait_selection::traits::error_reporting::TypeErrCtxtExt;
@@ -235,7 +235,8 @@ fn visit_implementation_of_dispatch_from_dyn(tcx: TyCtxt<'_>, impl_did: LocalDef
     use rustc_type_ir::sty::TyKind::*;
     match (source.kind(), target.kind()) {
         (&Ref(r_a, _, mutbl_a), Ref(r_b, _, mutbl_b))
-            if infcx.at(&cause, param_env).eq(r_a, *r_b).is_ok() && mutbl_a == *mutbl_b => {}
+            if infcx.at(&cause, param_env, DefiningAnchor::Error).eq(r_a, *r_b).is_ok()
+                && mutbl_a == *mutbl_b => {}
         (&RawPtr(tm_a), &RawPtr(tm_b)) if tm_a.mutbl == tm_b.mutbl => (),
         (&Adt(def_a, substs_a), &Adt(def_b, substs_b))
             if def_a.is_struct() && def_b.is_struct() =>
@@ -278,7 +279,9 @@ fn visit_implementation_of_dispatch_from_dyn(tcx: TyCtxt<'_>, impl_did: LocalDef
                         }
                     }
 
-                    if let Ok(ok) = infcx.at(&cause, param_env).eq(ty_a, ty_b) {
+                    if let Ok(ok) =
+                        infcx.at(&cause, param_env, DefiningAnchor::Error).eq(ty_a, ty_b)
+                    {
                         if ok.obligations.is_empty() {
                             create_err(
                                 "the trait `DispatchFromDyn` may only be implemented \
@@ -343,6 +346,7 @@ fn visit_implementation_of_dispatch_from_dyn(tcx: TyCtxt<'_>, impl_did: LocalDef
                             [field.ty(tcx, substs_a), field.ty(tcx, substs_b)],
                         )
                     }),
+                    infer::DefiningAnchor::Error,
                 );
                 if !errors.is_empty() {
                     infcx.err_ctxt().report_fulfillment_errors(&errors);
@@ -504,7 +508,7 @@ pub fn coerce_unsized_info<'tcx>(tcx: TyCtxt<'tcx>, impl_did: DefId) -> CoerceUn
                     // we may have to evaluate constraint
                     // expressions in the course of execution.)
                     // See e.g., #41936.
-                    if let Ok(ok) = infcx.at(&cause, param_env).eq(a, b) {
+                    if let Ok(ok) = infcx.at(&cause, param_env, DefiningAnchor::Error).eq(a, b) {
                         if ok.obligations.is_empty() {
                             return None;
                         }
@@ -583,7 +587,7 @@ pub fn coerce_unsized_info<'tcx>(tcx: TyCtxt<'tcx>, impl_did: DefId) -> CoerceUn
     let cause = traits::ObligationCause::misc(span, impl_did);
     let predicate =
         predicate_for_trait_def(tcx, param_env, cause, trait_def_id, 0, [source, target]);
-    let errors = traits::fully_solve_obligation(&infcx, predicate);
+    let errors = traits::fully_solve_obligation(&infcx, predicate, infer::DefiningAnchor::Error);
     if !errors.is_empty() {
         infcx.err_ctxt().report_fulfillment_errors(&errors);
     }

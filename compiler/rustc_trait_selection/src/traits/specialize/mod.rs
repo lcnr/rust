@@ -10,6 +10,7 @@
 //! [rustc dev guide]: https://rustc-dev-guide.rust-lang.org/traits/specialization.html
 
 pub mod specialization_graph;
+use rustc_infer::infer::DefiningAnchor;
 use specialization_graph::GraphExt;
 
 use crate::errors::NegativePositiveConflict;
@@ -186,14 +187,14 @@ fn fulfill_implication<'tcx>(
 
     let source_trait = ImplSubject::Trait(source_trait_ref);
 
-    let selcx = &mut SelectionContext::new(&infcx);
+    let selcx = &mut SelectionContext::new(&infcx, DefiningAnchor::Error);
     let target_substs = infcx.fresh_substs_for_item(DUMMY_SP, target_impl);
     let (target_trait, obligations) =
         util::impl_subject_and_oblig(selcx, param_env, target_impl, target_substs);
 
     // do the impls unify? If not, no specialization.
     let Ok(InferOk { obligations: more_obligations, .. }) =
-        infcx.at(&ObligationCause::dummy(), param_env).eq(source_trait, target_trait)
+        infcx.at(&ObligationCause::dummy(), param_env, DefiningAnchor::Error).eq(source_trait, target_trait)
     else {
         debug!(
             "fulfill_implication: {:?} does not unify with {:?}",
@@ -204,7 +205,7 @@ fn fulfill_implication<'tcx>(
 
     // Needs to be `in_snapshot` because this function is used to rebase
     // substitutions, which may happen inside of a select within a probe.
-    let ocx = ObligationCtxt::new_in_snapshot(infcx);
+    let ocx = ObligationCtxt::new_in_snapshot(infcx, DefiningAnchor::Error);
     // attempt to prove all of the predicates for impl2 given those for impl1
     // (which are packed up in penv)
     ocx.register_obligations(obligations.chain(more_obligations));
