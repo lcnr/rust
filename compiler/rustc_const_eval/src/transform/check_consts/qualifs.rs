@@ -187,7 +187,7 @@ impl Qualif for NeedsNonConstDrop {
         !traits::fully_solve_obligations(
             &infcx,
             impl_src.nested_obligations(),
-            rustc_infer::infer::DefiningAnchor::Error,
+            DefiningAnchor::Error,
         )
         .is_empty()
     }

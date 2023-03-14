@@ -3,6 +3,7 @@ use crate::traits::query::type_op::{self, TypeOp, TypeOpOutput};
 use crate::traits::query::NoSolution;
 use crate::traits::ObligationCause;
 use rustc_data_structures::fx::FxIndexSet;
+use rustc_infer::infer::DefiningAnchor;
 use rustc_middle::ty::{self, ParamEnv, Ty};
 use rustc_span::def_id::LocalDefId;
 
@@ -55,7 +56,7 @@ impl<'a, 'tcx: 'a> InferCtxtExt<'a, 'tcx> for InferCtxt<'tcx> {
         let span = self.tcx.def_span(body_id);
         let result = param_env
             .and(type_op::implied_outlives_bounds::ImpliedOutlivesBounds { ty })
-            .fully_perform(self, rustc_infer::infer::DefiningAnchor::Error);
+            .fully_perform(self, DefiningAnchor::Error);
         let result = match result {
             Ok(r) => r,
             Err(NoSolution) => {
@@ -83,7 +84,7 @@ impl<'a, 'tcx: 'a> InferCtxtExt<'a, 'tcx> for InferCtxt<'tcx> {
                         param_env,
                     )
                 }),
-                rustc_infer::infer::DefiningAnchor::Error,
+                DefiningAnchor::Error,
             );
             if !constraints.member_constraints.is_empty() {
                 span_bug!(span, "{:#?}", constraints.member_constraints);

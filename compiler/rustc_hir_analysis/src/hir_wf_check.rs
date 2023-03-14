@@ -2,7 +2,7 @@ use crate::collect::ItemCtxt;
 use rustc_hir as hir;
 use rustc_hir::intravisit::{self, Visitor};
 use rustc_hir::{ForeignItem, ForeignItemKind};
-use rustc_infer::infer::TyCtxtInferExt;
+use rustc_infer::infer::{TyCtxtInferExt, DefiningAnchor};
 use rustc_infer::traits::{ObligationCause, WellFormedLoc};
 use rustc_middle::ty::query::Providers;
 use rustc_middle::ty::{self, Region, TyCtxt, TypeFoldable, TypeFolder};
@@ -80,7 +80,7 @@ fn diagnostic_hir_wf_check<'tcx>(
                     self.param_env,
                     ty::Binder::dummy(ty::PredicateKind::WellFormed(tcx_ty.into())),
                 ),
-                rustc_infer::infer::DefiningAnchor::Error,
+                DefiningAnchor::Error,
             );
             if !errors.is_empty() {
                 debug!("Wf-check got errors for {:?}: {:?}", ty, errors);

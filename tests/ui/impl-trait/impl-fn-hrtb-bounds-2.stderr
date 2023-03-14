@@ -1,13 +1,9 @@
-error[E0700]: hidden type for `impl Debug` captures lifetime that does not appear in bounds
-  --> $DIR/impl-fn-hrtb-bounds-2.rs:5:9
+error[E0720]: cannot resolve opaque type
+  --> $DIR/impl-fn-hrtb-bounds-2.rs:4:27
    |
 LL | fn a() -> impl Fn(&u8) -> impl Debug {
-   |                           ---------- opaque type defined here
-LL |     |x| x
-   |     --- ^
-   |     |
-   |     hidden type `&u8` captures the anonymous lifetime #1 defined here
+   |                           ^^^^^^^^^^ cannot resolve opaque type
 
 error: aborting due to previous error
 
-For more information about this error, try `rustc --explain E0700`.
+For more information about this error, try `rustc --explain E0720`.
