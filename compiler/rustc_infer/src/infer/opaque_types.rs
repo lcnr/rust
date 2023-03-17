@@ -1,7 +1,7 @@
 use super::type_variable::{TypeVariableOrigin, TypeVariableOriginKind};
 use super::{DefineOpaqueTypes, InferResult};
 use crate::errors::OpaqueHiddenTypeDiag;
-use crate::infer::{DefiningAnchor, InferCtxt, InferOk};
+use crate::infer::{InferCtxt, InferOk};
 use crate::traits;
 use hir::def::DefKind;
 use hir::def_id::{DefId, LocalDefId};
@@ -12,11 +12,11 @@ use rustc_hir as hir;
 use rustc_middle::traits::ObligationCause;
 use rustc_middle::ty::error::{ExpectedFound, TypeError};
 use rustc_middle::ty::fold::BottomUpFolder;
-use rustc_middle::ty::GenericArgKind;
 use rustc_middle::ty::{
     self, OpaqueHiddenType, OpaqueTypeKey, Ty, TyCtxt, TypeFoldable, TypeSuperVisitable,
     TypeVisitable, TypeVisitableExt, TypeVisitor,
 };
+use rustc_middle::ty::{DefiningAnchor, GenericArgKind};
 use rustc_span::Span;
 use std::ops::ControlFlow;
 
@@ -54,7 +54,9 @@ impl<'tcx> InferCtxt<'tcx> {
         }
         let mut obligations = vec![];
         let replace_opaque_type = |def_id: DefId| {
-            def_id.as_local().map_or(false, |def_id| self.opaque_type_origin(def_id).is_some())
+            def_id
+                .as_local()
+                .map_or(false, |def_id| self.opaque_type_origin(param_env, def_id).is_some())
         };
         let value = value.fold_with(&mut BottomUpFolder {
             tcx: self.tcx,
@@ -103,7 +105,7 @@ impl<'tcx> InferCtxt<'tcx> {
         let process = |a: Ty<'tcx>, b: Ty<'tcx>, a_is_expected| match *a.kind() {
             ty::Alias(ty::Opaque, ty::AliasTy { def_id, substs, .. }) if def_id.is_local() => {
                 let def_id = def_id.expect_local();
-                let origin = match self.defining_use_anchor {
+                let origin = match param_env.defining_use_anchor() {
                     DefiningAnchor::Bind(_) => {
                         // Check that this is `impl Trait` type is
                         // declared by `parent_def_id` -- i.e., one whose
@@ -139,7 +141,7 @@ impl<'tcx> InferCtxt<'tcx> {
                         //     let x = || foo(); // returns the Opaque assoc with `foo`
                         // }
                         // ```
-                        self.opaque_type_origin(def_id)?
+                        self.opaque_type_origin(param_env, def_id)?
                     }
                     DefiningAnchor::Bubble => self.opaque_type_origin_unchecked(def_id),
                     DefiningAnchor::Error => return None,
@@ -150,8 +152,9 @@ impl<'tcx> InferCtxt<'tcx> {
                     // no one encounters it in practice.
                     // It does occur however in `fn fut() -> impl Future<Output = i32> { async { 42 } }`,
                     // where it is of no concern, so we only check for TAITs.
-                    if let Some(OpaqueTyOrigin::TyAlias) =
-                        b_def_id.as_local().and_then(|b_def_id| self.opaque_type_origin(b_def_id))
+                    if let Some(OpaqueTyOrigin::TyAlias) = b_def_id
+                        .as_local()
+                        .and_then(|b_def_id| self.opaque_type_origin(param_env, b_def_id))
                     {
                         self.tcx.sess.emit_err(OpaqueHiddenTypeDiag {
                             span: cause.span,
@@ -368,9 +371,13 @@ impl<'tcx> InferCtxt<'tcx> {
     /// Returns the origin of the opaque type `def_id` if we're currently
     /// in its defining scope.
     #[instrument(skip(self), level = "trace", ret)]
-    pub fn opaque_type_origin(&self, def_id: LocalDefId) -> Option<OpaqueTyOrigin> {
+    pub fn opaque_type_origin(
+        &self,
+        param_env: ty::ParamEnv<'tcx>,
+        def_id: LocalDefId,
+    ) -> Option<OpaqueTyOrigin> {
         let opaque_hir_id = self.tcx.hir().local_def_id_to_hir_id(def_id);
-        let parent_def_id = match self.defining_use_anchor {
+        let parent_def_id = match param_env.defining_use_anchor() {
             DefiningAnchor::Bubble | DefiningAnchor::Error => return None,
             DefiningAnchor::Bind(bind) => bind,
         };

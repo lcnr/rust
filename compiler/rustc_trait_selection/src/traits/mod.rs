@@ -286,6 +286,7 @@ pub fn normalize_param_env_or_error<'tcx>(
         tcx.mk_predicates(&predicates),
         unnormalized_env.reveal(),
         unnormalized_env.constness(),
+        unnormalized_env.defining_use_anchor(),
     );
 
     // HACK: we are trying to normalize the param-env inside *itself*. The problem is that
@@ -340,6 +341,7 @@ pub fn normalize_param_env_or_error<'tcx>(
         tcx.mk_predicates_from_iter(outlives_env),
         unnormalized_env.reveal(),
         unnormalized_env.constness(),
+        unnormalized_env.defining_use_anchor(),
     );
     let Ok(outlives_predicates) = do_normalize_predicates(
         tcx,
@@ -360,6 +362,7 @@ pub fn normalize_param_env_or_error<'tcx>(
         tcx.mk_predicates(&predicates),
         unnormalized_env.reveal(),
         unnormalized_env.constness(),
+        unnormalized_env.defining_use_anchor(),
     )
 }
 

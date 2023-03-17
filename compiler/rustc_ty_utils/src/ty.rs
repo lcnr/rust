@@ -3,8 +3,8 @@ use rustc_hir as hir;
 use rustc_hir::def::DefKind;
 use rustc_index::bit_set::BitSet;
 use rustc_middle::ty::{
-    self, Binder, EarlyBinder, ImplTraitInTraitData, Predicate, PredicateKind, ToPredicate, Ty,
-    TyCtxt, TypeSuperVisitable, TypeVisitable, TypeVisitor,
+    self, Binder, DefiningAnchor, EarlyBinder, ImplTraitInTraitData, Predicate, PredicateKind,
+    ToPredicate, Ty, TyCtxt, TypeSuperVisitable, TypeVisitable, TypeVisitor,
 };
 use rustc_session::config::TraitSolver;
 use rustc_span::def_id::{DefId, CRATE_DEF_ID};
@@ -234,8 +234,12 @@ fn param_env(tcx: TyCtxt<'_>, def_id: DefId) -> ty::ParamEnv<'_> {
         None => hir::Constness::NotConst,
     };
 
-    let unnormalized_env =
-        ty::ParamEnv::new(tcx.mk_predicates(&predicates), traits::Reveal::UserFacing, constness);
+    let unnormalized_env = ty::ParamEnv::new(
+        tcx.mk_predicates(&predicates),
+        traits::Reveal::UserFacing,
+        constness,
+        DefiningAnchor::Error,
+    );
 
     let body_id = local_did.unwrap_or(CRATE_DEF_ID);
     let cause = traits::ObligationCause::misc(tcx.def_span(def_id), body_id);

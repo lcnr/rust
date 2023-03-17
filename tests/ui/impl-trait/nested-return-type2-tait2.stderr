@@ -1,8 +1,27 @@
-error[E0277]: the trait bound `Sendable: Duh` is not satisfied
-  --> $DIR/nested-return-type2-tait2.rs:27:5
+error[E0271]: expected `[closure@nested-return-type2-tait2.rs:27:5]` to be a closure that returns `Sendable`, but it returns `i32`
+  --> $DIR/nested-return-type2-tait2.rs:26:13
    |
-LL |     || 42
-   |     ^^^^^ the trait `Duh` is not implemented for `Sendable`
+LL | type Sendable = impl Send;
+   |                 --------- the found opaque type
+...
+LL | fn foo() -> Traitable {
+   |             ^^^^^^^^^ expected `i32`, found opaque type
+   |
+   = note:     expected type `i32`
+           found opaque type `Sendable`
+note: required for `[closure@$DIR/nested-return-type2-tait2.rs:27:5: 27:7]` to implement `Trait`
+  --> $DIR/nested-return-type2-tait2.rs:14:31
+   |
+LL | impl<R: Duh, F: FnMut() -> R> Trait for F {
+   |                            -  ^^^^^     ^
+   |                            |
+   |                            unsatisfied trait bound introduced here
+
+error[E0277]: the trait bound `Sendable: Duh` is not satisfied
+  --> $DIR/nested-return-type2-tait2.rs:26:13
+   |
+LL | fn foo() -> Traitable {
+   |             ^^^^^^^^^ the trait `Duh` is not implemented for `Sendable`
    |
    = help: the trait `Duh` is implemented for `i32`
 note: required for `[closure@$DIR/nested-return-type2-tait2.rs:27:5: 27:7]` to implement `Trait`
@@ -13,6 +32,7 @@ LL | impl<R: Duh, F: FnMut() -> R> Trait for F {
    |         |
    |         unsatisfied trait bound introduced here
 
-error: aborting due to previous error
+error: aborting due to 2 previous errors
 
-For more information about this error, try `rustc --explain E0277`.
+Some errors have detailed explanations: E0271, E0277.
+For more information about an error, try `rustc --explain E0271`.

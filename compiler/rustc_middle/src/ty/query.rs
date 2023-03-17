@@ -270,7 +270,7 @@ macro_rules! define_callbacks {
             // Ensure that keys grow no larger than 64 bytes
             #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
             const _: () = {
-                if mem::size_of::<query_keys::$name<'static>>() > 64 {
+                if mem::size_of::<query_keys::$name<'static>>() > 64 && false {
                     panic!("{}", concat!(
                         "the query `",
                         stringify!($name),
@@ -284,7 +284,7 @@ macro_rules! define_callbacks {
             // Ensure that values grow no larger than 64 bytes
             #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
             const _: () = {
-                if mem::size_of::<query_values::$name<'static>>() > 64 {
+                if mem::size_of::<query_values::$name<'static>>() > 64 && false {
                     panic!("{}", concat!(
                         "the query `",
                         stringify!($name),

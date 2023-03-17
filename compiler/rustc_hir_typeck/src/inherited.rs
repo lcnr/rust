@@ -4,7 +4,7 @@ use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_hir as hir;
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir::HirIdMap;
-use rustc_infer::infer::{DefiningAnchor, InferCtxt, InferOk, TyCtxtInferExt};
+use rustc_infer::infer::{InferCtxt, InferOk, TyCtxtInferExt};
 use rustc_middle::ty::visit::TypeVisitableExt;
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::def_id::LocalDefIdMap;
@@ -76,11 +76,7 @@ impl<'tcx> Inherited<'tcx> {
     pub fn new(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> Self {
         let hir_owner = tcx.hir().local_def_id_to_hir_id(def_id).owner;
 
-        let infcx = tcx
-            .infer_ctxt()
-            .ignoring_regions()
-            .with_opaque_type_inference(DefiningAnchor::Bind(hir_owner.def_id))
-            .build();
+        let infcx = tcx.infer_ctxt().ignoring_regions().build();
         let typeck_results = RefCell::new(ty::TypeckResults::new(hir_owner));
 
         Inherited {

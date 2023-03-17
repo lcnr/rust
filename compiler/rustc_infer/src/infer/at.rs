@@ -68,7 +68,6 @@ impl<'tcx> InferCtxt<'tcx> {
     pub fn fork(&self) -> Self {
         Self {
             tcx: self.tcx,
-            defining_use_anchor: self.defining_use_anchor,
             considering_regions: self.considering_regions,
             inner: self.inner.clone(),
             skip_leak_check: self.skip_leak_check.clone(),

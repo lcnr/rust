@@ -3,10 +3,10 @@
 // seems likely that they should eventually be merged into more
 // general routines.
 
-use rustc_infer::infer::{DefiningAnchor, TyCtxtInferExt};
+use rustc_infer::infer::TyCtxtInferExt;
 use rustc_infer::traits::{FulfillmentErrorCode, TraitEngineExt as _};
 use rustc_middle::traits::CodegenObligationError;
-use rustc_middle::ty::{self, TyCtxt};
+use rustc_middle::ty::{self, DefiningAnchor, TyCtxt};
 use rustc_trait_selection::traits::error_reporting::TypeErrCtxtExt;
 use rustc_trait_selection::traits::{
     ImplSource, Obligation, ObligationCause, SelectionContext, TraitEngine, TraitEngineExt,
@@ -29,11 +29,9 @@ pub fn codegen_select_candidate<'tcx>(
 
     // Do the initial selection for the obligation. This yields the
     // shallow result we are looking for -- that is, what specific impl.
-    let infcx = tcx
-        .infer_ctxt()
-        .ignoring_regions()
-        .with_opaque_type_inference(DefiningAnchor::Bubble)
-        .build();
+    let infcx = tcx.infer_ctxt().ignoring_regions().build();
+
+    let param_env = param_env.with_defining_use_anchor(DefiningAnchor::Bubble);
     //~^ HACK `Bubble` is required for
     // this test to pass: type-alias-impl-trait/assoc-projection-ice.rs
     let mut selcx = SelectionContext::new(&infcx);

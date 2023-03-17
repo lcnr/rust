@@ -41,7 +41,8 @@ use rustc_infer::infer::UpvarRegion;
 use rustc_middle::hir::place::{Place, PlaceBase, PlaceWithHirId, Projection, ProjectionKind};
 use rustc_middle::mir::FakeReadCause;
 use rustc_middle::ty::{
-    self, ClosureSizeProfileData, Ty, TyCtxt, TypeckResults, UpvarCapture, UpvarSubsts,
+    self, ClosureSizeProfileData, DefiningAnchor, Ty, TyCtxt, TypeckResults, UpvarCapture,
+    UpvarSubsts,
 };
 use rustc_session::lint;
 use rustc_span::sym;
@@ -1053,7 +1054,13 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     ) -> Option<FxHashSet<UpvarMigrationInfo>> {
         let ty = self.resolve_vars_if_possible(self.node_ty(var_hir_id));
 
-        if !ty.has_significant_drop(self.tcx, self.tcx.param_env(closure_def_id)) {
+        let hir_owner = self.tcx.hir().local_def_id_to_hir_id(closure_def_id).owner;
+        let param_env = self
+            .tcx
+            .param_env(closure_def_id)
+            .with_defining_use_anchor(DefiningAnchor::Bind(hir_owner.def_id));
+
+        if !ty.has_significant_drop(self.tcx, param_env) {
             debug!("does not have significant drop");
             return None;
         }
@@ -1334,13 +1341,18 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         base_path_ty: Ty<'tcx>,
         captured_by_move_projs: Vec<&[Projection<'tcx>]>,
     ) -> bool {
-        let needs_drop =
-            |ty: Ty<'tcx>| ty.has_significant_drop(self.tcx, self.tcx.param_env(closure_def_id));
+        let hir_owner = self.tcx.hir().local_def_id_to_hir_id(closure_def_id).owner;
+        let param_env = self
+            .tcx
+            .param_env(closure_def_id)
+            .with_defining_use_anchor(DefiningAnchor::Bind(hir_owner.def_id));
+
+        let needs_drop = |ty: Ty<'tcx>| ty.has_significant_drop(self.tcx, param_env);
 
         let is_drop_defined_for_ty = |ty: Ty<'tcx>| {
             let drop_trait = self.tcx.require_lang_item(hir::LangItem::Drop, Some(closure_span));
             self.infcx
-                .type_implements_trait(drop_trait, [ty], self.tcx.param_env(closure_def_id))
+                .type_implements_trait(drop_trait, [ty], param_env)
                 .must_apply_modulo_regions()
         };
 

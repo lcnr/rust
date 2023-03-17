@@ -1554,6 +1554,17 @@ impl WithOptConstParam<DefId> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DefiningAnchor {
+    /// `DefId` of the item.
+    Bind(LocalDefId),
+    /// When opaque types are not resolved, we `Bubble` up, meaning
+    /// return the opaque/hidden type pair from query, for caller of query to handle it.
+    Bubble,
+    /// Used to catch type mismatch errors when handling opaque types.
+    Error,
+}
+
 /// When type checking, we use the `ParamEnv` to track
 /// details about the set of where-clauses that are in scope at this
 /// particular point.
@@ -1572,6 +1583,8 @@ pub struct ParamEnv<'tcx> {
     ///
     /// Note: This is packed, use the reveal() method to access it.
     packed: CopyTaggedPtr<&'tcx List<Predicate<'tcx>>, ParamTag, true>,
+
+    defining_use_anchor: DefiningAnchor,
 }
 
 #[derive(Copy, Clone)]
@@ -1630,6 +1643,7 @@ impl<'tcx> TypeFoldable<TyCtxt<'tcx>> for ParamEnv<'tcx> {
             self.caller_bounds().try_fold_with(folder)?,
             self.reveal().try_fold_with(folder)?,
             self.constness(),
+            self.defining_use_anchor(),
         ))
     }
 }
@@ -1648,7 +1662,12 @@ impl<'tcx> ParamEnv<'tcx> {
     /// type-checking.
     #[inline]
     pub fn empty() -> Self {
-        Self::new(List::empty(), Reveal::UserFacing, hir::Constness::NotConst)
+        Self::new(
+            List::empty(),
+            Reveal::UserFacing,
+            hir::Constness::NotConst,
+            DefiningAnchor::Error,
+        )
     }
 
     #[inline]
@@ -1671,6 +1690,11 @@ impl<'tcx> ParamEnv<'tcx> {
         self.packed.tag().constness == hir::Constness::Const
     }
 
+    #[inline]
+    pub fn defining_use_anchor(self) -> DefiningAnchor {
+        self.defining_use_anchor
+    }
+
     /// Construct a trait environment with no where-clauses in scope
     /// where the values of all `impl Trait` and other hidden types
     /// are revealed. This is suitable for monomorphized, post-typeck
@@ -1680,7 +1704,7 @@ impl<'tcx> ParamEnv<'tcx> {
     /// or invoke `param_env.with_reveal_all()`.
     #[inline]
     pub fn reveal_all() -> Self {
-        Self::new(List::empty(), Reveal::All, hir::Constness::NotConst)
+        Self::new(List::empty(), Reveal::All, hir::Constness::NotConst, DefiningAnchor::Error)
     }
 
     /// Construct a trait environment with the given set of predicates.
@@ -1689,8 +1713,16 @@ impl<'tcx> ParamEnv<'tcx> {
         caller_bounds: &'tcx List<Predicate<'tcx>>,
         reveal: Reveal,
         constness: hir::Constness,
+        defining_use_anchor: DefiningAnchor,
     ) -> Self {
-        ty::ParamEnv { packed: CopyTaggedPtr::new(caller_bounds, ParamTag { reveal, constness }) }
+        ty::ParamEnv {
+            packed: CopyTaggedPtr::new(caller_bounds, ParamTag { reveal, constness }),
+            defining_use_anchor,
+        }
+    }
+
+    pub fn with_defining_use_anchor(self, defining_use_anchor: DefiningAnchor) -> Self {
+        ParamEnv { defining_use_anchor, ..self }
     }
 
     pub fn with_user_facing(mut self) -> Self {
@@ -1739,13 +1771,14 @@ impl<'tcx> ParamEnv<'tcx> {
             tcx.reveal_opaque_types_in_bounds(self.caller_bounds()),
             Reveal::All,
             self.constness(),
+            self.defining_use_anchor(),
         )
     }
 
     /// Returns this same environment but with no caller bounds.
     #[inline]
     pub fn without_caller_bounds(self) -> Self {
-        Self::new(List::empty(), self.reveal(), self.constness())
+        Self::new(List::empty(), self.reveal(), self.constness(), self.defining_use_anchor())
     }
 
     /// Creates a suitable environment in which to perform trait

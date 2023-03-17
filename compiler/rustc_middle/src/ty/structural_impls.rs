@@ -364,8 +364,14 @@ impl<'a, 'tcx> Lift<'tcx> for Term<'a> {
 impl<'a, 'tcx> Lift<'tcx> for ty::ParamEnv<'a> {
     type Lifted = ty::ParamEnv<'tcx>;
     fn lift_to_tcx(self, tcx: TyCtxt<'tcx>) -> Option<Self::Lifted> {
-        tcx.lift(self.caller_bounds())
-            .map(|caller_bounds| ty::ParamEnv::new(caller_bounds, self.reveal(), self.constness()))
+        tcx.lift(self.caller_bounds()).map(|caller_bounds| {
+            ty::ParamEnv::new(
+                caller_bounds,
+                self.reveal(),
+                self.constness(),
+                self.defining_use_anchor(),
+            )
+        })
     }
 }
 

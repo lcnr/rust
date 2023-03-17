@@ -3,12 +3,14 @@ use rustc_data_structures::vec_map::VecMap;
 use rustc_errors::ErrorGuaranteed;
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir::OpaqueTyOrigin;
+use rustc_infer::infer::InferCtxt;
 use rustc_infer::infer::TyCtxtInferExt as _;
-use rustc_infer::infer::{DefiningAnchor, InferCtxt};
 use rustc_infer::traits::{Obligation, ObligationCause};
 use rustc_middle::ty::subst::{GenericArgKind, InternalSubsts};
 use rustc_middle::ty::visit::TypeVisitableExt;
-use rustc_middle::ty::{self, OpaqueHiddenType, OpaqueTypeKey, Ty, TyCtxt, TypeFoldable};
+use rustc_middle::ty::{
+    self, DefiningAnchor, OpaqueHiddenType, OpaqueTypeKey, Ty, TyCtxt, TypeFoldable,
+};
 use rustc_span::Span;
 use rustc_trait_selection::traits::error_reporting::TypeErrCtxtExt as _;
 use rustc_trait_selection::traits::ObligationCtxt;
@@ -272,12 +274,12 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
         let def_id = opaque_type_key.def_id;
         // This logic duplicates most of `check_opaque_meets_bounds`.
         // FIXME(oli-obk): Also do region checks here and then consider removing `check_opaque_meets_bounds` entirely.
-        let param_env = self.tcx.param_env(def_id);
-        // HACK This bubble is required for this tests to pass:
-        // nested-return-type2-tait2.rs
-        // nested-return-type2-tait3.rs
-        let infcx =
-            self.tcx.infer_ctxt().with_opaque_type_inference(DefiningAnchor::Bubble).build();
+        let hir_owner = self.tcx.hir().local_def_id_to_hir_id(def_id).owner;
+        let param_env = self
+            .tcx
+            .param_env(def_id)
+            .with_defining_use_anchor(DefiningAnchor::Bind(hir_owner.def_id));
+        let infcx = self.tcx.infer_ctxt().build();
         let ocx = ObligationCtxt::new(&infcx);
         // Require the hidden type to be well-formed with only the generics of the opaque type.
         // Defining use functions may have more bounds than the opaque type, which is ok, as long as the

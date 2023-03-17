@@ -198,6 +198,7 @@ fn compare_method_predicate_entailment<'tcx>(
         tcx.mk_predicates(&hybrid_preds.predicates),
         Reveal::UserFacing,
         hir::Constness::NotConst,
+        ty::DefiningAnchor::Error,
     );
     let param_env = traits::normalize_param_env_or_error(tcx, param_env, normalize_cause);
 
@@ -1804,6 +1805,7 @@ fn compare_type_predicate_entailment<'tcx>(
         tcx.mk_predicates(&hybrid_preds.predicates),
         Reveal::UserFacing,
         hir::Constness::NotConst,
+        ty::DefiningAnchor::Error,
     );
     let param_env = traits::normalize_param_env_or_error(tcx, param_env, normalize_cause);
     let infcx = tcx.infer_ctxt().build();
@@ -1984,7 +1986,12 @@ pub(super) fn check_type_bounds<'tcx>(
                 .to_predicate(tcx),
             ),
         };
-        ty::ParamEnv::new(tcx.mk_predicates(&predicates), Reveal::UserFacing, param_env.constness())
+        ty::ParamEnv::new(
+            tcx.mk_predicates(&predicates),
+            Reveal::UserFacing,
+            param_env.constness(),
+            param_env.defining_use_anchor(),
+        )
     };
     debug!(?normalize_param_env);
 

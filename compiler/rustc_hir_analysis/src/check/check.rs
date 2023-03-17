@@ -13,7 +13,7 @@ use rustc_hir::intravisit::Visitor;
 use rustc_hir::{ItemKind, Node, PathSegment};
 use rustc_infer::infer::opaque_types::ConstrainOpaqueTypeRegionVisitor;
 use rustc_infer::infer::outlives::env::OutlivesEnvironment;
-use rustc_infer::infer::{DefiningAnchor, RegionVariableOrigin, TyCtxtInferExt};
+use rustc_infer::infer::{RegionVariableOrigin, TyCtxtInferExt};
 use rustc_infer::traits::{Obligation, TraitEngineExt as _};
 use rustc_lint::builtin::REPR_TRANSPARENT_EXTERNAL_PRIVATE_FIELDS;
 use rustc_middle::hir::nested_filter;
@@ -22,7 +22,8 @@ use rustc_middle::ty::layout::{LayoutError, MAX_SIMD_LANES};
 use rustc_middle::ty::subst::GenericArgKind;
 use rustc_middle::ty::util::{Discr, IntTypeExt};
 use rustc_middle::ty::{
-    self, AdtDef, ParamEnv, Ty, TyCtxt, TypeSuperVisitable, TypeVisitable, TypeVisitableExt,
+    self, AdtDef, DefiningAnchor, ParamEnv, Ty, TyCtxt, TypeSuperVisitable, TypeVisitable,
+    TypeVisitableExt,
 };
 use rustc_session::lint::builtin::{UNINHABITED_STATIC, UNSUPPORTED_CALLING_CONVENTIONS};
 use rustc_span::symbol::sym;
@@ -400,12 +401,11 @@ fn check_opaque_meets_bounds<'tcx>(
         hir::OpaqueTyOrigin::FnReturn(did) | hir::OpaqueTyOrigin::AsyncFn(did) => did,
         hir::OpaqueTyOrigin::TyAlias => def_id,
     };
-    let param_env = tcx.param_env(defining_use_anchor);
+    let param_env = tcx
+        .param_env(defining_use_anchor)
+        .with_defining_use_anchor(DefiningAnchor::Bind(defining_use_anchor));
 
-    let infcx = tcx
-        .infer_ctxt()
-        .with_opaque_type_inference(DefiningAnchor::Bind(defining_use_anchor))
-        .build();
+    let infcx = tcx.infer_ctxt().build();
     let ocx = ObligationCtxt::new(&infcx);
     let opaque_ty = tcx.mk_opaque(def_id.to_def_id(), substs);
 
@@ -1523,7 +1523,10 @@ pub(super) fn check_generator_obligations(tcx: TyCtxt<'_>, def_id: LocalDefId) {
     debug_assert!(matches!(tcx.def_kind(def_id), DefKind::Generator));
 
     let typeck = tcx.typeck(def_id);
-    let param_env = tcx.param_env(def_id);
+    // Bind opaque types to `def_id` as they should have been checked by borrowck.
+    let hir_owner = tcx.hir().local_def_id_to_hir_id(def_id).owner;
+    let param_env =
+        tcx.param_env(def_id).with_defining_use_anchor(DefiningAnchor::Bind(hir_owner.def_id));
 
     let generator_interior_predicates = &typeck.generator_interior_predicates[&def_id];
     debug!(?generator_interior_predicates);
@@ -1533,8 +1536,6 @@ pub(super) fn check_generator_obligations(tcx: TyCtxt<'_>, def_id: LocalDefId) {
         // typeck writeback gives us predicates with their regions erased.
         // As borrowck already has checked lifetimes, we do not need to do it again.
         .ignoring_regions()
-        // Bind opaque types to `def_id` as they should have been checked by borrowck.
-        .with_opaque_type_inference(DefiningAnchor::Bind(def_id))
         .build();
 
     let mut fulfillment_cx = <dyn TraitEngine<'_>>::new(infcx.tcx);

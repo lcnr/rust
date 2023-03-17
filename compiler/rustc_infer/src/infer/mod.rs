@@ -221,31 +221,8 @@ impl<'tcx> InferCtxtInner<'tcx> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DefiningAnchor {
-    /// `DefId` of the item.
-    Bind(LocalDefId),
-    /// When opaque types are not resolved, we `Bubble` up, meaning
-    /// return the opaque/hidden type pair from query, for caller of query to handle it.
-    Bubble,
-    /// Used to catch type mismatch errors when handling opaque types.
-    Error,
-}
-
 pub struct InferCtxt<'tcx> {
     pub tcx: TyCtxt<'tcx>,
-
-    /// The `DefId` of the item in whose context we are performing inference or typeck.
-    /// It is used to check whether an opaque type use is a defining use.
-    ///
-    /// If it is `DefiningAnchor::Bubble`, we can't resolve opaque types here and need to bubble up
-    /// the obligation. This frequently happens for
-    /// short lived InferCtxt within queries. The opaque type obligations are forwarded
-    /// to the outside until the end up in an `InferCtxt` for typeck or borrowck.
-    ///
-    /// Its default value is `DefiningAnchor::Error`, this way it is easier to catch errors that
-    /// might come up during inference or typeck.
-    pub defining_use_anchor: DefiningAnchor,
 
     /// Whether this inference context should care about region obligations in
     /// the root universe. Most notably, this is used during hir typeck as region
@@ -542,7 +519,6 @@ impl<'tcx> fmt::Display for FixupError<'tcx> {
 /// Used to configure inference contexts before their creation.
 pub struct InferCtxtBuilder<'tcx> {
     tcx: TyCtxt<'tcx>,
-    defining_use_anchor: DefiningAnchor,
     considering_regions: bool,
     /// Whether we are in coherence mode.
     intercrate: bool,
@@ -554,27 +530,11 @@ pub trait TyCtxtInferExt<'tcx> {
 
 impl<'tcx> TyCtxtInferExt<'tcx> for TyCtxt<'tcx> {
     fn infer_ctxt(self) -> InferCtxtBuilder<'tcx> {
-        InferCtxtBuilder {
-            tcx: self,
-            defining_use_anchor: DefiningAnchor::Error,
-            considering_regions: true,
-            intercrate: false,
-        }
+        InferCtxtBuilder { tcx: self, considering_regions: true, intercrate: false }
     }
 }
 
 impl<'tcx> InferCtxtBuilder<'tcx> {
-    /// Whenever the `InferCtxt` should be able to handle defining uses of opaque types,
-    /// you need to call this function. Otherwise the opaque type will be treated opaquely.
-    ///
-    /// It is only meant to be called in two places, for typeck
-    /// (via `Inherited::build`) and for the inference context used
-    /// in mir borrowck.
-    pub fn with_opaque_type_inference(mut self, defining_use_anchor: DefiningAnchor) -> Self {
-        self.defining_use_anchor = defining_use_anchor;
-        self
-    }
-
     pub fn intercrate(mut self) -> Self {
         self.intercrate = true;
         self
@@ -606,10 +566,9 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
     }
 
     pub fn build(&mut self) -> InferCtxt<'tcx> {
-        let InferCtxtBuilder { tcx, defining_use_anchor, considering_regions, intercrate } = *self;
+        let InferCtxtBuilder { tcx, considering_regions, intercrate } = *self;
         InferCtxt {
             tcx,
-            defining_use_anchor,
             considering_regions,
             inner: RefCell::new(InferCtxtInner::new()),
             lexical_region_resolutions: RefCell::new(None),
@@ -1324,7 +1283,6 @@ impl<'tcx> InferCtxt<'tcx> {
 
     #[instrument(level = "debug", skip(self), ret)]
     pub fn take_opaque_types(&self) -> opaque_types::OpaqueTypeMap<'tcx> {
-        debug_assert_ne!(self.defining_use_anchor, DefiningAnchor::Error);
         std::mem::take(&mut self.inner.borrow_mut().opaque_type_storage.opaque_types)
     }
 

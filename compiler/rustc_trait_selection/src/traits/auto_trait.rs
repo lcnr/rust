@@ -354,6 +354,7 @@ impl<'tcx> AutoTraitFinder<'tcx> {
                 tcx.mk_predicates_from_iter(normalized_preds),
                 param_env.reveal(),
                 param_env.constness(),
+                param_env.defining_use_anchor(),
             );
         }
 
@@ -361,6 +362,7 @@ impl<'tcx> AutoTraitFinder<'tcx> {
             tcx.mk_predicates_from_iter(user_computed_preds.into_iter()),
             user_env.reveal(),
             user_env.constness(),
+            user_env.defining_use_anchor(),
         );
         debug!(
             "evaluate_nested_obligations(ty={:?}, trait_did={:?}): succeeded with '{:?}' \

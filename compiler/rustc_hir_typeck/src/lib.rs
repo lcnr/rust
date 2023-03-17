@@ -69,7 +69,7 @@ use rustc_infer::infer::type_variable::{TypeVariableOrigin, TypeVariableOriginKi
 use rustc_macros::fluent_messages;
 use rustc_middle::traits;
 use rustc_middle::ty::query::Providers;
-use rustc_middle::ty::{self, Ty, TyCtxt};
+use rustc_middle::ty::{self, DefiningAnchor, Ty, TyCtxt};
 use rustc_session::config;
 use rustc_session::Session;
 use rustc_span::def_id::{DefId, LocalDefId};
@@ -206,7 +206,9 @@ fn typeck_with_fallback<'tcx>(
     });
     let body = tcx.hir().body(body_id);
 
-    let param_env = tcx.param_env(def_id);
+    let hir_owner = tcx.hir().local_def_id_to_hir_id(def_id).owner;
+    let param_env =
+        tcx.param_env(def_id).with_defining_use_anchor(DefiningAnchor::Bind(hir_owner.def_id));
     let param_env = if tcx.has_attr(def_id.to_def_id(), sym::rustc_do_not_const_check) {
         param_env.without_const()
     } else {

@@ -774,6 +774,7 @@ fn receiver_is_dispatchable<'tcx>(
             tcx.mk_predicates_from_iter(caller_bounds),
             param_env.reveal(),
             param_env.constness(),
+            param_env.defining_use_anchor(),
         )
     };
 

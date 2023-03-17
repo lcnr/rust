@@ -14,7 +14,7 @@ use crate::mir::{
 };
 use crate::traits;
 use crate::ty::subst::SubstsRef;
-use crate::ty::{self, AdtDef, Ty};
+use crate::ty::{self, AdtDef, DefiningAnchor, Ty};
 use rustc_data_structures::fx::FxHashMap;
 use rustc_middle::ty::TyCtxt;
 use rustc_serialize::{Decodable, Encodable};
@@ -162,6 +162,7 @@ impl<'tcx, E: TyEncoder<I = TyCtxt<'tcx>>> Encodable<E> for ty::ParamEnv<'tcx> {
         self.caller_bounds().encode(e);
         self.reveal().encode(e);
         self.constness().encode(e);
+        assert_eq!(self.defining_use_anchor(), DefiningAnchor::Error);
     }
 }
 
@@ -293,7 +294,7 @@ impl<'tcx, D: TyDecoder<I = TyCtxt<'tcx>>> Decodable<D> for ty::ParamEnv<'tcx> {
         let caller_bounds = Decodable::decode(d);
         let reveal = Decodable::decode(d);
         let constness = Decodable::decode(d);
-        ty::ParamEnv::new(caller_bounds, reveal, constness)
+        ty::ParamEnv::new(caller_bounds, reveal, constness, DefiningAnchor::Error)
     }
 }
 
