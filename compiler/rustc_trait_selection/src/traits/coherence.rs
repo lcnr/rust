@@ -22,7 +22,7 @@ use rustc_infer::traits::util;
 use rustc_middle::traits::specialization_graph::OverlapMode;
 use rustc_middle::ty::fast_reject::{DeepRejectCtxt, TreatParams};
 use rustc_middle::ty::visit::{TypeVisitable, TypeVisitableExt};
-use rustc_middle::ty::{self, ImplSubject, Ty, TyCtxt, TypeVisitor};
+use rustc_middle::ty::{self, ImplSubject, Ty, TyCtxt, TypeVisitor, DefiningAnchor};
 use rustc_span::symbol::sym;
 use rustc_span::DUMMY_SP;
 use std::fmt::Debug;
@@ -174,7 +174,7 @@ fn overlap_within_probe<'cx, 'tcx>(
     // types into scope; instead, we replace the generic types with
     // fresh type variables, and hence we do our evaluations in an
     // empty environment.
-    let param_env = ty::ParamEnv::empty();
+    let param_env = ty::ParamEnv::empty().with_defining_use_anchor(DefiningAnchor::Bubble);
 
     let impl1_header = with_fresh_ty_vars(selcx, param_env, impl1_def_id);
     let impl2_header = with_fresh_ty_vars(selcx, param_env, impl2_def_id);

@@ -274,11 +274,10 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
         let def_id = opaque_type_key.def_id;
         // This logic duplicates most of `check_opaque_meets_bounds`.
         // FIXME(oli-obk): Also do region checks here and then consider removing `check_opaque_meets_bounds` entirely.
-        let hir_owner = self.tcx.hir().local_def_id_to_hir_id(def_id).owner;
         let param_env = self
             .tcx
             .param_env(def_id)
-            .with_defining_use_anchor(DefiningAnchor::Bind(hir_owner.def_id));
+            .with_defining_use_anchor(DefiningAnchor::Bubble);
         let infcx = self.tcx.infer_ctxt().build();
         let ocx = ObligationCtxt::new(&infcx);
         // Require the hidden type to be well-formed with only the generics of the opaque type.
