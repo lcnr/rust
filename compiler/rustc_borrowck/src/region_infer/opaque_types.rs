@@ -1,11 +1,13 @@
 use rustc_data_structures::fx::{FxIndexMap, FxIndexSet};
 use rustc_errors::ErrorGuaranteed;
+use rustc_hir as hir;
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir::OpaqueTyOrigin;
-use rustc_infer::infer::TyCtxtInferExt as _;
+use rustc_infer::infer::outlives::env::OutlivesEnvironment;
+use rustc_infer::infer::{TyCtxtInferExt as _, RegionVariableOrigin};
 use rustc_infer::infer::{DefiningAnchor, InferCtxt};
-use rustc_infer::traits::{Obligation, ObligationCause};
-use rustc_middle::ty::subst::{GenericArgKind, InternalSubsts};
+use rustc_infer::traits::{self, Obligation};
+use rustc_middle::ty::subst::GenericArgKind;
 use rustc_middle::ty::visit::TypeVisitableExt;
 use rustc_middle::ty::{self, OpaqueHiddenType, OpaqueTypeKey, Ty, TyCtxt, TypeFoldable};
 use rustc_span::Span;
@@ -250,9 +252,11 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
             return self.tcx.ty_error(e);
         }
 
-        let definition_ty = instantiated_ty
-            .remap_generic_params_to_declaration_params(opaque_type_key, self.tcx, false)
-            .ty;
+        let remapped_hidden_ty = instantiated_ty.remap_generic_params_to_declaration_params(
+            opaque_type_key,
+            self.tcx,
+            false,
+        );
 
         if let Err(guar) = check_opaque_type_parameter_valid(
             self.tcx,
@@ -263,71 +267,113 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
             return self.tcx.ty_error(guar);
         }
 
-        // Only check this for TAIT. RPIT already supports `tests/ui/impl-trait/nested-return-type2.rs`
-        // on stable and we'd break that.
-        let OpaqueTyOrigin::TyAlias = origin else {
-            return definition_ty;
+        let defining_anchor = match self.defining_use_anchor {
+            DefiningAnchor::Bind(def_id) => def_id,
+            DefiningAnchor::Bubble | DefiningAnchor::Error => {
+                bug!("`infer_opaque_definition_from_instantiation` outside of a defining context")
+            }
         };
-        let def_id = opaque_type_key.def_id;
-        // This logic duplicates most of `check_opaque_meets_bounds`.
-        // FIXME(oli-obk): Also do region checks here and then consider removing `check_opaque_meets_bounds` entirely.
-        let param_env = self.tcx.param_env(def_id);
-        // HACK This bubble is required for this tests to pass:
-        // nested-return-type2-tait2.rs
-        // nested-return-type2-tait3.rs
-        let infcx =
-            self.tcx.infer_ctxt().with_opaque_type_inference(DefiningAnchor::Bubble).build();
-        let ocx = ObligationCtxt::new(&infcx);
-        // Require the hidden type to be well-formed with only the generics of the opaque type.
-        // Defining use functions may have more bounds than the opaque type, which is ok, as long as the
-        // hidden type is well formed even without those bounds.
-        let predicate = ty::Binder::dummy(ty::PredicateKind::WellFormed(definition_ty.into()));
 
-        let id_substs = InternalSubsts::identity_for_item(self.tcx, def_id);
-
-        // Require that the hidden type actually fulfills all the bounds of the opaque type, even without
-        // the bounds that the function supplies.
-        let opaque_ty = self.tcx.mk_opaque(def_id.to_def_id(), id_substs);
-        if let Err(err) = ocx.eq(
-            &ObligationCause::misc(instantiated_ty.span, def_id),
-            param_env,
-            opaque_ty,
-            definition_ty,
+        if let Err(guar) = check_opaque_meets_bounds(
+            self.tcx,
+            defining_anchor,
+            opaque_type_key.def_id,
+            remapped_hidden_ty,
+            &origin,
         ) {
-            infcx
-                .err_ctxt()
-                .report_mismatched_types(
-                    &ObligationCause::misc(instantiated_ty.span, def_id),
-                    opaque_ty,
-                    definition_ty,
-                    err,
-                )
-                .emit();
-        }
-
-        ocx.register_obligation(Obligation::misc(
-            infcx.tcx,
-            instantiated_ty.span,
-            def_id,
-            param_env,
-            predicate,
-        ));
-
-        // Check that all obligations are satisfied by the implementation's
-        // version.
-        let errors = ocx.select_all_or_error();
-
-        // This is still required for many(half of the tests in ui/type-alias-impl-trait)
-        // tests to pass
-        let _ = infcx.take_opaque_types();
-
-        if errors.is_empty() {
-            definition_ty
+            self.tcx.ty_error(guar)
         } else {
-            let reported = infcx.err_ctxt().report_fulfillment_errors(&errors);
-            self.tcx.ty_error(reported)
+            remapped_hidden_ty.ty
         }
     }
+}
+
+/// Check that the concrete type behind `impl Trait` actually implements `Trait`.
+///
+/// We check this using the environment of the opaque types but
+/// while being in the scope of the places that specify the opaque type.
+///
+/// This is necessary in case a TAIT is defined in a function which
+/// has bounds not on this opaque type:
+///
+/// ```ignore (illustrative)
+/// type X<T> = impl Clone;
+/// fn f<T: Clone>(t: T) -> X<T> {
+///     t
+/// }
+/// ```
+///
+/// Without this check the above code is incorrectly accepted: we would ICE if
+/// someone tried, for example, to clone an `Option<X<&mut ()>>`.
+#[instrument(level = "debug", skip(tcx))]
+fn check_opaque_meets_bounds<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    defining_use_anchor: LocalDefId,
+    opaque_def_id: LocalDefId,
+    hidden_ty: OpaqueHiddenType<'tcx>,
+    origin: &hir::OpaqueTyOrigin,
+) -> Result<(), ErrorGuaranteed> {
+    let param_env = tcx.param_env(opaque_def_id);
+
+    let infcx = tcx
+        .infer_ctxt()
+        .with_opaque_type_inference(DefiningAnchor::Bind(defining_use_anchor))
+        .build();
+    let ocx = ObligationCtxt::new(&infcx);
+    let identity_substs = ty::InternalSubsts::identity_for_item(tcx, opaque_def_id);
+    let opaque_ty = tcx.mk_opaque(opaque_def_id.to_def_id(), identity_substs);
+
+    // `ReErased` regions appear in the "parent_substs" of closures/generators.
+    // We're ignoring them here and replacing them with fresh region variables.
+    // See tests in ui/type-alias-impl-trait/closure_{parent_substs,wf_outlives}.rs.
+    //
+    // FIXME: Consider wrapping the hidden type in an existential `Binder` and instantiating it
+    // here rather than using ReErased.
+    let instantiation_span = hidden_ty.span;
+    let hidden_ty = tcx.fold_regions(hidden_ty.ty, |re, _dbi| match re.kind() {
+        ty::ReErased => infcx.next_region_var(RegionVariableOrigin::MiscVariable(instantiation_span)),
+        _ => re,
+    });
+
+    let misc_cause = traits::ObligationCause::misc(instantiation_span, opaque_def_id);
+
+    match ocx.eq(&misc_cause, param_env, opaque_ty, hidden_ty) {
+        Ok(()) => {}
+        Err(ty_err) => {
+            let ty_err = ty_err.to_string(tcx);
+            return Err(tcx.sess.delay_span_bug(
+                instantiation_span,
+                &format!("could not unify `{hidden_ty}` with revealed type: {ty_err}"),
+            ));
+        }
+    }
+
+    // Additionally require the hidden type to be well-formed with only the generics of the opaque type.
+    // Defining use functions may have more bounds than the opaque type, which is ok, as long as the
+    // hidden type is well formed even without those bounds.
+    let predicate = ty::Binder::dummy(ty::PredicateKind::WellFormed(hidden_ty.into()));
+    ocx.register_obligation(Obligation::new(tcx, misc_cause, param_env, predicate));
+
+    // Check that all obligations are satisfied by the implementation's
+    // version.
+    let errors = ocx.select_all_or_error();
+    if !errors.is_empty() {
+        return Err(infcx.err_ctxt().report_fulfillment_errors(&errors));
+    }
+
+    match origin {
+        // Checked when type checking the function containing them.
+        hir::OpaqueTyOrigin::FnReturn(..) | hir::OpaqueTyOrigin::AsyncFn(..) => {},
+        // Can have different predicates to their defining use
+        hir::OpaqueTyOrigin::TyAlias => {
+            let outlives_env = OutlivesEnvironment::new(param_env);
+            ocx.resolve_regions_and_report_errors(defining_use_anchor, &outlives_env)?;
+        }
+    }
+
+    // We can't really do anything with these constraints, just drop them for now.
+    let _ = infcx.take_opaque_types();
+    Ok(())
 }
 
 fn check_opaque_type_parameter_valid(

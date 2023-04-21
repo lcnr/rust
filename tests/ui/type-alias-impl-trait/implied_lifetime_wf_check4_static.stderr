@@ -1,13 +1,13 @@
 error[E0310]: the parameter type `A` may not live long enough
-  --> $DIR/implied_lifetime_wf_check4_static.rs:4:18
+  --> $DIR/implied_lifetime_wf_check4_static.rs:5:46
    |
-LL |     type Ty<A> = impl Sized + 'static;
-   |                  ^^^^^^^^^^^^^^^^^^^^ ...so that the type `A` will meet its required lifetime bounds
+LL |     fn defining<A: 'static>(s: A) -> Ty<A> { s }
+   |                                              ^ ...so that the type `A` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound...
    |
-LL |     type Ty<A: 'static> = impl Sized + 'static;
-   |              +++++++++
+LL |     fn defining<A: 'static + 'static>(s: A) -> Ty<A> { s }
+   |                            +++++++++
 
 error: aborting due to previous error
 

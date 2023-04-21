@@ -1,8 +1,12 @@
 error[E0277]: `Sender<i32>` cannot be shared between threads safely
-  --> $DIR/issue-70935-complex-spans.rs:13:45
+  --> $DIR/issue-70935-complex-spans.rs:16:5
    |
-LL | fn foo(tx: std::sync::mpsc::Sender<i32>) -> impl Future + Send {
-   |                                             ^^^^^^^^^^^^^^^^^^ `Sender<i32>` cannot be shared between threads safely
+LL | /     async move {
+LL | |         baz(|| async{
+LL | |             foo(tx.clone());
+LL | |         }).await;
+LL | |     }
+   | |_____^ `Sender<i32>` cannot be shared between threads safely
    |
    = help: the trait `Sync` is not implemented for `Sender<i32>`
    = note: required for `&Sender<i32>` to implement `Send`
