@@ -115,12 +115,12 @@ impl<'tcx> InferCtxt<'tcx> {
 
             // We don't expect `TyVar` or `Fresh*` vars at this point with lazy norm.
             (
-                ty::Alias(AliasKind::Projection, _),
+                ty::Alias(..),
                 ty::Infer(ty::TyVar(_) | ty::FreshTy(_) | ty::FreshIntTy(_) | ty::FreshFloatTy(_)),
             )
             | (
                 ty::Infer(ty::TyVar(_) | ty::FreshTy(_) | ty::FreshIntTy(_) | ty::FreshFloatTy(_)),
-                ty::Alias(AliasKind::Projection, _),
+                ty::Alias(..),
             ) if self.tcx.trait_solver_next() => {
                 bug!()
             }
