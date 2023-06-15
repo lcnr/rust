@@ -4,7 +4,7 @@ fn main() {
     let y = 42;
     let x = wrong_generic(&y);
     let z: i32 = x;
-    //~^ ERROR expected generic type parameter, found `&i32`
+    //~^ ERROR non-defining opaque type use in defining scope
 }
 
 type WrongGeneric<T> = impl 'static;

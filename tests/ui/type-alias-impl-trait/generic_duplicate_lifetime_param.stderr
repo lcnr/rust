@@ -1,4 +1,4 @@
-error: non-defining opaque type use in defining scope
+error[E0792]: non-defining opaque type use in defining scope
   --> $DIR/generic_duplicate_lifetime_param.rs:12:5
    |
 LL |     t
@@ -12,3 +12,4 @@ LL | type Two<'a, 'b> = impl std::fmt::Debug + Captures<'a> + Captures<'b>;
 
 error: aborting due to previous error
 
+For more information about this error, try `rustc --explain E0792`.

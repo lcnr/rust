@@ -14,14 +14,14 @@ help: consider introducing lifetime `'a` here
 LL | type Return<'a, A> = impl WithAssoc<A, AssocType = impl SomeTrait + 'a>;
    |             +++
 
-error[E0792]: expected generic type parameter, found `()`
+error[E0792]: non-defining opaque type use in defining scope
   --> $DIR/issue-69136-inner-lifetime-resolve-error.rs:20:27
    |
 LL | type Return<A> = impl WithAssoc<A, AssocType = impl SomeTrait + 'a>;
-   |             - this generic parameter must be used with a generic type parameter
+   |             - this generic parameter of the opaque must be used with a generic type parameter
 ...
 LL | fn my_fun() -> Return<()> {}
-   |                           ^^
+   |                           ^^ expected generic type parameter, found `()`
 
 error: aborting due to 2 previous errors
 

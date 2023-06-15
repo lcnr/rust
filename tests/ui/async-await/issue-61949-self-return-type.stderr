@@ -7,6 +7,24 @@ LL |     pub async fn new(_bar: &'a i32) -> Self {
    = note: see issue #103532 <https://github.com/rust-lang/rust/issues/103532> for more information
    = help: add `#![feature(impl_trait_projections)]` to the crate attributes to enable
 
+error[E0792]: non-defining opaque type use in defining scope
+  --> $DIR/issue-61949-self-return-type.rs:11:45
+   |
+LL |       pub async fn new(_bar: &'a i32) -> Self {
+   |  _____________________________________________^
+LL | |
+LL | |         Foo {
+LL | |             bar: &22
+LL | |         }
+LL | |     }
+   | |_____^
+   |
+note: lifetime used multiple times
+  --> $DIR/issue-61949-self-return-type.rs:10:6
+   |
+LL | impl<'a> Foo<'a> {
+   |      ^^
+
 error[E0597]: `bar` does not live long enough
   --> $DIR/issue-61949-self-return-type.rs:22:18
    |
@@ -20,7 +38,7 @@ LL |
 LL |     };
    |     - `bar` dropped here while still borrowed
 
-error: aborting due to 2 previous errors
+error: aborting due to 3 previous errors
 
-Some errors have detailed explanations: E0597, E0658.
+Some errors have detailed explanations: E0597, E0658, E0792.
 For more information about an error, try `rustc --explain E0597`.

@@ -133,7 +133,8 @@ borrowck_moved_due_to_usage_in_operator =
     }
 
 borrowck_opaque_type_non_generic_param =
-    expected generic {$kind} parameter, found `{$ty}`
+    non-defining opaque type use in defining scope
+    .note = expected a generic {$kind} parameter, found `{$ty}`
     .label = {STREQ($ty, "'static") ->
         [true] cannot use static lifetime; use a bound lifetime instead or remove the lifetime parameter from the opaque type
         *[other] this generic parameter must be used with a generic {$kind} parameter

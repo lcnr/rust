@@ -1,4 +1,7 @@
+use std::iter;
+
 use rustc_data_structures::fx::{FxIndexMap, FxIndexSet};
+use rustc_errors::error_code;
 use rustc_errors::ErrorGuaranteed;
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir::OpaqueTyOrigin;
@@ -353,36 +356,18 @@ fn check_opaque_type_parameter_valid(
     opaque_type_key: OpaqueTypeKey<'_>,
     span: Span,
 ) -> Result<(), ErrorGuaranteed> {
-    let opaque_ty_hir = tcx.hir().expect_item(opaque_type_key.def_id);
-    match opaque_ty_hir.expect_opaque_ty().origin {
-        // No need to check return position impl trait (RPIT)
-        // because for type and const parameters they are correct
-        // by construction: we convert
-        //
-        // fn foo<P0..Pn>() -> impl Trait
-        //
-        // into
-        //
-        // type Foo<P0...Pn>
-        // fn foo<P0..Pn>() -> Foo<P0...Pn>.
-        //
-        // For lifetime parameters we convert
-        //
-        // fn foo<'l0..'ln>() -> impl Trait<'l0..'lm>
-        //
-        // into
-        //
-        // type foo::<'p0..'pn>::Foo<'q0..'qm>
-        // fn foo<l0..'ln>() -> foo::<'static..'static>::Foo<'l0..'lm>.
-        //
-        // which would error here on all of the `'static` args.
-        OpaqueTyOrigin::FnReturn(..) | OpaqueTyOrigin::AsyncFn(..) => return Ok(()),
-        // Check these
-        OpaqueTyOrigin::TyAlias { .. } => {}
-    }
     let opaque_generics = tcx.generics_of(opaque_type_key.def_id);
+    let variances = tcx.variances_of(opaque_type_key.def_id);
     let mut seen_params: FxIndexMap<_, Vec<_>> = FxIndexMap::default();
-    for (i, arg) in opaque_type_key.substs.iter().enumerate() {
+    for (i, (arg, variance)) in iter::zip(opaque_type_key.substs.iter(), variances).enumerate() {
+        // Skipping bivariant generic arguments as these have to be unused by the opaque
+        // type. This is checked separately.
+        if *variance == ty::Variance::Bivariant {
+            continue;
+        } else if let Err(guar) = arg.error_reported() {
+            return Err(guar);
+        }
+
         let arg_is_param = match arg.unpack() {
             GenericArgKind::Type(ty) => matches!(ty.kind(), ty::Param(_)),
             GenericArgKind::Lifetime(lt) => {
@@ -398,12 +383,20 @@ fn check_opaque_type_parameter_valid(
             let opaque_param = opaque_generics.param_at(i, tcx);
             let kind = opaque_param.kind.descr();
 
-            return Err(tcx.sess.emit_err(NonGenericOpaqueTypeParam {
-                ty: arg,
-                kind,
-                span,
-                param_span: tcx.def_span(opaque_param.def_id),
-            }));
+            return Err(tcx
+                .sess
+                .struct_span_err_with_code(
+                    span,
+                    "non-defining opaque type use in defining scope",
+                    error_code!(E0792),
+                )
+                .span_label(span, format!("expected generic {kind} parameter, found `{arg}`"))
+                .span_label(tcx.def_span(opaque_param.def_id), if arg.as_region().map_or(false, |r| r.is_static()) {
+                    "cannot use static lifetime; use a bound lifetime instead \
+                     or remove the lifetime parameter from the opaque type".to_string()
+                } else {
+                    format!("this generic parameter of the opaque must be used with a generic {kind} parameter")
+                }).emit());
         }
     }
 
@@ -414,11 +407,16 @@ fn check_opaque_type_parameter_valid(
                 .into_iter()
                 .map(|i| tcx.def_span(opaque_generics.param_at(i, tcx).def_id))
                 .collect();
-            return Err(tcx
+            let guar = tcx
                 .sess
-                .struct_span_err(span, "non-defining opaque type use in defining scope")
+                .struct_span_err_with_code(
+                    span,
+                    "non-defining opaque type use in defining scope",
+                    error_code!(E0792),
+                )
                 .span_note(spans, format!("{} used multiple times", descr))
-                .emit());
+                .emit();
+            return Err(guar);
         }
     }
 

@@ -1,11 +1,11 @@
-error[E0792]: expected generic type parameter, found `<T as TraitWithAssoc>::Assoc`
+error[E0792]: non-defining opaque type use in defining scope
   --> $DIR/bound_reduction2.rs:16:5
    |
 LL | type Foo<V> = impl Trait<V>;
-   |          - this generic parameter must be used with a generic type parameter
+   |          - this generic parameter of the opaque must be used with a generic type parameter
 ...
 LL |     ()
-   |     ^^
+   |     ^^ expected generic type parameter, found `<T as TraitWithAssoc>::Assoc`
 
 error: aborting due to previous error
 

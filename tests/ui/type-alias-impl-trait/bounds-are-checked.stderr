@@ -1,11 +1,11 @@
-error[E0792]: expected generic lifetime parameter, found `'static`
+error[E0792]: non-defining opaque type use in defining scope
   --> $DIR/bounds-are-checked.rs:9:5
    |
 LL | type X<'a> = impl Into<&'static str> + From<&'a str>;
    |        -- cannot use static lifetime; use a bound lifetime instead or remove the lifetime parameter from the opaque type
 ...
 LL |     t
-   |     ^
+   |     ^ expected generic lifetime parameter, found `'static`
 
 error: aborting due to previous error
 
