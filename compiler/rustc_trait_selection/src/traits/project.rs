@@ -315,18 +315,21 @@ fn project_and_unify_type<'cx, 'tcx>(
         Err(InProgress) => return ProjectAndUnifyResult::Recursive,
     };
     debug!(?normalized, ?obligations, "project_and_unify_type result");
-    let actual = obligation.predicate.term;
-    // For an example where this is necessary see tests/ui/impl-trait/nested-return-type2.rs
-    // This allows users to omit re-mentioning all bounds on an associated type and just use an
-    // `impl Trait` for the assoc type to add more bounds.
-    let InferOk { value: actual, obligations: new } =
-        selcx.infcx.replace_opaque_types_with_inference_vars(
-            actual,
-            obligation.cause.body_id,
-            obligation.cause.span,
-            obligation.param_env,
-        );
-    obligations.extend(new);
+    let mut actual = obligation.predicate.term;
+    if actual.has_opaque_types() && !infcx.can_eq(obligation.param_env, normalized, actual) {
+        // For an example where this is necessary see tests/ui/impl-trait/nested-return-type2.rs
+        // This allows users to omit re-mentioning all bounds on an associated type and just use an
+        // `impl Trait` for the assoc type to add more bounds.
+        let InferOk { value, obligations: new } =
+            selcx.infcx.replace_opaque_types_with_inference_vars(
+                actual,
+                obligation.cause.body_id,
+                obligation.cause.span,
+                obligation.param_env,
+            );
+        actual = value;
+        obligations.extend(new);
+    }
 
     // Need to define opaque types to support nested opaque types like `impl Fn() -> impl Trait`
     match infcx.at(&obligation.cause, obligation.param_env).eq(
