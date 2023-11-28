@@ -218,8 +218,8 @@ impl<'tcx> UniversalRegionRelationsBuilder<'_, 'tcx> {
             .universal_regions
             .unnormalized_input_tys
             .iter()
-            .cloned()
-            .chain(Some(self.universal_regions.unnormalized_output_ty));
+            .map(|ty| (*ty, true))
+            .chain(Some((self.universal_regions.unnormalized_output_ty, false)));
 
         // For each of the input/output types:
         // - Normalize the type. This will create some region
@@ -232,14 +232,17 @@ impl<'tcx> UniversalRegionRelationsBuilder<'_, 'tcx> {
         let mut normalized_inputs_and_output =
             Vec::with_capacity(self.universal_regions.unnormalized_input_tys.len() + 1);
         let mut constraints = vec![];
-        for ty in unnormalized_input_output_tys {
+        for (ty, is_input) in unnormalized_input_output_tys {
             debug!("build: input_or_output={:?}", ty);
             // We add implied bounds from both the unnormalized and normalized ty.
             // See issue #87748
-            let constraints_unnorm = self.add_implied_bounds(ty);
-            if let Some(c) = constraints_unnorm {
-                constraints.push(c)
+            if is_input {
+                let constraints_unnorm = self.add_implied_bounds(ty);
+                if let Some(c) = constraints_unnorm {
+                    constraints.push(c)
+                }
             }
+
             let TypeOpOutput { output: norm_ty, constraints: constraints_normalize, .. } = self
                 .param_env
                 .and(type_op::normalize::Normalize::new(ty))
@@ -265,7 +268,7 @@ impl<'tcx> UniversalRegionRelationsBuilder<'_, 'tcx> {
             // }
             // ```
             // Both &Self::Bar and &() are WF
-            if ty != norm_ty {
+            if is_input && ty != norm_ty {
                 let constraints_norm = self.add_implied_bounds(norm_ty);
                 if let Some(c) = constraints_norm {
                     constraints.push(c)

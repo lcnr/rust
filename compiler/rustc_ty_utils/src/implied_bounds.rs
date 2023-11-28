@@ -24,7 +24,7 @@ fn assumed_wf_types<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> &'tcx [(Ty<'
             let sig = tcx.fn_sig(def_id).instantiate_identity();
             let liberated_sig = tcx.liberate_late_bound_regions(def_id.to_def_id(), sig);
             tcx.arena.alloc_from_iter(itertools::zip_eq(
-                liberated_sig.inputs_and_output,
+                liberated_sig.inputs().iter().cloned(),
                 fn_sig_spans(tcx, def_id),
             ))
         }
@@ -34,7 +34,7 @@ fn assumed_wf_types<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> &'tcx [(Ty<'
             let mut assumed_wf_types: Vec<_> =
                 tcx.assumed_wf_types(tcx.local_parent(def_id)).into();
             assumed_wf_types.extend(itertools::zip_eq(
-                liberated_sig.inputs_and_output,
+                liberated_sig.inputs().iter().cloned(),
                 fn_sig_spans(tcx, def_id),
             ));
             tcx.arena.alloc_slice(&assumed_wf_types)
@@ -163,7 +163,7 @@ fn assumed_wf_types<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> &'tcx [(Ty<'
 fn fn_sig_spans(tcx: TyCtxt<'_>, def_id: LocalDefId) -> impl Iterator<Item = Span> + '_ {
     let node = tcx.hir().get(tcx.local_def_id_to_hir_id(def_id));
     if let Some(decl) = node.fn_decl() {
-        decl.inputs.iter().map(|ty| ty.span).chain(iter::once(decl.output.span()))
+        decl.inputs.iter().map(|ty| ty.span)
     } else {
         bug!("unexpected item for fn {def_id:?}: {node:?}")
     }
