@@ -24,7 +24,6 @@ use rustc_errors::{error_code, DelayDm, Diagnostic};
 use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_middle::ty::{self, ImplSubject, Ty, TyCtxt, TypeVisitableExt};
 use rustc_middle::ty::{GenericArgs, GenericArgsRef};
-use rustc_session::lint::builtin::COHERENCE_LEAK_CHECK;
 use rustc_session::lint::builtin::ORDER_DEPENDENT_TRAIT_OBJECTS;
 use rustc_span::{Span, DUMMY_SP};
 
@@ -441,7 +440,6 @@ fn report_conflicting_impls<'tcx>(
         Some(kind) => {
             let lint = match kind {
                 FutureCompatOverlapErrorKind::Issue33140 => ORDER_DEPENDENT_TRAIT_OBJECTS,
-                FutureCompatOverlapErrorKind::LeakCheck => COHERENCE_LEAK_CHECK,
             };
             tcx.struct_span_lint_hir(
                 lint,

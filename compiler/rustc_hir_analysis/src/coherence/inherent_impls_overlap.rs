@@ -7,7 +7,7 @@ use rustc_index::IndexVec;
 use rustc_middle::traits::specialization_graph::OverlapMode;
 use rustc_middle::ty::{self, TyCtxt};
 use rustc_span::Symbol;
-use rustc_trait_selection::traits::{self, SkipLeakCheck};
+use rustc_trait_selection::traits;
 use smallvec::SmallVec;
 use std::collections::hash_map::Entry;
 
@@ -139,15 +139,8 @@ impl<'tcx> InherentOverlapChecker<'tcx> {
         impl1_def_id: DefId,
         impl2_def_id: DefId,
     ) {
-        let maybe_overlap = traits::overlapping_impls(
-            self.tcx,
-            impl1_def_id,
-            impl2_def_id,
-            // We go ahead and just skip the leak check for
-            // inherent impls without warning.
-            SkipLeakCheck::Yes,
-            overlap_mode,
-        );
+        let maybe_overlap =
+            traits::overlapping_impls(self.tcx, impl1_def_id, impl2_def_id, overlap_mode);
 
         if let Some(overlap) = maybe_overlap {
             self.check_for_common_items_in_impls(impl1_def_id, impl2_def_id, overlap);

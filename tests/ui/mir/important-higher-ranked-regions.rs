@@ -3,7 +3,7 @@
 
 // This test checks that bivariant parameters are handled correctly
 // in the mir.
-#![allow(coherence_leak_check)]
+
 trait Trait {
     type Assoc;
 }

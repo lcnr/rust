@@ -25,7 +25,6 @@ declare_lint_pass! {
         BREAK_WITH_LABEL_AND_LOOP,
         BYTE_SLICE_IN_PACKED_STRUCT_WITH_DERIVE,
         CENUM_IMPL_DROP_CAST,
-        COHERENCE_LEAK_CHECK,
         CONFLICTING_REPR_HINTS,
         CONST_EVALUATABLE_UNCHECKED,
         CONST_ITEM_MUTATION,
@@ -1464,46 +1463,6 @@ declare_lint! {
     @future_incompatible = FutureIncompatibleInfo {
         reason: FutureIncompatibilityReason::FutureReleaseErrorReportInDeps,
         reference: "issue #56484 <https://github.com/rust-lang/rust/issues/56484>",
-    };
-}
-
-declare_lint! {
-    /// The `coherence_leak_check` lint detects conflicting implementations of
-    /// a trait that are only distinguished by the old leak-check code.
-    ///
-    /// ### Example
-    ///
-    /// ```rust
-    /// trait SomeTrait { }
-    /// impl SomeTrait for for<'a> fn(&'a u8) { }
-    /// impl<'a> SomeTrait for fn(&'a u8) { }
-    /// ```
-    ///
-    /// {{produces}}
-    ///
-    /// ### Explanation
-    ///
-    /// In the past, the compiler would accept trait implementations for
-    /// identical functions that differed only in where the lifetime binder
-    /// appeared. Due to a change in the borrow checker implementation to fix
-    /// several bugs, this is no longer allowed. However, since this affects
-    /// existing code, this is a [future-incompatible] lint to transition this
-    /// to a hard error in the future.
-    ///
-    /// Code relying on this pattern should introduce "[newtypes]",
-    /// like `struct Foo(for<'a> fn(&'a u8))`.
-    ///
-    /// See [issue #56105] for more details.
-    ///
-    /// [issue #56105]: https://github.com/rust-lang/rust/issues/56105
-    /// [newtypes]: https://doc.rust-lang.org/book/ch19-04-advanced-types.html#using-the-newtype-pattern-for-type-safety-and-abstraction
-    /// [future-incompatible]: ../index.md#future-incompatible-lints
-    pub COHERENCE_LEAK_CHECK,
-    Warn,
-    "distinct impls distinguished only by the leak-check code",
-    @future_incompatible = FutureIncompatibleInfo {
-        reason: FutureIncompatibilityReason::FutureReleaseErrorDontReportInDeps,
-        reference: "issue #56105 <https://github.com/rust-lang/rust/issues/56105>",
     };
 }
 

@@ -256,12 +256,6 @@ pub struct InferCtxt<'tcx> {
     /// solving is left to borrowck instead.
     pub considering_regions: bool,
 
-    /// If set, this flag causes us to skip the 'leak check' during
-    /// higher-ranked subtyping operations. This flag is a temporary one used
-    /// to manage the removal of the leak-check: for the time being, we still run the
-    /// leak-check, but we issue warnings.
-    skip_leak_check: bool,
-
     pub inner: RefCell<InferCtxtInner<'tcx>>,
 
     /// Once region inference is done, the values for each variable.
@@ -606,7 +600,6 @@ pub struct InferCtxtBuilder<'tcx> {
     tcx: TyCtxt<'tcx>,
     defining_use_anchor: DefiningAnchor,
     considering_regions: bool,
-    skip_leak_check: bool,
     /// Whether we are in coherence mode.
     intercrate: bool,
     /// Whether we should use the new trait solver in the local inference context,
@@ -624,7 +617,6 @@ impl<'tcx> TyCtxtInferExt<'tcx> for TyCtxt<'tcx> {
             tcx: self,
             defining_use_anchor: DefiningAnchor::Error,
             considering_regions: true,
-            skip_leak_check: false,
             intercrate: false,
             next_trait_solver: self.next_trait_solver_globally(),
         }
@@ -658,11 +650,6 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
         self
     }
 
-    pub fn skip_leak_check(mut self, skip_leak_check: bool) -> Self {
-        self.skip_leak_check = skip_leak_check;
-        self
-    }
-
     /// Given a canonical value `C` as a starting point, create an
     /// inference context that contains each of the bound values
     /// within instantiated as a fresh variable. The `f` closure is
@@ -688,7 +675,6 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
             tcx,
             defining_use_anchor,
             considering_regions,
-            skip_leak_check,
             intercrate,
             next_trait_solver,
         } = *self;
@@ -696,7 +682,6 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
             tcx,
             defining_use_anchor,
             considering_regions,
-            skip_leak_check,
             inner: RefCell::new(InferCtxtInner::new()),
             lexical_region_resolutions: RefCell::new(None),
             selection_cache: Default::default(),

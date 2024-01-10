@@ -78,7 +78,6 @@ impl<'tcx> InferCtxt<'tcx> {
             tcx: self.tcx,
             defining_use_anchor: self.defining_use_anchor,
             considering_regions: self.considering_regions,
-            skip_leak_check: self.skip_leak_check,
             inner: self.inner.clone(),
             lexical_region_resolutions: self.lexical_region_resolutions.clone(),
             selection_cache: self.selection_cache.clone(),

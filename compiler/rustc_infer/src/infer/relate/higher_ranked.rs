@@ -116,13 +116,11 @@ impl<'tcx> InferCtxt<'tcx> {
         outer_universe: ty::UniverseIndex,
         only_consider_snapshot: Option<&CombinedSnapshot<'tcx>>,
     ) -> RelateResult<'tcx, ()> {
-        // If the user gave `-Zno-leak-check`, or we have been
-        // configured to skip the leak check, then skip the leak check
-        // completely. The leak check is deprecated. Any legitimate
-        // subtyping errors that it would have caught will now be
-        // caught later on, during region checking. However, we
-        // continue to use it for a transition period.
-        if self.tcx.sess.opts.unstable_opts.no_leak_check || self.skip_leak_check {
+        // If the user gave `-Zno-leak-check`, then skip the leak check
+        // completely. While we considered to remove the leak check at
+        // some point, we are now confident that it will remain in some
+        // form or another.
+        if self.tcx.sess.opts.unstable_opts.no_leak_check {
             return Ok(());
         }
 

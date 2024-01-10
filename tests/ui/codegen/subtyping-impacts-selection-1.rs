@@ -4,7 +4,6 @@
 //[codegen] compile-flags: -Zmir-opt-level=0
 
 // A regression test for #107205
-#![allow(coherence_leak_check)]
 struct Foo<T: 'static>(T);
 
 fn useful<'a>(_: &'a u8) {}

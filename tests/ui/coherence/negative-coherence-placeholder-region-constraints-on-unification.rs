@@ -1,7 +1,5 @@
 // revisions: explicit implicit
-//[implicit] check-pass
-
-#![forbid(coherence_leak_check)]
+// check-pass
 #![feature(negative_impls, with_negative_coherence)]
 
 pub trait Marker {}
@@ -19,7 +17,5 @@ trait FnMarker {}
 // as an assumption when proving `&'!0 T: Marker`...
 impl<T: ?Sized + Marker> FnMarker for fn(T) {}
 impl<T: ?Sized> FnMarker for fn(&T) {}
-//[explicit]~^ ERROR conflicting implementations of trait `FnMarker` for type `fn(&_)`
-//[explicit]~| WARN this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
 
 fn main() {}

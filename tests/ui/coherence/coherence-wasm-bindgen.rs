@@ -1,13 +1,8 @@
 // Capture a coherence pattern from wasm-bindgen that we discovered as part of
-// future-compatibility warning #56105. This pattern currently receives a lint
-// warning but we probably want to support it long term.
-//
-// Key distinction: we are implementing once for `A` (take ownership) and one
-// for `&A` (borrow).
-//
-// c.f. #56105
+// future-compatibility warning #56105. This pattern relies on universe
+// errors impacting selection and is something we want to support.
 
-#![deny(coherence_leak_check)]
+// check-pass
 
 trait IntoWasmAbi {
     fn some_method(&self) {}
@@ -30,8 +25,6 @@ where
     A: RefFromWasmAbi,
     R: ReturnWasmAbi,
 {
-    //~^^^^^ ERROR conflicting implementation
-    //~| WARNING this was previously accepted
 }
 
 fn main() {}

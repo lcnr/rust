@@ -13,7 +13,6 @@ use crate::traits::query::evaluate_obligation::InferCtxtExt;
 use crate::traits::select::IntercrateAmbiguityCause;
 use crate::traits::structural_normalize::StructurallyNormalizeExt;
 use crate::traits::NormalizeExt;
-use crate::traits::SkipLeakCheck;
 use crate::traits::{
     Obligation, ObligationCause, ObligationCtxt, PredicateObligation, PredicateObligations,
     SelectionContext,
@@ -84,12 +83,11 @@ impl TrackAmbiguityCauses {
 /// If there are types that satisfy both impls, returns `Some`
 /// with a suitably-freshened `ImplHeader` with those types
 /// substituted. Otherwise, returns `None`.
-#[instrument(skip(tcx, skip_leak_check), level = "debug")]
+#[instrument(skip(tcx), level = "debug")]
 pub fn overlapping_impls(
     tcx: TyCtxt<'_>,
     impl1_def_id: DefId,
     impl2_def_id: DefId,
-    skip_leak_check: SkipLeakCheck,
     overlap_mode: OverlapMode,
 ) -> Option<OverlapResult<'_>> {
     // Before doing expensive operations like entering an inference context, do
@@ -114,27 +112,14 @@ pub fn overlapping_impls(
         return None;
     }
 
-    let _overlap_with_bad_diagnostics = overlap(
-        tcx,
-        TrackAmbiguityCauses::No,
-        skip_leak_check,
-        impl1_def_id,
-        impl2_def_id,
-        overlap_mode,
-    )?;
+    let _overlap_with_bad_diagnostics =
+        overlap(tcx, TrackAmbiguityCauses::No, impl1_def_id, impl2_def_id, overlap_mode)?;
 
     // In the case where we detect an error, run the check again, but
     // this time tracking intercrate ambiguity causes for better
     // diagnostics. (These take time and can lead to false errors.)
-    let overlap = overlap(
-        tcx,
-        TrackAmbiguityCauses::Yes,
-        skip_leak_check,
-        impl1_def_id,
-        impl2_def_id,
-        overlap_mode,
-    )
-    .unwrap();
+    let overlap =
+        overlap(tcx, TrackAmbiguityCauses::Yes, impl1_def_id, impl2_def_id, overlap_mode).unwrap();
     Some(overlap)
 }
 
@@ -176,7 +161,6 @@ fn fresh_impl_header_normalized<'tcx>(
 fn overlap<'tcx>(
     tcx: TyCtxt<'tcx>,
     track_ambiguity_causes: TrackAmbiguityCauses,
-    skip_leak_check: SkipLeakCheck,
     impl1_def_id: DefId,
     impl2_def_id: DefId,
     overlap_mode: OverlapMode,
@@ -192,7 +176,6 @@ fn overlap<'tcx>(
     let infcx = tcx
         .infer_ctxt()
         .with_opaque_type_inference(DefiningAnchor::Bubble)
-        .skip_leak_check(skip_leak_check.is_yes())
         .intercrate(true)
         .with_next_trait_solver(tcx.next_trait_solver_in_coherence())
         .build();
@@ -230,8 +213,15 @@ fn overlap<'tcx>(
         }
     }
 
-    // We toggle the `leak_check` by using `skip_leak_check` when constructing the
-    // inference context, so this may be a noop.
+    // Detect any region errors caused by equating these two impls.
+    //
+    // Only higher ranked region errors are possible here, given that we
+    // replaced all parameter regions with existentials.
+    //
+    // Unlike a full region check, which sometimes incompletely handles
+    // `TypeOutlives` constraints, the leak check is a complete. While the
+    // leak check does not detect all region errors, it never
+    // fails in cases which would later pass full region checking.
     if infcx.leak_check(ty::UniverseIndex::ROOT, None).is_err() {
         debug!("overlap: leak check failed");
         return None;

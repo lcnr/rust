@@ -1,7 +1,6 @@
 // run-pass
 // revisions: old next
 //[next] compile-flags: -Znext-solver
-#![allow(coherence_leak_check)]
 
 trait Trait: Sized {
     fn is_higher_ranked(self) -> bool;

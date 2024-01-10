@@ -70,24 +70,6 @@ pub use self::util::{get_vtable_index_of_object_method, impl_item_is_final, upca
 
 pub use rustc_infer::traits::*;
 
-/// Whether to skip the leak check, as part of a future compatibility warning step.
-///
-/// The "default" for skip-leak-check corresponds to the current
-/// behavior (do not skip the leak check) -- not the behavior we are
-/// transitioning into.
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
-pub enum SkipLeakCheck {
-    Yes,
-    #[default]
-    No,
-}
-
-impl SkipLeakCheck {
-    fn is_yes(self) -> bool {
-        self == SkipLeakCheck::Yes
-    }
-}
-
 /// The mode that trait queries run in.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum TraitQueryMode {

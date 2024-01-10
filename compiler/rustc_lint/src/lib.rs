@@ -419,6 +419,11 @@ fn register_builtins(store: &mut LintStore) {
          <https://github.com/rust-lang/rust/issues/48950> for more information",
     );
     store.register_removed(
+        "coherence_leak_check",
+        "no longer a warning, see issue #119820 \
+         <https://github.com/rust-lang/rust/issues/119820> for more information",
+    );
+    store.register_removed(
         "resolve_trait_on_defaulted_unit",
         "converted into hard error, see issue #48950 \
          <https://github.com/rust-lang/rust/issues/48950> for more information",
