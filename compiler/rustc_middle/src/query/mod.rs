@@ -1950,15 +1950,6 @@ rustc_queries! {
         desc { "normalizing `{}`", goal.value }
     }
 
-    query implied_outlives_bounds_compat(
-        goal: CanonicalTyGoal<'tcx>
-    ) -> Result<
-        &'tcx Canonical<'tcx, canonical::QueryResponse<'tcx, Vec<OutlivesBound<'tcx>>>>,
-        NoSolution,
-    > {
-        desc { "computing implied outlives bounds for `{}`", goal.value.value }
-    }
-
     query implied_outlives_bounds(
         goal: CanonicalTyGoal<'tcx>
     ) -> Result<

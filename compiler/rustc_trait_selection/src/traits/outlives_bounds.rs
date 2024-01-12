@@ -9,16 +9,8 @@ use rustc_span::def_id::LocalDefId;
 
 pub use rustc_middle::traits::query::OutlivesBound;
 
-pub type BoundsCompat<'a, 'tcx: 'a> = impl Iterator<Item = OutlivesBound<'tcx>> + 'a;
 pub type Bounds<'a, 'tcx: 'a> = impl Iterator<Item = OutlivesBound<'tcx>> + 'a;
 pub trait InferCtxtExt<'a, 'tcx> {
-    fn implied_bounds_tys_compat(
-        &'a self,
-        param_env: ty::ParamEnv<'tcx>,
-        body_id: LocalDefId,
-        tys: &'a FxIndexSet<Ty<'tcx>>,
-    ) -> BoundsCompat<'a, 'tcx>;
-
     fn implied_bounds_tys(
         &'a self,
         param_env: ty::ParamEnv<'tcx>,
@@ -66,13 +58,8 @@ fn implied_outlives_bounds<'a, 'tcx>(
     assert!(!ty.has_non_region_infer());
 
     let mut canonical_var_values = OriginalQueryValues::default();
-    let canonical_ty =
-        infcx.canonicalize_query(param_env.and(ty), &mut canonical_var_values);
-    let implied_bounds_result = if compat {
-        infcx.tcx.implied_outlives_bounds_compat(canonical_ty)
-    } else {
-        infcx.tcx.implied_outlives_bounds(canonical_ty)
-    };
+    let canonical_ty = infcx.canonicalize_query(param_env.and(ty), &mut canonical_var_values);
+    let implied_bounds_result = infcx.tcx.implied_outlives_bounds(canonical_ty);
     let Ok(canonical_result) = implied_bounds_result else {
         return vec![];
     };
@@ -119,7 +106,7 @@ fn implied_outlives_bounds<'a, 'tcx>(
         if !errors.is_empty() {
             infcx.dcx().span_delayed_bug(
                 span,
-                "implied_outlives_bounds_compat failed to solve obligations from instantiation",
+                "implied_outlives_bounds failed to solve obligations from instantiation",
             );
         }
     };
@@ -128,15 +115,6 @@ fn implied_outlives_bounds<'a, 'tcx>(
 }
 
 impl<'a, 'tcx: 'a> InferCtxtExt<'a, 'tcx> for InferCtxt<'tcx> {
-    fn implied_bounds_tys_compat(
-        &'a self,
-        param_env: ParamEnv<'tcx>,
-        body_id: LocalDefId,
-        tys: &'a FxIndexSet<Ty<'tcx>>,
-    ) -> BoundsCompat<'a, 'tcx> {
-        tys.iter().flat_map(move |ty| implied_outlives_bounds(self, param_env, body_id, *ty, true))
-    }
-
     fn implied_bounds_tys(
         &'a self,
         param_env: ParamEnv<'tcx>,
