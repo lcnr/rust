@@ -2,7 +2,6 @@ use std::mem;
 
 use rustc_infer::infer::InferCtxt;
 use rustc_infer::traits::solve::MaybeCause;
-use rustc_infer::traits::Obligation;
 use rustc_infer::traits::{
     query::NoSolution, FulfillmentError, FulfillmentErrorCode, MismatchedProjectionTypes,
     PredicateObligation, SelectionError, TraitEngine,
@@ -65,13 +64,13 @@ impl<'tcx> TraitEngine<'tcx> for FulfillmentCtxt<'tcx> {
                         .evaluate_root_goal(obligation.clone().into(), GenerateProofTree::IfEnabled)
                         .0
                     {
-                        Ok((_, Certainty::Maybe(MaybeCause::Ambiguity), _)) => {
+                        Ok((_, Certainty::Maybe(MaybeCause::Ambiguity))) => {
                             FulfillmentErrorCode::Ambiguity { overflow: false }
                         }
-                        Ok((_, Certainty::Maybe(MaybeCause::Overflow), _)) => {
+                        Ok((_, Certainty::Maybe(MaybeCause::Overflow))) => {
                             FulfillmentErrorCode::Ambiguity { overflow: true }
                         }
-                        Ok((_, Certainty::Yes, _)) => {
+                        Ok((_, Certainty::Yes)) => {
                             bug!("did not expect successful goal when collecting ambiguity errors")
                         }
                         Err(_) => {
@@ -100,7 +99,7 @@ impl<'tcx> TraitEngine<'tcx> for FulfillmentCtxt<'tcx> {
             let mut has_changed = false;
             for obligation in mem::take(&mut self.obligations) {
                 let goal = obligation.clone().into();
-                let (changed, certainty, nested_goals) =
+                let (changed, certainty) =
                     match infcx.evaluate_root_goal(goal, GenerateProofTree::IfEnabled).0 {
                         Ok(result) => result,
                         Err(NoSolution) => {
@@ -159,16 +158,7 @@ impl<'tcx> TraitEngine<'tcx> for FulfillmentCtxt<'tcx> {
                             continue;
                         }
                     };
-                // Push any nested goals that we get from unifying our canonical response
-                // with our obligation onto the fulfillment context.
-                self.obligations.extend(nested_goals.into_iter().map(|goal| {
-                    Obligation::new(
-                        infcx.tcx,
-                        obligation.cause.clone(),
-                        goal.param_env,
-                        goal.predicate,
-                    )
-                }));
+
                 has_changed |= changed;
                 match certainty {
                     Certainty::Yes => {}

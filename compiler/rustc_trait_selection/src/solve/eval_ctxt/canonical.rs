@@ -191,22 +191,20 @@ impl<'tcx> EvalCtxt<'_, 'tcx> {
         param_env: ty::ParamEnv<'tcx>,
         original_values: Vec<ty::GenericArg<'tcx>>,
         response: CanonicalResponse<'tcx>,
-    ) -> Result<(Certainty, Vec<Goal<'tcx, ty::Predicate<'tcx>>>), NoSolution> {
+    ) -> Certainty {
         let substitution =
             Self::compute_query_response_substitution(self.infcx, &original_values, &response);
 
         let Response { var_values, external_constraints, certainty } =
             response.substitute(self.tcx(), &substitution);
 
-        let nested_goals =
-            Self::unify_query_var_values(self.infcx, param_env, &original_values, var_values)?;
+        Self::unify_query_var_values(self.infcx, param_env, &original_values, var_values);
 
         let ExternalConstraintsData { region_constraints, opaque_types } =
             external_constraints.deref();
         self.register_region_constraints(region_constraints);
-        self.register_opaque_types(param_env, opaque_types)?;
-
-        Ok((certainty, nested_goals))
+        self.register_new_opaque_types(param_env, opaque_types);
+        certainty
     }
 
     /// This returns the substitutions to instantiate the bound variables of
@@ -299,26 +297,61 @@ impl<'tcx> EvalCtxt<'_, 'tcx> {
         param_env: ty::ParamEnv<'tcx>,
         original_values: &[ty::GenericArg<'tcx>],
         var_values: CanonicalVarValues<'tcx>,
-    ) -> Result<Vec<Goal<'tcx, ty::Predicate<'tcx>>>, NoSolution> {
+    ) {
         assert_eq!(original_values.len(), var_values.len());
-
-        let mut nested_goals = vec![];
         for (&orig, response) in iter::zip(original_values, var_values.var_values) {
-            nested_goals.extend(
-                infcx
+            EvalCtxt::unify_var_value(infcx, param_env, orig, response);
+        }
+    }
+
+    fn unify_var_value(
+        infcx: &InferCtxt<'tcx>,
+        param_env: ty::ParamEnv<'tcx>,
+        orig: ty::GenericArg<'tcx>,
+        response: ty::GenericArg<'tcx>,
+    ) {
+        let orig = infcx.shallow_resolve(orig);
+        match (orig.unpack(), response.unpack()) {
+            (ty::GenericArgKind::Lifetime(orig), ty::GenericArgKind::Lifetime(response)) => {
+                let InferOk { value: (), obligations } = infcx
                     .at(&ObligationCause::dummy(), param_env)
                     .eq(DefineOpaqueTypes::No, orig, response)
-                    .map(|InferOk { value: (), obligations }| {
-                        obligations.into_iter().map(|o| Goal::from(o))
-                    })
-                    .map_err(|e| {
-                        debug!(?e, "failed to equate");
-                        NoSolution
-                    })?,
-            );
+                    .unwrap();
+                assert!(obligations.is_empty());
+            }
+            (ty::GenericArgKind::Type(orig), ty::GenericArgKind::Type(response)) => {
+                if let ty::Infer(ty::TyVar(orig)) = *orig.kind()
+                    && !response.is_ty_or_numeric_infer()
+                {
+                    infcx.inner.borrow_mut().type_variables().instantiate(orig, response);
+                } else {
+                    let InferOk { value: (), obligations } = infcx
+                        .at(&ObligationCause::dummy(), param_env)
+                        .eq(DefineOpaqueTypes::No, orig, response)
+                        .unwrap();
+                    assert!(obligations.is_empty());
+                }
+            }
+            (ty::GenericArgKind::Const(orig), ty::GenericArgKind::Const(response)) => {
+                if let ty::ConstKind::Infer(ty::InferConst::Var(orig)) = orig.kind()
+                    && !response.is_ct_infer()
+                {
+                    infcx.inner.borrow_mut().instantiate_const_var(orig, response);
+                } else {
+                    let InferOk { value: (), obligations } = infcx
+                        .at(&ObligationCause::dummy(), param_env)
+                        .eq(DefineOpaqueTypes::No, orig, response)
+                        .unwrap();
+                    assert!(obligations.is_empty());
+                }
+            }
+            (
+                ty::GenericArgKind::Lifetime(_)
+                | ty::GenericArgKind::Type(_)
+                | ty::GenericArgKind::Const(_),
+                _,
+            ) => unreachable!(),
         }
-
-        Ok(nested_goals)
     }
 
     fn register_region_constraints(&mut self, region_constraints: &QueryRegionConstraints<'tcx>) {
@@ -330,21 +363,17 @@ impl<'tcx> EvalCtxt<'_, 'tcx> {
             }
         }
 
-        for member_constraint in &region_constraints.member_constraints {
-            // FIXME: Deal with member constraints :<
-            let _ = member_constraint;
-        }
+        assert!(region_constraints.member_constraints.is_empty());
     }
 
-    fn register_opaque_types(
+    fn register_new_opaque_types(
         &mut self,
         param_env: ty::ParamEnv<'tcx>,
         opaque_types: &[(ty::OpaqueTypeKey<'tcx>, Ty<'tcx>)],
-    ) -> Result<(), NoSolution> {
+    ) {
         for &(key, ty) in opaque_types {
-            self.insert_hidden_type(key, param_env, ty)?;
+            self.insert_hidden_type(key, param_env, ty).unwrap();
         }
-        Ok(())
     }
 }
 
@@ -368,14 +397,13 @@ impl<'tcx> inspect::ProofTreeBuilder<'tcx> {
         param_env: ty::ParamEnv<'tcx>,
         original_values: &[ty::GenericArg<'tcx>],
         state: inspect::CanonicalState<'tcx, T>,
-    ) -> Result<(Vec<Goal<'tcx, ty::Predicate<'tcx>>>, T), NoSolution> {
+    ) -> T {
         let substitution =
             EvalCtxt::compute_query_response_substitution(infcx, original_values, &state);
 
         let inspect::State { var_values, data } = state.substitute(infcx.tcx, &substitution);
 
-        let nested_goals =
-            EvalCtxt::unify_query_var_values(infcx, param_env, original_values, var_values)?;
-        Ok((nested_goals, data))
+        EvalCtxt::unify_query_var_values(infcx, param_env, original_values, var_values);
+        data
     }
 }

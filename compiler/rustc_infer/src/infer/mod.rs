@@ -199,7 +199,12 @@ impl<'tcx> InferCtxtInner<'tcx> {
     }
 
     #[inline]
-    fn type_variables(&mut self) -> type_variable::TypeVariableTable<'_, 'tcx> {
+    pub fn instantiate_const_var(&mut self, var: ConstVid, value: ty::Const<'tcx>) {
+        self.const_unification_table().union_value(var, ConstVariableValue::Known { value })
+    }
+
+    #[inline]
+    pub fn type_variables(&mut self) -> type_variable::TypeVariableTable<'_, 'tcx> {
         self.type_variable_storage.with_log(&mut self.undo_log)
     }
 
