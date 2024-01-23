@@ -622,9 +622,9 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         })
     }
 
-    /// Evaluates the predicates in `predicates` recursively. Note that
-    /// this applies projections in the predicates, and therefore
-    /// is run within an inference probe.
+    /// Evaluates the predicates in `predicates` recursively. This may
+    /// guide inference. If this is not desired, run it inside of a
+    /// `probe`.
     #[instrument(skip(self, stack), level = "debug")]
     fn evaluate_predicates_recursively<'o, I>(
         &mut self,
@@ -1760,6 +1760,8 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             });
 
         if is_match {
+            
+
             let generics = self.tcx().generics_of(obligation.predicate.def_id);
             // FIXME(generic-associated-types): Addresses aggressive inference in #92917.
             // If this type is a GAT, and of the GAT args resolve to something new,
