@@ -1,16 +1,16 @@
-error[E0282]: type annotations needed
-  --> $DIR/recursive-coroutine-boxed.rs:10:23
+error[E0282]: type annotations needed for `Pin<Box<T>>`
+  --> $DIR/recursive-coroutine-boxed.rs:10:13
    |
 LL |         let mut gen = Box::pin(foo());
-   |                       ^^^^^^^^ cannot infer type of the type parameter `T` declared on the struct `Box`
+   |             ^^^^^^^
 ...
 LL |         let mut r = gen.as_mut().resume(());
    |                         ------ type must be known at this point
    |
-help: consider specifying the generic argument
+help: consider giving `gen` an explicit type, where the type for type parameter `T` is specified
    |
-LL |         let mut gen = Box::<T>::pin(foo());
-   |                          +++++
+LL |         let mut gen: Pin<Box<T>> = Box::pin(foo());
+   |                    +++++++++++++
 
 error[E0282]: type annotations needed
   --> $DIR/recursive-coroutine-boxed.rs:10:32

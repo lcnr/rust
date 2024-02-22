@@ -1,13 +1,13 @@
-error[E0282]: type annotations needed for `Option<T>`
-  --> $DIR/copy-guessing.rs:20:9
+error[E0282]: type annotations needed
+  --> $DIR/copy-guessing.rs:20:13
    |
 LL |     let n = None;
-   |         ^   ---- type must be known at this point
+   |             ^^^^ cannot infer type of the type parameter `T` declared on the enum `Option`
    |
-help: consider giving `n` an explicit type, where the type for type parameter `T` is specified
+help: consider specifying the generic argument
    |
-LL |     let n: Option<T> = None;
-   |          +++++++++++
+LL |     let n = None::<T>;
+   |                 +++++
 
 error: aborting due to 1 previous error
 

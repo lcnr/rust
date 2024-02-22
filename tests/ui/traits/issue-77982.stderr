@@ -18,30 +18,26 @@ LL |     opts.get::<Q>(opt.as_ref());
    |             +++++
 
 error[E0283]: type annotations needed
-  --> $DIR/issue-77982.rs:9:10
+  --> $DIR/issue-77982.rs:9:18
    |
 LL |     opts.get(opt.as_ref());
-   |          ^^^     ------ type must be known at this point
-   |          |
-   |          cannot infer type of the type parameter `Q` declared on the method `get`
+   |                  ^^^^^^
    |
    = note: multiple `impl`s satisfying `String: AsRef<_>` found in the following crates: `alloc`, `std`:
            - impl AsRef<OsStr> for String;
            - impl AsRef<Path> for String;
            - impl AsRef<[u8]> for String;
            - impl AsRef<str> for String;
-help: consider specifying the generic argument
+help: try using a fully qualified path to specify the expected types
    |
-LL |     opts.get::<Q>(opt.as_ref());
-   |             +++++
+LL |     opts.get(<String as AsRef<T>>::as_ref(&opt));
+   |              ++++++++++++++++++++++++++++++   ~
 
 error[E0283]: type annotations needed
-  --> $DIR/issue-77982.rs:14:59
+  --> $DIR/issue-77982.rs:14:44
    |
 LL |     let ips: Vec<_> = (0..100_000).map(|_| u32::from(0u32.into())).collect();
-   |                                            ---            ^^^^
-   |                                            |
-   |                                            type must be known at this point
+   |                                            ^^^ cannot infer type for type parameter `T` declared on the trait `From`
    |
    = note: multiple `impl`s satisfying `u32: From<_>` found in the `core` crate:
            - impl From<Char> for u32;
@@ -50,16 +46,12 @@ LL |     let ips: Vec<_> = (0..100_000).map(|_| u32::from(0u32.into())).collect(
            - impl From<char> for u32;
            - impl From<u16> for u32;
            - impl From<u8> for u32;
-help: try using a fully qualified path to specify the expected types
-   |
-LL |     let ips: Vec<_> = (0..100_000).map(|_| u32::from(<u32 as Into<T>>::into(0u32))).collect();
-   |                                                      +++++++++++++++++++++++    ~
 
-error[E0283]: type annotations needed for `Box<T>`
-  --> $DIR/issue-77982.rs:37:9
+error[E0283]: type annotations needed
+  --> $DIR/issue-77982.rs:37:16
    |
 LL |     let _ = ().foo();
-   |         ^      --- type must be known at this point
+   |                ^^^
    |
 note: multiple `impl`s satisfying `(): Foo<'_, _>` found
   --> $DIR/issue-77982.rs:30:1
@@ -68,16 +60,16 @@ LL | impl Foo<'static, u32> for () {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 LL | impl<'a> Foo<'a, i16> for () {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-help: consider giving this pattern a type, where the type for type parameter `T` is specified
+help: try using a fully qualified path to specify the expected types
    |
-LL |     let _: Box<T> = ().foo();
-   |          ++++++++
+LL |     let _ = <() as Foo<'_, T>>::foo(&());
+   |             +++++++++++++++++++++++++  ~
 
-error[E0283]: type annotations needed for `Box<T>`
-  --> $DIR/issue-77982.rs:41:9
+error[E0283]: type annotations needed
+  --> $DIR/issue-77982.rs:41:19
    |
 LL |     let _ = (&()).bar();
-   |         ^         --- type must be known at this point
+   |                   ^^^
    |
 note: multiple `impl`s satisfying `&(): Bar<'_, _>` found
   --> $DIR/issue-77982.rs:33:1
@@ -86,10 +78,10 @@ LL | impl<'a> Bar<'static, u32> for &'a () {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 LL | impl<'a> Bar<'a, i16> for &'a () {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-help: consider giving this pattern a type, where the type for type parameter `T` is specified
+help: try using a fully qualified path to specify the expected types
    |
-LL |     let _: Box<T> = (&()).bar();
-   |          ++++++++
+LL |     let _ = <&() as Bar<'_, T>>::bar(&(&()));
+   |             ++++++++++++++++++++++++++     ~
 
 error: aborting due to 5 previous errors
 

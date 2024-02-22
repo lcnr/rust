@@ -12,16 +12,12 @@ LL |     x = |c| c + 1;
    = help: consider boxing your closure and/or using it as a trait object
 
 error[E0284]: type annotations needed
-  --> $DIR/issue-24036.rs:9:15
+  --> $DIR/issue-24036.rs:9:20
    |
 LL |         1 => |c| c + 1,
-   |               ^    - type must be known at this point
+   |                    ^ cannot infer type
    |
    = note: cannot satisfy `<_ as Add<i32>>::Output == _`
-help: consider giving this closure parameter an explicit type
-   |
-LL |         1 => |c: /* Type */| c + 1,
-   |                ++++++++++++
 
 error: aborting due to 2 previous errors
 

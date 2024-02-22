@@ -37,27 +37,21 @@ help: you might have meant to end the type parameters here
 LL |   let v : Vec<'a> = vec![];
    |                 +
 
-error[E0282]: type annotations needed for `Vec<_>`
-  --> $DIR/missing-closing-angle-bracket-eq-constraint.rs:7:7
+error[E0282]: type annotations needed
+  --> $DIR/missing-closing-angle-bracket-eq-constraint.rs:7:25
    |
 LL |   let v : Vec<(u32,_) = vec![];
-   |       ^                 ------ type must be known at this point
+   |                         ^^^^^^ cannot infer type
    |
-help: consider giving `v` an explicit type, where the placeholders `_` are specified
-   |
-LL |   let v: Vec<_> : Vec<(u32,_) = vec![];
-   |        ++++++++
+   = note: this error originates in the macro `vec` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0282]: type annotations needed for `Vec<_>`
-  --> $DIR/missing-closing-angle-bracket-eq-constraint.rs:18:7
+error[E0282]: type annotations needed
+  --> $DIR/missing-closing-angle-bracket-eq-constraint.rs:18:20
    |
 LL |   let v : Vec<'a = vec![];
-   |       ^            ------ type must be known at this point
+   |                    ^^^^^^ cannot infer type
    |
-help: consider giving `v` an explicit type, where the placeholders `_` are specified
-   |
-LL |   let v: Vec<_> : Vec<'a = vec![];
-   |        ++++++++
+   = note: this error originates in the macro `vec` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: aborting due to 5 previous errors
 

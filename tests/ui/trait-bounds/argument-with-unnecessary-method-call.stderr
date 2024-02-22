@@ -1,8 +1,8 @@
 error[E0283]: type annotations needed
-  --> $DIR/argument-with-unnecessary-method-call.rs:8:13
+  --> $DIR/argument-with-unnecessary-method-call.rs:8:9
    |
 LL |     qux(Bar.into());
-   |     ---     ^^^^
+   |     --- ^^^^^^^^^^ cannot infer type for type parameter `impl From<Bar>` declared on the function `qux`
    |     |
    |     required by a bound introduced by this call
    |
@@ -12,10 +12,6 @@ note: required by a bound in `qux`
    |
 LL | fn qux(_: impl From<Bar>) {}
    |                ^^^^^^^^^ required by this bound in `qux`
-help: try using a fully qualified path to specify the expected types
-   |
-LL |     qux(<Bar as Into<T>>::into(Bar));
-   |         +++++++++++++++++++++++   ~
 help: consider removing this method call, as the receiver has type `Bar` and `Bar: From<Bar>` trivially holds
    |
 LL -     qux(Bar.into());

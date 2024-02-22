@@ -1,16 +1,13 @@
-error[E0282]: type annotations needed for `Result<(), E>`
-  --> $DIR/cannot-infer-closure-circular.rs:7:14
+error[E0282]: type annotations needed
+  --> $DIR/cannot-infer-closure-circular.rs:9:9
    |
-LL |     let x = |r| {
-   |              ^
-LL |         let v = r?;
 LL |         Ok(v)
-   |         ----- type must be known at this point
+   |         ^^ cannot infer type of the type parameter `E` declared on the enum `Result`
    |
-help: consider giving this closure parameter an explicit type, where the type for type parameter `E` is specified
+help: consider specifying the generic arguments
    |
-LL |     let x = |r: Result<(), E>| {
-   |               +++++++++++++++
+LL |         Ok::<(), E>(v)
+   |           +++++++++
 
 error: aborting due to 1 previous error
 

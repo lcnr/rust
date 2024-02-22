@@ -4,16 +4,11 @@ error: defaults for type parameters are only allowed in `struct`, `enum`, `type`
 LL | const NONE<T = ()>: Option<T> = None::<T>;
    |            ^^^^^^
 
-error[E0282]: type annotations needed for `Option<T>`
-  --> $DIR/parameter-defaults.rs:13:9
+error[E0282]: type annotations needed
+  --> $DIR/parameter-defaults.rs:13:13
    |
 LL |     let _ = NONE;
-   |         ^   ---- type must be known at this point
-   |
-help: consider giving this pattern a type, where the type for type parameter `T` is specified
-   |
-LL |     let _: Option<T> = NONE;
-   |          +++++++++++
+   |             ^^^^ cannot infer type for type parameter `T` declared on the constant `NONE`
 
 error: aborting due to 2 previous errors
 
