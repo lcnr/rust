@@ -1,12 +1,7 @@
+//~ ERROR expected generic lifetime parameter, found `'_`
 #![feature(type_alias_impl_trait)]
 
 //@ edition:2021
-//@ compile-flags:-Z treat-err-as-bug=2
-//@ error-pattern: due to `-Z treat-err-as-bug=2
-//@ failure-status:101
-//@ normalize-stderr-test ".*note: .*\n\n" -> ""
-//@ normalize-stderr-test "thread 'rustc' panicked.*:\n.*\n" -> ""
-//@ rustc-env:RUST_BACKTRACE=0
 
 use std::future::Future;
 
@@ -29,6 +24,7 @@ struct Context {
 type TransactionResult<O> = Result<O, ()>;
 
 type TransactionFuture<'__, O> = impl '__ + Future<Output = TransactionResult<O>>;
+//~^ ERROR unconstrained opaque type
 
 fn execute_transaction_fut<'f, F, O>(
     f: F,
@@ -37,6 +33,7 @@ where
     F: FnOnce(&mut dyn Transaction) -> TransactionFuture<'_, O> + 'f
 {
     f
+    //~^ ERROR expected generic lifetime parameter, found `'_`
 }
 
 impl Context {

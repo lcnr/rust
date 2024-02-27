@@ -164,6 +164,10 @@ impl<'me, 'bccx, 'tcx> NllTypeRelating<'me, 'bccx, 'tcx> {
         let obligations =
             infcx.handle_opaque_type(a, b, true, &cause, self.param_env())?.obligations;
         self.register_obligations(obligations);
+        self.register_predicates([
+            ty::ClauseKind::WellFormed(a.into()),
+            ty::ClauseKind::WellFormed(b.into()),
+        ]);
         Ok(())
     }
 
@@ -586,6 +590,10 @@ impl<'bccx, 'tcx> ObligationEmittingRelation<'tcx> for NllTypeRelating<'_, 'bccx
     }
 
     fn register_type_relate_obligation(&mut self, a: Ty<'tcx>, b: Ty<'tcx>) {
+        self.register_predicates([
+            ty::ClauseKind::WellFormed(a.into()),
+            ty::ClauseKind::WellFormed(b.into()),
+        ]);
         self.register_predicates([ty::Binder::dummy(match self.ambient_variance {
             ty::Variance::Covariant => ty::PredicateKind::AliasRelate(
                 a.into(),
