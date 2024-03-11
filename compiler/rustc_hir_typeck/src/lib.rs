@@ -210,6 +210,12 @@ fn typeck_with_fallback<'tcx>(
 
         // Compute the function signature from point of view of inside the fn.
         let fn_sig = tcx.liberate_late_bound_regions(def_id.to_def_id(), fn_sig);
+        for (idx, ty) in fn_sig.inputs_and_output.iter().enumerate() {
+            let span =
+                decl.inputs.get(idx).map_or(decl.output.span(), |arg: &hir::Ty<'_>| arg.span);
+            let loc = Some(WellFormedLoc::Param { function: def_id, param_idx: idx as u16 });
+            fcx.register_wf_obligation(ty.into(), span, ObligationCauseCode::WellFormed(loc));
+        }
         let fn_sig = fcx.normalize(body.value.span, fn_sig);
 
         check_fn(&mut fcx, fn_sig, None, decl, def_id, body, tcx.features().unsized_fn_params);
@@ -252,10 +258,9 @@ fn typeck_with_fallback<'tcx>(
         };
         let expected_type = expected_type.unwrap_or_else(fallback);
 
-        let expected_type = fcx.normalize(body.value.span, expected_type);
-
         let wf_code = ObligationCauseCode::WellFormed(Some(WellFormedLoc::Ty(def_id)));
         fcx.register_wf_obligation(expected_type.into(), body.value.span, wf_code);
+        let expected_type = fcx.normalize(body.value.span, expected_type);
 
         fcx.require_type_is_sized(expected_type, body.value.span, traits::ConstSized);
 

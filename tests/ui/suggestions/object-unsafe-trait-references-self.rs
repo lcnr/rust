@@ -6,10 +6,14 @@ trait Trait {
     //~| ERROR the size for values of type `Self` cannot be known
 }
 
-fn bar(x: &dyn Trait) {} //~ ERROR the trait `Trait` cannot be made into an object
+fn bar(x: &dyn Trait) {}
+//~^ ERROR the trait `Trait` cannot be made into an object
+//~| ERROR the trait `Trait` cannot be made into an object
 
 trait Other: Sized {}
 
-fn foo(x: &dyn Other) {} //~ ERROR the trait `Other` cannot be made into an object
+fn foo(x: &dyn Other) {}
+//~^ ERROR the trait `Other` cannot be made into an object
+//~| ERROR the trait `Other` cannot be made into an object
 
 fn main() {}

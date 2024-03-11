@@ -14,5 +14,23 @@ LL | fn needs_evaluatable_bound_alias<T, const N: usize>() -> FooAlias<N>
    |
    = help: try adding a `where` bound using this expression: `where [(); { N + 1 }]:`
 
-error: aborting due to 2 previous errors
+error: unconstrained generic constant
+  --> $DIR/generic-expr-default.rs:5:54
+   |
+LL | pub fn needs_evaluatable_bound<const N1: usize>() -> Foo<N1> {
+   |                                                      ^^^^^^^
+   |
+   = help: try adding a `where` bound using this expression: `where [(); { N + 1 }]:`
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error: unconstrained generic constant
+  --> $DIR/generic-expr-default.rs:14:58
+   |
+LL | fn needs_evaluatable_bound_alias<T, const N: usize>() -> FooAlias<N>
+   |                                                          ^^^^^^^^^^^
+   |
+   = help: try adding a `where` bound using this expression: `where [(); { N + 1 }]:`
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error: aborting due to 4 previous errors
 

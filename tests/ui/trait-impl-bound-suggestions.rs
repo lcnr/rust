@@ -13,6 +13,7 @@ struct ConstrainedStruct<X: Copy> {
 trait InsufficientlyConstrainedGeneric<X=()> where Self: Sized {
     fn return_the_constrained_type(&self, x: X) -> ConstrainedStruct<X> {
         //~^ ERROR the trait bound `X: Copy` is not satisfied
+        //~| ERROR the trait bound `X: Copy` is not satisfied
         ConstrainedStruct { x }
         //~^ ERROR the trait bound `X: Copy` is not satisfied
     }
@@ -23,6 +24,7 @@ trait InsufficientlyConstrainedGeneric<X=()> where Self: Sized {
 trait InsufficientlyConstrainedGenericWithEmptyWhere<X=()> where Self: Sized {
     fn return_the_constrained_type(&self, x: X) -> ConstrainedStruct<X> {
         //~^ ERROR the trait bound `X: Copy` is not satisfied
+        //~| ERROR the trait bound `X: Copy` is not satisfied
         ConstrainedStruct { x }
         //~^ ERROR the trait bound `X: Copy` is not satisfied
     }

@@ -1,8 +1,8 @@
 error[E0277]: the trait bound `impl FnMut(&mut Self): Allocator` is not satisfied
-  --> $DIR/could-not-resolve-issue-121503.rs:6:5
+  --> $DIR/could-not-resolve-issue-121503.rs:6:35
    |
 LL |     async fn box_ref_Struct(self: Box<Self, impl FnMut(&mut Self)>) -> &u32 {
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Allocator` is not implemented for `impl FnMut(&mut Self)`
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Allocator` is not implemented for `impl FnMut(&mut Self)`
    |
 note: required by a bound in `Box`
   --> $SRC_DIR/alloc/src/boxed.rs:LL:COL

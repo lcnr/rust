@@ -78,6 +78,23 @@ help: this trait has no implementations, consider adding one
 LL | pub trait Foo: NotFoo {
    | ^^^^^^^^^^^^^^^^^^^^^
 
+error[E0277]: the trait bound `(): NotFoo` is not satisfied
+  --> $DIR/issue-59324.rs:23:29
+   |
+LL | fn with_factory<H>(factory: dyn ThriftService<()>) {}
+   |                             ^^^^^^^^^^^^^^^^^^^^^ the trait `NotFoo` is not implemented for `()`
+   |
+help: this trait has no implementations, consider adding one
+  --> $DIR/issue-59324.rs:1:1
+   |
+LL | trait NotFoo {}
+   | ^^^^^^^^^^^^
+note: required by a bound in `Foo`
+  --> $DIR/issue-59324.rs:3:16
+   |
+LL | pub trait Foo: NotFoo {
+   |                ^^^^^^ required by this bound in `Foo`
+
 error[E0277]: the size for values of type `(dyn ThriftService<(), AssocType = _> + 'static)` cannot be known at compilation time
   --> $DIR/issue-59324.rs:23:20
    |
@@ -95,6 +112,6 @@ help: function arguments must have a statically known size, borrowed types alway
 LL | fn with_factory<H>(factory: &dyn ThriftService<()>) {}
    |                             +
 
-error: aborting due to 7 previous errors
+error: aborting due to 8 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

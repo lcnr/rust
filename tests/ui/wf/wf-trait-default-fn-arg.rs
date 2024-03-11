@@ -5,11 +5,12 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-struct Bar<T:Eq+?Sized> { value: Box<T> }
+struct Bar<T: Eq + ?Sized> { value: Box<T> }
 
 trait Foo {
     fn bar(&self, x: &Bar<Self>) {
-        //~^ ERROR E0277
+        //~^ ERROR the trait bound `Self: Eq` is not satisfied 
+        //~| ERROR the trait bound `Self: Eq` is not satisfied 
         //
         // Here, Eq ought to be implemented.
     }

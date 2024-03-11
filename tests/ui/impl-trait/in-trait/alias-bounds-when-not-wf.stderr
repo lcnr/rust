@@ -13,5 +13,13 @@ error: the type `W<A<usize>>` is not well-formed
 LL | fn hello(_: W<A<usize>>) {}
    |             ^^^^^^^^^^^
 
-error: aborting due to 1 previous error; 1 warning emitted
+error: the type `W<A<usize>>` is not well-formed
+  --> $DIR/alias-bounds-when-not-wf.rs:16:13
+   |
+LL | fn hello(_: W<A<usize>>) {}
+   |             ^^^^^^^^^^^
+   |
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error: aborting due to 2 previous errors; 1 warning emitted
 

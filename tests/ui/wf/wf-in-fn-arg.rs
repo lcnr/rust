@@ -7,8 +7,9 @@ struct MustBeCopy<T:Copy> {
     t: T
 }
 
-fn bar<T>(_: &MustBeCopy<T>) //~ ERROR E0277
-{
+fn bar<T>(_: &MustBeCopy<T>) {
+    //~^ ERROR E0277
+    //~| ERROR E0277
 }
 
 fn main() { }

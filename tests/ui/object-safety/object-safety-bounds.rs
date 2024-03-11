@@ -6,6 +6,7 @@ trait X {
 
 fn f() -> Box<dyn X<U = u32>> {
     //~^ ERROR the trait `X` cannot be made into an object
+    //~| ERROR the trait `X` cannot be made into an object
     loop {}
 }
 
