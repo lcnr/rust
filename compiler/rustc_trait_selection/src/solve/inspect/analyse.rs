@@ -188,9 +188,14 @@ impl<'a, 'tcx> InspectCandidate<'a, 'tcx> {
                     };
                     let goal =
                         goal.with(infcx.tcx, ty::NormalizesTo { alias, term: unconstrained_term });
-                    let proof_tree = EvalCtxt::enter_root(infcx, GenerateProofTree::Yes, |ecx| {
-                        ecx.evaluate_goal_raw(GoalEvaluationKind::Root, GoalSource::Misc, goal)
-                    })
+                    let proof_tree = EvalCtxt::enter_root(
+                        infcx,
+                        Default::default(),
+                        GenerateProofTree::Yes,
+                        |ecx| {
+                            ecx.evaluate_goal_raw(GoalEvaluationKind::Root, GoalSource::Misc, goal)
+                        },
+                    )
                     .1;
                     InspectGoal::new(
                         infcx,
@@ -202,7 +207,10 @@ impl<'a, 'tcx> InspectCandidate<'a, 'tcx> {
                 _ => InspectGoal::new(
                     infcx,
                     self.goal.depth + 1,
-                    infcx.evaluate_root_goal(goal, GenerateProofTree::Yes).1.unwrap(),
+                    infcx
+                        .evaluate_root_goal(goal, Default::default(), GenerateProofTree::Yes)
+                        .1
+                        .unwrap(),
                     None,
                 ),
             })
@@ -367,7 +375,8 @@ impl<'tcx> InferCtxt<'tcx> {
         goal: Goal<'tcx, ty::Predicate<'tcx>>,
         visitor: &mut V,
     ) -> V::Result {
-        let (_, proof_tree) = self.evaluate_root_goal(goal, GenerateProofTree::Yes);
+        let (_, proof_tree) =
+            self.evaluate_root_goal(goal, Default::default(), GenerateProofTree::Yes);
         let proof_tree = proof_tree.unwrap();
         visitor.visit_goal(&InspectGoal::new(self, 0, proof_tree, None))
     }

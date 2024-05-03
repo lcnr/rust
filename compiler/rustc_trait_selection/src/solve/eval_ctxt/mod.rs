@@ -132,6 +132,13 @@ pub enum GenerateProofTree {
     Never,
 }
 
+#[derive(Default, PartialEq, Eq, Debug, Hash, HashStable, Clone, Copy)]
+pub enum WithTinyRecursionLimit {
+    Yes,
+    #[default]
+    No,
+}
+
 #[extension(pub trait InferCtxtEvalExt<'tcx>)]
 impl<'tcx> InferCtxt<'tcx> {
     /// Evaluates a goal from **outside** of the trait solver.
@@ -142,9 +149,10 @@ impl<'tcx> InferCtxt<'tcx> {
     fn evaluate_root_goal(
         &self,
         goal: Goal<'tcx, ty::Predicate<'tcx>>,
+        with_tiny_recursion_limit: WithTinyRecursionLimit,
         generate_proof_tree: GenerateProofTree,
     ) -> (Result<(bool, Certainty), NoSolution>, Option<inspect::GoalEvaluation<'tcx>>) {
-        EvalCtxt::enter_root(self, generate_proof_tree, |ecx| {
+        EvalCtxt::enter_root(self, with_tiny_recursion_limit, generate_proof_tree, |ecx| {
             ecx.evaluate_goal(GoalEvaluationKind::Root, GoalSource::Misc, goal)
         })
     }
@@ -164,11 +172,12 @@ impl<'a, 'tcx> EvalCtxt<'a, 'tcx> {
     /// over using this manually (such as [`InferCtxtEvalExt::evaluate_root_goal`]).
     pub(super) fn enter_root<R>(
         infcx: &InferCtxt<'tcx>,
+        with_tiny_recursion_limit: WithTinyRecursionLimit,
         generate_proof_tree: GenerateProofTree,
         f: impl FnOnce(&mut EvalCtxt<'_, 'tcx>) -> R,
     ) -> (R, Option<inspect::GoalEvaluation<'tcx>>) {
         let mode = if infcx.intercrate { SolverMode::Coherence } else { SolverMode::Normal };
-        let mut search_graph = search_graph::SearchGraph::new(mode);
+        let mut search_graph = search_graph::SearchGraph::new(mode, with_tiny_recursion_limit);
 
         let mut ecx = EvalCtxt {
             infcx,

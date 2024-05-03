@@ -3,6 +3,7 @@ use crate::solve::FIXPOINT_STEP_LIMIT;
 use super::inspect;
 use super::inspect::ProofTreeBuilder;
 use super::SolverMode;
+use super::WithTinyRecursionLimit;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_data_structures::fx::FxHashSet;
 use rustc_index::Idx;
@@ -100,6 +101,7 @@ impl<'tcx> ProvisionalCacheEntry<'tcx> {
 
 pub(super) struct SearchGraph<'tcx> {
     mode: SolverMode,
+    with_tiny_recursion_limit: WithTinyRecursionLimit,
     /// The stack of goals currently being computed.
     ///
     /// An element is *deeper* in the stack if its index is *lower*.
@@ -116,9 +118,13 @@ pub(super) struct SearchGraph<'tcx> {
 }
 
 impl<'tcx> SearchGraph<'tcx> {
-    pub(super) fn new(mode: SolverMode) -> SearchGraph<'tcx> {
+    pub(super) fn new(
+        mode: SolverMode,
+        with_tiny_recursion_limit: WithTinyRecursionLimit,
+    ) -> SearchGraph<'tcx> {
         Self {
             mode,
+            with_tiny_recursion_limit,
             stack: Default::default(),
             provisional_cache: Default::default(),
             cycle_participants: Default::default(),
@@ -182,6 +188,7 @@ impl<'tcx> SearchGraph<'tcx> {
     /// in case there is exponential blowup.
     fn allowed_depth_for_nested(
         tcx: TyCtxt<'tcx>,
+        with_tiny_recursion_limit: WithTinyRecursionLimit,
         stack: &IndexVec<StackDepth, StackEntry<'tcx>>,
     ) -> Option<Limit> {
         if let Some(last) = stack.raw.last() {
@@ -195,7 +202,10 @@ impl<'tcx> SearchGraph<'tcx> {
                 Limit(last.available_depth.0 - 1)
             })
         } else {
-            Some(tcx.recursion_limit())
+            Some(match with_tiny_recursion_limit {
+                WithTinyRecursionLimit::Yes => Limit(tcx.recursion_limit().0.min(5)),
+                WithTinyRecursionLimit::No => tcx.recursion_limit(),
+            })
         }
     }
 
@@ -257,7 +267,9 @@ impl<'tcx> SearchGraph<'tcx> {
         mut prove_goal: impl FnMut(&mut Self, &mut ProofTreeBuilder<'tcx>) -> QueryResult<'tcx>,
     ) -> QueryResult<'tcx> {
         // Check for overflow.
-        let Some(available_depth) = Self::allowed_depth_for_nested(tcx, &self.stack) else {
+        let Some(available_depth) =
+            Self::allowed_depth_for_nested(tcx, self.with_tiny_recursion_limit, &self.stack)
+        else {
             if let Some(last) = self.stack.raw.last_mut() {
                 last.encountered_overflow = true;
             }

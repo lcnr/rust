@@ -10,6 +10,7 @@ use rustc_middle::ty;
 use rustc_middle::ty::error::{ExpectedFound, TypeError};
 
 use super::eval_ctxt::GenerateProofTree;
+use super::WithTinyRecursionLimit;
 use super::{Certainty, InferCtxtEvalExt};
 
 /// A trait engine using the new trait solver.
@@ -74,7 +75,9 @@ impl<'tcx> ObligationStorage<'tcx> {
             // change.
             self.overflowed.extend(self.pending.extract_if(|o| {
                 let goal = o.clone().into();
-                let result = infcx.evaluate_root_goal(goal, GenerateProofTree::Never).0;
+                let result = infcx
+                    .evaluate_root_goal(goal, WithTinyRecursionLimit::No, GenerateProofTree::Never)
+                    .0;
                 match result {
                     Ok((has_changed, _)) => has_changed,
                     _ => false,
@@ -151,10 +154,17 @@ impl<'tcx> TraitEngine<'tcx> for FulfillmentCtxt<'tcx> {
                 return errors;
             }
 
+            let with_tiny_recursion_limit =
+                if i == 0 { WithTinyRecursionLimit::Yes } else { WithTinyRecursionLimit::No };
+
             let mut has_changed = false;
             for obligation in self.obligations.unstalled_for_select() {
                 let goal = obligation.clone().into();
-                let result = infcx.evaluate_root_goal(goal, GenerateProofTree::IfEnabled).0;
+                let (result, _) = infcx.evaluate_root_goal(
+                    goal,
+                    with_tiny_recursion_limit,
+                    GenerateProofTree::IfEnabled,
+                );
                 self.inspect_evaluated_obligation(infcx, &obligation, &result);
                 let (changed, certainty) = match result {
                     Ok(result) => result,
@@ -242,7 +252,14 @@ fn fulfillment_error_for_stalled<'tcx>(
     obligation: PredicateObligation<'tcx>,
 ) -> FulfillmentError<'tcx> {
     let code = infcx.probe(|_| {
-        match infcx.evaluate_root_goal(obligation.clone().into(), GenerateProofTree::Never).0 {
+        match infcx
+            .evaluate_root_goal(
+                obligation.clone().into(),
+                WithTinyRecursionLimit::No,
+                GenerateProofTree::Never,
+            )
+            .0
+        {
             Ok((_, Certainty::Maybe(MaybeCause::Ambiguity))) => {
                 FulfillmentErrorCode::Ambiguity { overflow: None }
             }
