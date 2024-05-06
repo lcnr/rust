@@ -187,6 +187,14 @@ impl<'tcx> assembly::GoalKind<'tcx> for NormalizesTo<'tcx> {
             let impl_trait_ref = impl_trait_header.trait_ref.instantiate(tcx, impl_args);
 
             ecx.eq(goal.param_env, goal_trait_ref, impl_trait_ref)?;
+            if ecx.next_trait_solver_coinductive() {
+                let item_bounds = tcx
+                    .implied_predicates_of(impl_trait_ref.def_id)
+                    .instantiate(tcx, impl_trait_ref.args)
+                    .into_iter()
+                    .map(|(pred, _)| goal.with(tcx, pred));
+                ecx.add_goals(GoalSource::Misc, item_bounds);
+            }
 
             let where_clause_bounds = tcx
                 .predicates_of(impl_def_id)

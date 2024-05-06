@@ -2636,6 +2636,11 @@ impl<'tcx> TyCtxt<'tcx> {
         self.intrinsic_raw(def_id)
     }
 
+    /// Whether to use the new coinduction semantics of the new trait solver.
+    pub fn next_trait_solver_coinductive(self) -> bool {
+        self.sess.opts.unstable_opts.next_solver.map_or(false, |c| c.coinductive)
+    }
+
     pub fn next_trait_solver_globally(self) -> bool {
         self.sess.opts.unstable_opts.next_solver.map_or(false, |c| c.globally)
     }

@@ -786,6 +786,11 @@ pub struct NextSolverConfig {
     /// Whether the new trait solver should be enabled everywhere.
     /// This is only `true` if `coherence` is also enabled.
     pub globally: bool,
+    /// Whether to use the new coinduction semantics of trait solver
+    /// cycles. This considers more goals to hold by considering all
+    /// cycles stepping into impl where-bounds to be coinductive,
+    /// regardless of other cycle participants.
+    pub coinductive: bool,
     /// Whether to dump proof trees after computing a proof tree.
     pub dump_tree: DumpSolverProofTree,
 }

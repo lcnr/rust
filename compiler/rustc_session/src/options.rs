@@ -1055,16 +1055,20 @@ mod parse {
         slot: &mut Option<NextSolverConfig>,
         v: Option<&str>,
     ) -> bool {
+        let mut coherence = false;
+        let mut globally = true;
+        let mut coinductive = false;
+        let mut dump_tree = None;
         if let Some(config) = v {
-            let mut coherence = false;
-            let mut globally = true;
-            let mut dump_tree = None;
             for c in config.split(',') {
                 match c {
                     "globally" => globally = true,
                     "coherence" => {
                         globally = false;
                         coherence = true;
+                    }
+                    "coinductive" => {
+                        coinductive = true;
                     }
                     "dump-tree" => {
                         if dump_tree.replace(DumpSolverProofTree::Always).is_some() {
@@ -1079,20 +1083,14 @@ mod parse {
                     _ => return false,
                 }
             }
-
-            *slot = Some(NextSolverConfig {
-                coherence: coherence || globally,
-                globally,
-                dump_tree: dump_tree.unwrap_or_default(),
-            });
-        } else {
-            *slot = Some(NextSolverConfig {
-                coherence: true,
-                globally: true,
-                dump_tree: Default::default(),
-            });
         }
 
+        *slot = Some(NextSolverConfig {
+            coherence: coherence || globally,
+            globally,
+            coinductive,
+            dump_tree: dump_tree.unwrap_or_default(),
+        });
         true
     }
 

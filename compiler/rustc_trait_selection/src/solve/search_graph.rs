@@ -9,10 +9,11 @@ use rustc_index::Idx;
 use rustc_index::IndexVec;
 use rustc_middle::dep_graph::dep_kinds;
 use rustc_middle::traits::solve::CacheData;
+use rustc_middle::traits::solve::GoalSource;
 use rustc_middle::traits::solve::{CanonicalInput, Certainty, EvaluationCache, QueryResult};
 use rustc_middle::ty::TyCtxt;
 use rustc_session::Limit;
-use std::mem;
+use std::{iter, mem};
 
 rustc_index::newtype_index! {
     #[orderable]
@@ -33,6 +34,11 @@ bitflags::bitflags! {
 #[derive(Debug)]
 struct StackEntry<'tcx> {
     input: CanonicalInput<'tcx>,
+
+    /// Why we're proving this goal on the stack. This is used
+    /// by `-Znext-solver=coinductive` to decide whether a cycle
+    /// is coinductive.
+    goal_source: GoalSource,
 
     available_depth: Limit,
 
@@ -203,10 +209,22 @@ impl<'tcx> SearchGraph<'tcx> {
         tcx: TyCtxt<'tcx>,
         stack: &IndexVec<StackDepth, StackEntry<'tcx>>,
         head: StackDepth,
+        cycle_leaf_source: GoalSource,
     ) -> bool {
-        stack.raw[head.index()..]
-            .iter()
-            .all(|entry| entry.input.value.goal.predicate.is_coinductive(tcx))
+        let mut cycle_participants = stack.raw[head.index()..].iter();
+        if tcx.next_trait_solver_coinductive() {
+            // TODO: test
+            // We skip the goal source of the cycle head as
+            // it doesn't matter how we enter a cycle, it only
+            // matters how the cycle is closed.
+            cycle_participants
+                .skip(1)
+                .map(|entry| entry.goal_source)
+                .chain(iter::once(cycle_leaf_source))
+                .any(|source| source.is_coinductive_step())
+        } else {
+            cycle_participants.all(|entry| entry.input.value.goal.predicate.is_coinductive(tcx))
+        }
     }
 
     // When encountering a solver cycle, the result of the current goal
@@ -253,6 +271,7 @@ impl<'tcx> SearchGraph<'tcx> {
         &mut self,
         tcx: TyCtxt<'tcx>,
         input: CanonicalInput<'tcx>,
+        goal_source: GoalSource,
         inspect: &mut ProofTreeBuilder<'tcx>,
         mut prove_goal: impl FnMut(&mut Self, &mut ProofTreeBuilder<'tcx>) -> QueryResult<'tcx>,
     ) -> QueryResult<'tcx> {
@@ -307,12 +326,11 @@ impl<'tcx> SearchGraph<'tcx> {
         if let Some(entry) = cache_entry
             .with_coinductive_stack
             .as_ref()
-            .filter(|p| Self::stack_coinductive_from(tcx, &self.stack, p.head))
+            .filter(|p| Self::stack_coinductive_from(tcx, &self.stack, p.head, goal_source))
             .or_else(|| {
-                cache_entry
-                    .with_inductive_stack
-                    .as_ref()
-                    .filter(|p| !Self::stack_coinductive_from(tcx, &self.stack, p.head))
+                cache_entry.with_inductive_stack.as_ref().filter(|p| {
+                    !Self::stack_coinductive_from(tcx, &self.stack, p.head, goal_source)
+                })
             })
         {
             // We have a nested goal which is already in the provisional cache, use
@@ -336,7 +354,8 @@ impl<'tcx> SearchGraph<'tcx> {
             // Finally we can return either the provisional response or the initial response
             // in case we're in the first fixpoint iteration for this goal.
             inspect.goal_evaluation_kind(inspect::WipCanonicalGoalEvaluationKind::CycleInStack);
-            let is_coinductive_cycle = Self::stack_coinductive_from(tcx, &self.stack, stack_depth);
+            let is_coinductive_cycle =
+                Self::stack_coinductive_from(tcx, &self.stack, stack_depth, goal_source);
             let usage_kind = if is_coinductive_cycle {
                 HasBeenUsed::COINDUCTIVE_CYCLE
             } else {
@@ -363,6 +382,7 @@ impl<'tcx> SearchGraph<'tcx> {
             let depth = self.stack.next_index();
             let entry = StackEntry {
                 input,
+                goal_source,
                 available_depth,
                 reached_depth: depth,
                 non_root_cycle_participant: None,
@@ -449,7 +469,8 @@ impl<'tcx> SearchGraph<'tcx> {
         // do not remove it from the provisional cache and update its provisional result.
         // We only add the root of cycles to the global cache.
         if let Some(head) = final_entry.non_root_cycle_participant {
-            let coinductive_stack = Self::stack_coinductive_from(tcx, &self.stack, head);
+            let coinductive_stack =
+                Self::stack_coinductive_from(tcx, &self.stack, head, goal_source);
 
             let entry = self.provisional_cache.get_mut(&input).unwrap();
             entry.stack_depth = None;

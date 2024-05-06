@@ -156,6 +156,10 @@ impl<'a, 'tcx> EvalCtxt<'a, 'tcx> {
         self.search_graph.solver_mode()
     }
 
+    pub(super) fn next_trait_solver_coinductive(&self) -> bool {
+        self.infcx.tcx.next_trait_solver_coinductive()
+    }
+
     pub(super) fn set_is_normalizes_to_goal(&mut self) {
         self.is_normalizes_to_goal = true;
     }
@@ -283,6 +287,7 @@ impl<'a, 'tcx> EvalCtxt<'a, 'tcx> {
         tcx: TyCtxt<'tcx>,
         search_graph: &'a mut search_graph::SearchGraph<'tcx>,
         canonical_input: CanonicalInput<'tcx>,
+        goal_source: GoalSource,
         goal_evaluation: &mut ProofTreeBuilder<'tcx>,
     ) -> QueryResult<'tcx> {
         let mut canonical_goal_evaluation =
@@ -295,6 +300,7 @@ impl<'a, 'tcx> EvalCtxt<'a, 'tcx> {
             search_graph.with_new_goal(
                 tcx,
                 canonical_input,
+                goal_source,
                 &mut canonical_goal_evaluation,
                 |search_graph, canonical_goal_evaluation| {
                     EvalCtxt::enter_canonical(
@@ -322,11 +328,11 @@ impl<'a, 'tcx> EvalCtxt<'a, 'tcx> {
     fn evaluate_goal(
         &mut self,
         goal_evaluation_kind: GoalEvaluationKind,
-        source: GoalSource,
+        goal_source: GoalSource,
         goal: Goal<'tcx, ty::Predicate<'tcx>>,
     ) -> Result<(bool, Certainty), NoSolution> {
         let (normalization_nested_goals, has_changed, certainty) =
-            self.evaluate_goal_raw(goal_evaluation_kind, source, goal)?;
+            self.evaluate_goal_raw(goal_evaluation_kind, goal_source, goal)?;
         assert!(normalization_nested_goals.is_empty());
         Ok((has_changed, certainty))
     }
@@ -338,12 +344,10 @@ impl<'a, 'tcx> EvalCtxt<'a, 'tcx> {
     /// `NormalizesTo` is only used by `AliasRelate`, all other callsites
     /// should use [`EvalCtxt::evaluate_goal`] which discards that empty
     /// storage.
-    // FIXME(-Znext-solver=coinduction): `_source` is currently unused but will
-    // be necessary once we implement the new coinduction approach.
     pub(super) fn evaluate_goal_raw(
         &mut self,
         goal_evaluation_kind: GoalEvaluationKind,
-        _source: GoalSource,
+        goal_source: GoalSource,
         goal: Goal<'tcx, ty::Predicate<'tcx>>,
     ) -> Result<(NestedNormalizationGoals<'tcx>, bool, Certainty), NoSolution> {
         let (orig_values, canonical_goal) = self.canonicalize_goal(goal);
@@ -353,6 +357,7 @@ impl<'a, 'tcx> EvalCtxt<'a, 'tcx> {
             self.tcx(),
             self.search_graph,
             canonical_goal,
+            goal_source,
             &mut goal_evaluation,
         );
         let canonical_response = match canonical_response {

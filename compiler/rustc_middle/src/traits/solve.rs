@@ -265,16 +265,18 @@ pub enum GoalSource {
     ///
     /// FIXME(-Znext-solver=coinductive): Explain how and why this
     /// changes whether cycles are coinductive.
-    ///
-    /// This also impacts whether we erase constraints on overflow.
-    /// Erasing constraints is generally very useful for perf and also
-    /// results in better error messages by avoiding spurious errors.
-    /// We do not erase overflow constraints in `normalizes-to` goals unless
-    /// they are from an impl where-clause. This is necessary due to
-    /// backwards compatability, cc trait-system-refactor-initiatitive#70.
     ImplWhereBound,
     /// Instantiating a higher-ranked goal and re-proving it.
     InstantiateHigherRanked,
+}
+
+impl GoalSource {
+    pub fn is_coinductive_step(self) -> bool {
+        match self {
+            GoalSource::Misc => false,
+            GoalSource::ImplWhereBound => true,
+        }
+    }
 }
 
 /// Possible ways the given goal can be proven.
