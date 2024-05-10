@@ -12,7 +12,6 @@ use rustc_middle::traits::solve::CacheData;
 use rustc_middle::traits::solve::{CanonicalInput, Certainty, EvaluationCache, QueryResult};
 use rustc_middle::ty::TyCtxt;
 use rustc_session::Limit;
-use std::mem;
 
 rustc_index::newtype_index! {
     #[orderable]
@@ -98,13 +97,30 @@ impl<'tcx> ProvisionalCacheEntry<'tcx> {
     }
 }
 
-pub(super) struct SearchGraph<'tcx> {
-    mode: SolverMode,
-    /// The stack of goals currently being computed.
-    ///
-    /// An element is *deeper* in the stack if its index is *lower*.
-    stack: IndexVec<StackDepth, StackEntry<'tcx>>,
-    provisional_cache: FxHashMap<CanonicalInput<'tcx>, ProvisionalCacheEntry<'tcx>>,
+/// The provisional result for a given goal. It is only applicable if
+/// we access the goal with the same stack as during the last itereation.
+struct ProvisionalResult<'tcx> {
+    stack: IndexVec<StackDepth, CanonicalInput<'tcx>>,
+    result: QueryResult<'tcx>,
+}
+
+impl<'tcx> ProvisionalResult<'tcx> {
+    fn is_applicable(&self, stack: &IndexVec<StackDepth, StackEntry<'tcx>>) -> bool {
+        self.stack.len() == stack.len()
+            && itertools::zip_eq(&self.stack, stack.iter().map(|e| &e.input)).all(|(l, r)| l == r)
+    }
+}
+
+struct CycleData<'tcx> {
+    /// The lowest stack depth of all participants. The root is the only cycle
+    /// participant which will get moved to the global cache.
+    root: StackDepth,
+
+    /// The provisional results for all nested cycle heads we've already computed.
+    /// The next time we evaluate these cycle heads we use that result in the first
+    /// iteration.
+    provisional_results: FxHashMap<CanonicalInput<'tcx>, Vec<ProvisionalResult<'tcx>>>,
+
     /// We put only the root goal of a coinductive cycle into the global cache.
     ///
     /// If we were to use that result when later trying to prove another cycle
@@ -115,13 +131,100 @@ pub(super) struct SearchGraph<'tcx> {
     cycle_participants: FxHashSet<CanonicalInput<'tcx>>,
 }
 
+impl<'tcx> CycleData<'tcx> {
+    fn new(root: StackDepth) -> CycleData<'tcx> {
+        CycleData {
+            root,
+            provisional_results: Default::default(),
+            cycle_participants: Default::default(),
+        }
+    }
+
+    /// When encountering a solver cycle, the result of the current goal
+    /// depends on goals lower on the stack.
+    ///
+    /// We have to therefore be careful when caching goals. Only the final result
+    /// of the cycle root, i.e. the lowest goal on the stack involved in this cycle,
+    /// is moved to the global cache while all others are stored in a provisional cache.
+    ///
+    /// We update both the head of this cycle to rerun its evaluation until
+    /// we reach a fixpoint and all other cycle participants to make sure that
+    /// their result does not get moved to the global cache.
+    fn tag_cycle_participants(
+        &mut self,
+        stack: &mut IndexVec<StackDepth, StackEntry<'tcx>>,
+        usage_kind: HasBeenUsed,
+        head: StackDepth,
+    ) {
+        stack[head].has_been_used |= usage_kind;
+        debug_assert!(!stack[head].has_been_used.is_empty());
+        self.root = self.root.min(head);
+        for entry in &mut stack.raw[head.index() + 1..] {
+            entry.non_root_cycle_participant = entry.non_root_cycle_participant.max(Some(head));
+            self.cycle_participants.insert(entry.input);
+        }
+
+        debug!(?self.root, ?stack);
+    }
+
+    /// Add the provisional result for a given goal to the storage.
+    fn add_provisional_result(
+        &mut self,
+        stack: &IndexVec<StackDepth, StackEntry<'tcx>>,
+        entry: &StackEntry<'tcx>,
+        result: QueryResult<'tcx>,
+    ) {
+        // Add this provisional result for this goal, optionally overwriting its previous entry.
+        let provisional_result =
+            ProvisionalResult { stack: stack.iter().map(|e| e.input).collect(), result };
+        let provisional_results = self.provisional_results.entry(entry.input).or_default();
+        provisional_results.retain(|result| !result.is_applicable(stack));
+        provisional_results.push(provisional_result);
+    }
+
+    fn get_provisional_result(
+        &mut self,
+        stack: &IndexVec<StackDepth, StackEntry<'tcx>>,
+        input: CanonicalInput<'tcx>,
+    ) -> Option<QueryResult<'tcx>> {
+        self.provisional_results.get(&input).and_then(|results| {
+            for result in results {
+                if result.is_applicable(stack) {
+                    return Some(result.result);
+                }
+            }
+
+            None
+        })
+    }
+}
+
+pub(super) struct SearchGraph<'tcx> {
+    mode: SolverMode,
+    /// The stack of goals currently being computed.
+    ///
+    /// An element is *deeper* in the stack if its index is *lower*.
+    stack: IndexVec<StackDepth, StackEntry<'tcx>>,
+
+    /// In case we're currently in a solver cycle, we have to track a
+    /// lot of additional data.
+    cycle_data: Option<CycleData<'tcx>>,
+
+    /// A cache for the result of nested goals which depend on goals currently on the
+    /// stack. We remove cached results once we pop any goal used while computing it.
+    ///
+    /// This is not part of `cycle_data` as it contains all stack entries even while we're
+    /// not yet in a cycle.
+    provisional_cache: FxHashMap<CanonicalInput<'tcx>, ProvisionalCacheEntry<'tcx>>,
+}
+
 impl<'tcx> SearchGraph<'tcx> {
     pub(super) fn new(mode: SolverMode) -> SearchGraph<'tcx> {
         Self {
             mode,
             stack: Default::default(),
+            cycle_data: None,
             provisional_cache: Default::default(),
-            cycle_participants: Default::default(),
         }
     }
 
@@ -130,7 +233,7 @@ impl<'tcx> SearchGraph<'tcx> {
     }
 
     /// Update the stack and reached depths on cache hits.
-    #[instrument(level = "debug", skip(self))]
+    #[instrument(level = "trace", skip(self))]
     fn on_cache_hit(&mut self, additional_depth: usize, encountered_overflow: bool) {
         let reached_depth = self.stack.next_index().plus(additional_depth);
         if let Some(last) = self.stack.raw.last_mut() {
@@ -165,9 +268,10 @@ impl<'tcx> SearchGraph<'tcx> {
     }
 
     pub(super) fn is_empty(&self) -> bool {
-        if self.stack.is_empty() {
-            debug_assert!(self.provisional_cache.is_empty());
-            debug_assert!(self.cycle_participants.is_empty());
+        let Self { mode: _, stack, cycle_data, provisional_cache } = self;
+        if stack.is_empty() {
+            debug_assert!(cycle_data.is_none());
+            debug_assert!(provisional_cache.is_empty());
             true
         } else {
             false
@@ -207,30 +311,6 @@ impl<'tcx> SearchGraph<'tcx> {
         stack.raw[head.index()..]
             .iter()
             .all(|entry| entry.input.value.goal.predicate.is_coinductive(tcx))
-    }
-
-    // When encountering a solver cycle, the result of the current goal
-    // depends on goals lower on the stack.
-    //
-    // We have to therefore be careful when caching goals. Only the final result
-    // of the cycle root, i.e. the lowest goal on the stack involved in this cycle,
-    // is moved to the global cache while all others are stored in a provisional cache.
-    //
-    // We update both the head of this cycle to rerun its evaluation until
-    // we reach a fixpoint and all other cycle participants to make sure that
-    // their result does not get moved to the global cache.
-    fn tag_cycle_participants(
-        stack: &mut IndexVec<StackDepth, StackEntry<'tcx>>,
-        cycle_participants: &mut FxHashSet<CanonicalInput<'tcx>>,
-        usage_kind: HasBeenUsed,
-        head: StackDepth,
-    ) {
-        stack[head].has_been_used |= usage_kind;
-        debug_assert!(!stack[head].has_been_used.is_empty());
-        for entry in &mut stack.raw[head.index() + 1..] {
-            entry.non_root_cycle_participant = entry.non_root_cycle_participant.max(Some(head));
-            cycle_participants.insert(entry.input);
-        }
     }
 
     fn clear_dependent_provisional_results(
@@ -320,9 +400,9 @@ impl<'tcx> SearchGraph<'tcx> {
             // already set correctly while computing the cache entry.
             inspect
                 .goal_evaluation_kind(inspect::WipCanonicalGoalEvaluationKind::ProvisionalCacheHit);
-            Self::tag_cycle_participants(
+
+            self.cycle_data.as_mut().unwrap().tag_cycle_participants(
                 &mut self.stack,
-                &mut self.cycle_participants,
                 HasBeenUsed::empty(),
                 entry.head,
             );
@@ -342,12 +422,9 @@ impl<'tcx> SearchGraph<'tcx> {
             } else {
                 HasBeenUsed::INDUCTIVE_CYCLE
             };
-            Self::tag_cycle_participants(
-                &mut self.stack,
-                &mut self.cycle_participants,
-                usage_kind,
-                stack_depth,
-            );
+
+            let cycle_data = self.cycle_data.get_or_insert_with(|| CycleData::new(stack_depth));
+            cycle_data.tag_cycle_participants(&mut self.stack, usage_kind, stack_depth);
 
             // Return the provisional result or, if we're in the first iteration,
             // start with no constraints.
@@ -361,6 +438,10 @@ impl<'tcx> SearchGraph<'tcx> {
         } else {
             // No entry, we push this goal on the stack and try to prove it.
             let depth = self.stack.next_index();
+            let provisional_result = self
+                .cycle_data
+                .as_mut()
+                .and_then(|cycle_data| cycle_data.get_provisional_result(&self.stack, input));
             let entry = StackEntry {
                 input,
                 available_depth,
@@ -368,7 +449,7 @@ impl<'tcx> SearchGraph<'tcx> {
                 non_root_cycle_participant: None,
                 encountered_overflow: false,
                 has_been_used: HasBeenUsed::empty(),
-                provisional_result: None,
+                provisional_result,
             };
             assert_eq!(self.stack.push(entry), depth);
             cache_entry.stack_depth = Some(depth);
@@ -384,14 +465,15 @@ impl<'tcx> SearchGraph<'tcx> {
                 // of this we continuously recompute the cycle until the result
                 // of the previous iteration is equal to the final result, at which
                 // point we are done.
-                for _ in 0..FIXPOINT_STEP_LIMIT {
+                for i in 0..FIXPOINT_STEP_LIMIT {
                     let result = prove_goal(self, inspect);
-                    let stack_entry = self.pop_stack();
-                    debug_assert_eq!(stack_entry.input, input);
+                    let entry = self.pop_stack();
+                    debug_assert_eq!(entry.input, input);
 
-                    // If the current goal is not the root of a cycle, we are done.
-                    if stack_entry.has_been_used.is_empty() {
-                        return (stack_entry, result);
+                    // For goals which are not the head of a cycle, this is
+                    // trivial.
+                    if entry.has_been_used.is_empty() {
+                        return (entry, result);
                     }
 
                     // If it is a cycle head, we have to keep trying to prove it until
@@ -412,12 +494,12 @@ impl<'tcx> SearchGraph<'tcx> {
                     // is equal to the provisional result of the previous iteration, or because
                     // this was only the root of either coinductive or inductive cycles, and the
                     // final result is equal to the initial response for that case.
-                    let reached_fixpoint = if let Some(r) = stack_entry.provisional_result {
+                    let reached_fixpoint = if let Some(r) = entry.provisional_result {
                         r == result
-                    } else if stack_entry.has_been_used == HasBeenUsed::COINDUCTIVE_CYCLE {
-                        Self::response_no_constraints(tcx, input, Certainty::Yes) == result
-                    } else if stack_entry.has_been_used == HasBeenUsed::INDUCTIVE_CYCLE {
-                        Self::response_no_constraints(tcx, input, Certainty::overflow(false))
+                    } else if entry.has_been_used == HasBeenUsed::COINDUCTIVE_CYCLE {
+                        Self::response_no_constraints(tcx, entry.input, Certainty::Yes) == result
+                    } else if entry.has_been_used == HasBeenUsed::INDUCTIVE_CYCLE {
+                        Self::response_no_constraints(tcx, entry.input, Certainty::overflow(false))
                             == result
                     } else {
                         false
@@ -425,12 +507,14 @@ impl<'tcx> SearchGraph<'tcx> {
 
                     // If we did not reach a fixpoint, update the provisional result and reevaluate.
                     if reached_fixpoint {
-                        return (stack_entry, result);
+                        let cycle_data = self.cycle_data.as_mut().unwrap();
+                        cycle_data.add_provisional_result(&self.stack, &entry, result);
+                        return (entry, result);
                     } else {
                         let depth = self.stack.push(StackEntry {
                             has_been_used: HasBeenUsed::empty(),
                             provisional_result: Some(result),
-                            ..stack_entry
+                            ..entry
                         });
                         debug_assert_eq!(self.provisional_cache[&input].stack_depth, Some(depth));
                     }
@@ -461,7 +545,6 @@ impl<'tcx> SearchGraph<'tcx> {
         } else {
             self.provisional_cache.remove(&input);
             let reached_depth = final_entry.reached_depth.as_usize() - self.stack.len();
-            let cycle_participants = mem::take(&mut self.cycle_participants);
             // When encountering a cycle, both inductive and coinductive, we only
             // move the root into the global cache. We also store all other cycle
             // participants involved.
@@ -470,6 +553,14 @@ impl<'tcx> SearchGraph<'tcx> {
             // participant is on the stack. This is necessary to prevent unstable
             // results. See the comment of `SearchGraph::cycle_participants` for
             // more details.
+            let cycle_participants = if let Some(cycle_data) =
+                self.cycle_data.take_if(|data| data.root == self.stack.next_index())
+            {
+                cycle_data.cycle_participants
+            } else {
+                Default::default()
+            };
+
             self.global_cache(tcx).insert(
                 tcx,
                 input,
