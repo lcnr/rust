@@ -124,8 +124,8 @@ impl<'tcx> ReuseableProvisionalCacheEntry<'tcx> {
             let actual = match stack[stack_depth].provisional_result {
                 Some(actual) => actual,
                 None => {
-                    let is_coinductive_cycle =
-                        self.is_coinductive && SearchGraph::stack_coinductive_from(tcx, stack, stack_depth);
+                    let is_coinductive_cycle = self.is_coinductive
+                        && SearchGraph::stack_coinductive_from(tcx, stack, stack_depth);
                     let input = stack[stack_depth].input;
                     if is_coinductive_cycle {
                         SearchGraph::response_no_constraints(tcx, input, Certainty::Yes)
@@ -265,9 +265,9 @@ impl<'tcx> CycleData<'tcx> {
                     let mut heads = entry.heads;
 
                     for head in heads.iter().copied() {
-                        let is_coinductive_cycle =
-                            entry.is_coinductive && SearchGraph::stack_coinductive_from(tcx, stack, head);
-                    
+                        let is_coinductive_cycle = entry.is_coinductive
+                            && SearchGraph::stack_coinductive_from(tcx, stack, head);
+
                         if is_coinductive_cycle {
                             stack[head].has_been_used |= HasBeenUsed::COINDUCTIVE_CYCLE
                         } else {
@@ -275,10 +275,14 @@ impl<'tcx> CycleData<'tcx> {
                         };
                     }
                     heads.push(stack.next_index());
-                    cache_entry.with_inductive_stack =
-                        Some(DetachedEntry { heads: heads.clone(), result: entry.result });
-                    cache_entry.with_coinductive_stack =
-                        Some(DetachedEntry { heads, result: entry.result });
+
+                    if entry.is_coinductive {
+                        cache_entry.with_coinductive_stack =
+                            Some(DetachedEntry { heads, result: entry.result });
+                    } else {
+                        cache_entry.with_inductive_stack =
+                            Some(DetachedEntry { heads: heads.clone(), result: entry.result });
+                    }
                 }
             }
             Some(result.result)
