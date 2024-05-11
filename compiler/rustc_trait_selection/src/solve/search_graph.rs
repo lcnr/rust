@@ -39,13 +39,15 @@ struct StackEntry<'tcx> {
     /// for the top of the stack and lazily updated for the rest.
     reached_depth: StackDepth,
 
-    /// Whether this entry is a non-root cycle participant.
+    /// If this entry is a non-root cycle participant, the depth of all
+    /// cycle heads accessed while computing this goal in increasing
+    /// order.
     ///
     /// We must not move the result of non-root cycle participants to the
     /// global cache. See [SearchGraph::cycle_participants] for more details.
     /// We store the highest stack depth of a head of a cycle this goal is involved
     /// in. This necessary to soundly cache its provisional result.
-    non_root_cycle_participant: Option<StackDepth>,
+    cycle_heads: Vec<StackDepth>,
 
     encountered_overflow: bool,
 
@@ -66,8 +68,14 @@ struct DetachedEntry<'tcx> {
     /// B :- C
     /// C :- A + B + C
     /// ```
-    head: StackDepth,
+    heads: Vec<StackDepth>,
     result: QueryResult<'tcx>,
+}
+
+impl<'tcx> DetachedEntry<'tcx> {
+    fn head(&self) -> StackDepth {
+        *self.heads.last().unwrap()
+    }
 }
 
 /// Stores the stack depth of a currently evaluated goal *and* already
@@ -97,11 +105,51 @@ impl<'tcx> ProvisionalCacheEntry<'tcx> {
     }
 }
 
+#[derive(Debug)]
+struct ReuseableProvisionalCacheEntry<'tcx> {
+    heads: Vec<StackDepth>,
+    provisional_results: Vec<QueryResult<'tcx>>,
+    is_coinductive: bool,
+
+    result: QueryResult<'tcx>,
+}
+
+impl<'tcx> ReuseableProvisionalCacheEntry<'tcx> {
+    fn is_applicable(
+        &self,
+        tcx: TyCtxt<'tcx>,
+        stack: &IndexVec<StackDepth, StackEntry<'tcx>>,
+    ) -> bool {
+        itertools::zip_eq(&self.heads, &self.provisional_results).all(|(&stack_depth, &result)| {
+            let actual = match stack[stack_depth].provisional_result {
+                Some(actual) => actual,
+                None => {
+                    let is_coinductive_cycle =
+                        self.is_coinductive && SearchGraph::stack_coinductive_from(tcx, stack, stack_depth);
+                    let input = stack[stack_depth].input;
+                    if is_coinductive_cycle {
+                        SearchGraph::response_no_constraints(tcx, input, Certainty::Yes)
+                    } else {
+                        SearchGraph::response_no_constraints(tcx, input, Certainty::overflow(false))
+                    }
+                }
+            };
+
+            actual == result
+        })
+    }
+}
+
 /// The provisional result for a given goal. It is only applicable if
 /// we access the goal with the same stack as during the last itereation.
+#[derive(Debug)]
 struct ProvisionalResult<'tcx> {
     stack: IndexVec<StackDepth, CanonicalInput<'tcx>>,
+
     result: QueryResult<'tcx>,
+
+    provisional_cache_entries:
+        FxHashMap<CanonicalInput<'tcx>, ReuseableProvisionalCacheEntry<'tcx>>,
 }
 
 impl<'tcx> ProvisionalResult<'tcx> {
@@ -154,13 +202,17 @@ impl<'tcx> CycleData<'tcx> {
         &mut self,
         stack: &mut IndexVec<StackDepth, StackEntry<'tcx>>,
         usage_kind: HasBeenUsed,
-        head: StackDepth,
+        heads: &[StackDepth],
     ) {
+        let head = *heads.last().unwrap();
         stack[head].has_been_used |= usage_kind;
         debug_assert!(!stack[head].has_been_used.is_empty());
         self.root = self.root.min(head);
         for entry in &mut stack.raw[head.index() + 1..] {
-            entry.non_root_cycle_participant = entry.non_root_cycle_participant.max(Some(head));
+            // TODO
+            entry.cycle_heads.extend(heads);
+            entry.cycle_heads.sort();
+            entry.cycle_heads.dedup();
             self.cycle_participants.insert(entry.input);
         }
 
@@ -173,28 +225,63 @@ impl<'tcx> CycleData<'tcx> {
         stack: &IndexVec<StackDepth, StackEntry<'tcx>>,
         entry: &StackEntry<'tcx>,
         result: QueryResult<'tcx>,
+        provisional_cache_entries: FxHashMap<
+            CanonicalInput<'tcx>,
+            ReuseableProvisionalCacheEntry<'tcx>,
+        >,
     ) {
         // Add this provisional result for this goal, optionally overwriting its previous entry.
-        let provisional_result =
-            ProvisionalResult { stack: stack.iter().map(|e| e.input).collect(), result };
+        let provisional_result = ProvisionalResult {
+            stack: stack.iter().map(|e| e.input).collect(),
+            result,
+            provisional_cache_entries,
+        };
         let provisional_results = self.provisional_results.entry(entry.input).or_default();
-        provisional_results.retain(|result| !result.is_applicable(stack));
+        if cfg!(debug_assertions) {
+            if let Some(r) = provisional_results.iter().find(|r| r.is_applicable(stack)) {
+                bug!("existing provisional result: {r:?}");
+            }
+        }
+
         provisional_results.push(provisional_result);
     }
 
+    /// This also adds entries to the provisional cache.
     fn get_provisional_result(
         &mut self,
-        stack: &IndexVec<StackDepth, StackEntry<'tcx>>,
+        tcx: TyCtxt<'tcx>,
+        stack: &mut IndexVec<StackDepth, StackEntry<'tcx>>,
+        provisional_cache: &mut FxHashMap<CanonicalInput<'tcx>, ProvisionalCacheEntry<'tcx>>,
         input: CanonicalInput<'tcx>,
     ) -> Option<QueryResult<'tcx>> {
-        self.provisional_results.get(&input).and_then(|results| {
-            for result in results {
-                if result.is_applicable(stack) {
-                    return Some(result.result);
+        self.provisional_results.get_mut(&input).and_then(|results| {
+            let idx = results.iter().position(|r| r.is_applicable(stack))?;
+            let result = results.remove(idx);
+
+            #[allow(rustc::potential_query_instability)]
+            for (input, entry) in result.provisional_cache_entries {
+                if entry.is_applicable(tcx, stack) {
+                    let cache_entry = provisional_cache.entry(input).or_default();
+                    let mut heads = entry.heads;
+
+                    for head in heads.iter().copied() {
+                        let is_coinductive_cycle =
+                            entry.is_coinductive && SearchGraph::stack_coinductive_from(tcx, stack, head);
+                    
+                        if is_coinductive_cycle {
+                            stack[head].has_been_used |= HasBeenUsed::COINDUCTIVE_CYCLE
+                        } else {
+                            stack[head].has_been_used |= HasBeenUsed::INDUCTIVE_CYCLE
+                        };
+                    }
+                    heads.push(stack.next_index());
+                    cache_entry.with_inductive_stack =
+                        Some(DetachedEntry { heads: heads.clone(), result: entry.result });
+                    cache_entry.with_coinductive_stack =
+                        Some(DetachedEntry { heads, result: entry.result });
                 }
             }
-
-            None
+            Some(result.result)
         })
     }
 }
@@ -316,11 +403,17 @@ impl<'tcx> SearchGraph<'tcx> {
     fn clear_dependent_provisional_results(
         provisional_cache: &mut FxHashMap<CanonicalInput<'tcx>, ProvisionalCacheEntry<'tcx>>,
         head: StackDepth,
+        mut f: impl FnMut(
+            CanonicalInput<'tcx>,
+            Option<DetachedEntry<'tcx>>,
+            Option<DetachedEntry<'tcx>>,
+        ),
     ) {
         #[allow(rustc::potential_query_instability)]
-        provisional_cache.retain(|_, entry| {
-            entry.with_coinductive_stack.take_if(|p| p.head == head);
-            entry.with_inductive_stack.take_if(|p| p.head == head);
+        provisional_cache.retain(|input, entry| {
+            let coinductive = entry.with_coinductive_stack.take_if(|p| p.head() == head);
+            let inductive = entry.with_inductive_stack.take_if(|p| p.head() == head);
+            f(*input, coinductive, inductive);
             !entry.is_empty()
         });
     }
@@ -387,12 +480,12 @@ impl<'tcx> SearchGraph<'tcx> {
         if let Some(entry) = cache_entry
             .with_coinductive_stack
             .as_ref()
-            .filter(|p| Self::stack_coinductive_from(tcx, &self.stack, p.head))
+            .filter(|p| Self::stack_coinductive_from(tcx, &self.stack, p.head()))
             .or_else(|| {
                 cache_entry
                     .with_inductive_stack
                     .as_ref()
-                    .filter(|p| !Self::stack_coinductive_from(tcx, &self.stack, p.head))
+                    .filter(|p| !Self::stack_coinductive_from(tcx, &self.stack, p.head()))
             })
         {
             // We have a nested goal which is already in the provisional cache, use
@@ -404,7 +497,7 @@ impl<'tcx> SearchGraph<'tcx> {
             self.cycle_data.as_mut().unwrap().tag_cycle_participants(
                 &mut self.stack,
                 HasBeenUsed::empty(),
-                entry.head,
+                &entry.heads,
             );
             return entry.result;
         } else if let Some(stack_depth) = cache_entry.stack_depth {
@@ -424,7 +517,7 @@ impl<'tcx> SearchGraph<'tcx> {
             };
 
             let cycle_data = self.cycle_data.get_or_insert_with(|| CycleData::new(stack_depth));
-            cycle_data.tag_cycle_participants(&mut self.stack, usage_kind, stack_depth);
+            cycle_data.tag_cycle_participants(&mut self.stack, usage_kind, &[stack_depth]);
 
             // Return the provisional result or, if we're in the first iteration,
             // start with no constraints.
@@ -438,21 +531,27 @@ impl<'tcx> SearchGraph<'tcx> {
         } else {
             // No entry, we push this goal on the stack and try to prove it.
             let depth = self.stack.next_index();
-            let provisional_result = self
-                .cycle_data
-                .as_mut()
-                .and_then(|cycle_data| cycle_data.get_provisional_result(&self.stack, input));
+            cache_entry.stack_depth = Some(depth);
+            let provisional_result = self.cycle_data.as_mut().and_then(|cycle_data| {
+                cycle_data.get_provisional_result(
+                    tcx,
+                    &mut self.stack,
+                    &mut self.provisional_cache,
+                    input,
+                )
+            });
+            let has_been_used =
+                provisional_result.map_or(HasBeenUsed::empty(), |_| HasBeenUsed::all());
             let entry = StackEntry {
                 input,
                 available_depth,
                 reached_depth: depth,
-                non_root_cycle_participant: None,
+                cycle_heads: Default::default(),
                 encountered_overflow: false,
-                has_been_used: HasBeenUsed::empty(),
+                has_been_used,
                 provisional_result,
             };
             assert_eq!(self.stack.push(entry), depth);
-            cache_entry.stack_depth = Some(depth);
         }
 
         // This is for global caching, so we properly track query dependencies.
@@ -465,7 +564,7 @@ impl<'tcx> SearchGraph<'tcx> {
                 // of this we continuously recompute the cycle until the result
                 // of the previous iteration is equal to the final result, at which
                 // point we are done.
-                for i in 0..FIXPOINT_STEP_LIMIT {
+                for _ in 0..FIXPOINT_STEP_LIMIT {
                     let result = prove_goal(self, inspect);
                     let entry = self.pop_stack();
                     debug_assert_eq!(entry.input, input);
@@ -482,13 +581,6 @@ impl<'tcx> SearchGraph<'tcx> {
                     //
                     // See tests/ui/traits/next-solver/cycles/fixpoint-rerun-all-cycle-heads.rs
                     // for an example.
-
-                    // Start by clearing all provisional cache entries which depend on this
-                    // the current goal.
-                    Self::clear_dependent_provisional_results(
-                        &mut self.provisional_cache,
-                        self.stack.next_index(),
-                    );
 
                     // Check whether we reached a fixpoint, either because the final result
                     // is equal to the provisional result of the previous iteration, or because
@@ -508,9 +600,63 @@ impl<'tcx> SearchGraph<'tcx> {
                     // If we did not reach a fixpoint, update the provisional result and reevaluate.
                     if reached_fixpoint {
                         let cycle_data = self.cycle_data.as_mut().unwrap();
-                        cycle_data.add_provisional_result(&self.stack, &entry, result);
+                        let mut provisional_cache_entries = FxHashMap::default();
+                        Self::clear_dependent_provisional_results(
+                            &mut self.provisional_cache,
+                            self.stack.next_index(),
+                            |input, coinductive, inductive| {
+                                let (mut entry, is_coinductive) = match (coinductive, inductive) {
+                                    (Some(entry), None) => (entry, true),
+                                    (None, Some(entry)) => (entry, false),
+                                    _ => return,
+                                };
+
+                                assert_eq!(entry.heads.pop(), Some(self.stack.next_index()));
+                                let provisional_results = entry
+                                    .heads
+                                    .iter()
+                                    .map(|&head| {
+                                        let is_coinductive_cycle = is_coinductive
+                                            && Self::stack_coinductive_from(tcx, &self.stack, head);
+                                        if let Some(result) = self.stack[head].provisional_result {
+                                            result
+                                        } else if is_coinductive_cycle {
+                                            Self::response_no_constraints(
+                                                tcx,
+                                                input,
+                                                Certainty::Yes,
+                                            )
+                                        } else {
+                                            Self::response_no_constraints(
+                                                tcx,
+                                                input,
+                                                Certainty::overflow(false),
+                                            )
+                                        }
+                                    })
+                                    .collect();
+                                let entry = ReuseableProvisionalCacheEntry {
+                                    heads: entry.heads,
+                                    provisional_results,
+                                    is_coinductive,
+                                    result: entry.result,
+                                };
+                                provisional_cache_entries.insert(input, entry);
+                            },
+                        );
+                        cycle_data.add_provisional_result(
+                            &self.stack,
+                            &entry,
+                            result,
+                            provisional_cache_entries,
+                        );
                         return (entry, result);
                     } else {
+                        Self::clear_dependent_provisional_results(
+                            &mut self.provisional_cache,
+                            self.stack.next_index(),
+                            |_, _, _| {},
+                        );
                         let depth = self.stack.push(StackEntry {
                             has_been_used: HasBeenUsed::empty(),
                             provisional_result: Some(result),
@@ -532,17 +678,7 @@ impl<'tcx> SearchGraph<'tcx> {
         // We're now done with this goal. In case this goal is involved in a larger cycle
         // do not remove it from the provisional cache and update its provisional result.
         // We only add the root of cycles to the global cache.
-        if let Some(head) = final_entry.non_root_cycle_participant {
-            let coinductive_stack = Self::stack_coinductive_from(tcx, &self.stack, head);
-
-            let entry = self.provisional_cache.get_mut(&input).unwrap();
-            entry.stack_depth = None;
-            if coinductive_stack {
-                entry.with_coinductive_stack = Some(DetachedEntry { head, result });
-            } else {
-                entry.with_inductive_stack = Some(DetachedEntry { head, result });
-            }
-        } else {
+        if final_entry.cycle_heads.is_empty() {
             self.provisional_cache.remove(&input);
             let reached_depth = final_entry.reached_depth.as_usize() - self.stack.len();
             // When encountering a cycle, both inductive and coinductive, we only
@@ -571,6 +707,17 @@ impl<'tcx> SearchGraph<'tcx> {
                 dep_node,
                 result,
             )
+        } else {
+            let heads = final_entry.cycle_heads;
+            let coinductive_stack =
+                Self::stack_coinductive_from(tcx, &self.stack, *heads.last().unwrap());
+            let entry = self.provisional_cache.get_mut(&input).unwrap();
+            entry.stack_depth = None;
+            if coinductive_stack {
+                entry.with_coinductive_stack = Some(DetachedEntry { heads, result });
+            } else {
+                entry.with_inductive_stack = Some(DetachedEntry { heads, result });
+            }
         }
 
         result
