@@ -224,8 +224,8 @@ use rustc_middle::ty::adjustment::{CustomCoerceUnsized, PointerCoercion};
 use rustc_middle::ty::layout::ValidityRequirement;
 use rustc_middle::ty::print::with_no_trimmed_paths;
 use rustc_middle::ty::{
-    self, AssocKind, GenericParamDefKind, Instance, InstanceDef, Ty, TyCtxt, TypeFoldable,
-    TypeVisitableExt, VtblEntry,
+    self, AssocKind, GenericParamDefKind, Instance, InstanceDef, Ty, TyCtxt, TypeFoldable, TypeVisitor,
+    TypeVisitableExt, VtblEntry, TypeSuperVisitable, TypeVisitable,
 };
 use rustc_middle::ty::{GenericArgKind, GenericArgs};
 use rustc_middle::{bug, span_bug};
@@ -236,7 +236,6 @@ use rustc_span::symbol::{sym, Ident};
 use rustc_span::{Span, DUMMY_SP};
 use rustc_target::abi::Size;
 use std::path::PathBuf;
-use tracing::{debug, instrument, trace};
 
 use crate::errors::{
     self, EncounteredErrorWhileInstantiating, NoOptimizedMir, RecursionLimit, TypeLengthLimit,
@@ -631,15 +630,23 @@ fn check_recursion_limit<'tcx>(
 }
 
 fn check_type_length_limit<'tcx>(tcx: TyCtxt<'tcx>, instance: Instance<'tcx>) {
-    let type_length = instance
-        .args
-        .iter()
-        .flat_map(|arg| arg.walk())
-        .filter(|arg| match arg.unpack() {
-            GenericArgKind::Type(_) | GenericArgKind::Const(_) => true,
-            GenericArgKind::Lifetime(_) => false,
-        })
-        .count();
+    struct Visitor {
+        type_length: usize,
+    }
+    impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for Visitor {
+        fn visit_ty(&mut self, t: Ty<'tcx>) {
+            self.type_length += 1;
+            t.super_visit_with(self);
+        }
+
+        fn visit_const(&mut self, ct: ty::Const<'tcx>) {
+            self.type_length += 1;
+            ct.super_visit_with(self);
+        }
+    }
+    let mut visitor = Visitor { type_length: 0 };
+    instance.args.visit_with(&mut visitor);
+    let Visitor { type_length } = visitor;
     debug!(" => type length={}", type_length);
 
     // Rust code can easily create exponentially-long types using only a
