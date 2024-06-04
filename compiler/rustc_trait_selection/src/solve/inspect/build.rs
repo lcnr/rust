@@ -12,6 +12,7 @@ use rustc_middle::bug;
 use rustc_next_trait_solver::solve::{
     CanonicalInput, Certainty, Goal, GoalSource, QueryInput, QueryResult,
 };
+use rustc_search_graph as sg;
 use rustc_type_ir::{self as ty, InferCtxtLike, Interner};
 
 /// The core data structure when building proof trees.
@@ -316,23 +317,6 @@ impl<Infcx: InferCtxtLike<Interner = I>, I: Interner> ProofTreeBuilder<Infcx> {
         })
     }
 
-    pub fn finalize_canonical_goal_evaluation(
-        &mut self,
-        tcx: I,
-    ) -> Option<I::CanonicalGoalEvaluationStepRef> {
-        self.as_mut().map(|this| match this {
-            DebugSolver::CanonicalGoalEvaluation(evaluation) => {
-                let final_revision = mem::take(&mut evaluation.final_revision).unwrap();
-                let final_revision =
-                    tcx.intern_canonical_goal_evaluation_step(final_revision.finalize());
-                let kind = WipCanonicalGoalEvaluationKind::Interned { final_revision };
-                assert_eq!(evaluation.kind.replace(kind), None);
-                final_revision
-            }
-            _ => unreachable!(),
-        })
-    }
-
     pub fn canonical_goal_evaluation(
         &mut self,
         canonical_goal_evaluation: ProofTreeBuilder<Infcx>,
@@ -567,5 +551,53 @@ impl<Infcx: InferCtxtLike<Interner = I>, I: Interner> ProofTreeBuilder<Infcx> {
                 _ => unreachable!(),
             }
         }
+    }
+}
+
+impl<Infcx, I> sg::ProofTreeBuilder<I> for ProofTreeBuilder<Infcx>
+where
+    Infcx: InferCtxtLike<Interner = I>,
+    I: Interner,
+{
+    fn try_apply_proof_tree(
+        &mut self,
+        proof_tree: Option<I::CanonicalGoalEvaluationStepRef>,
+    ) -> bool {
+        if !self.is_noop() {
+            if let Some(final_revision) = proof_tree {
+                let kind = WipCanonicalGoalEvaluationKind::Interned { final_revision };
+                self.canonical_goal_evaluation_kind(kind);
+                true
+            } else {
+                false
+            }
+        } else {
+            true
+        }
+    }
+
+    fn on_provisional_cache_hit(&mut self) {
+        self.canonical_goal_evaluation_kind(WipCanonicalGoalEvaluationKind::ProvisionalCacheHit);
+    }
+
+    fn on_cycle_in_stack(&mut self) {
+        self.canonical_goal_evaluation_kind(WipCanonicalGoalEvaluationKind::CycleInStack);
+    }
+
+    fn finalize_canonical_goal_evaluation(
+        &mut self,
+        tcx: I,
+    ) -> Option<I::CanonicalGoalEvaluationStepRef> {
+        self.as_mut().map(|this| match this {
+            DebugSolver::CanonicalGoalEvaluation(evaluation) => {
+                let final_revision = mem::take(&mut evaluation.final_revision).unwrap();
+                let final_revision =
+                    tcx.intern_canonical_goal_evaluation_step(final_revision.finalize());
+                let kind = WipCanonicalGoalEvaluationKind::Interned { final_revision };
+                assert_eq!(evaluation.kind.replace(kind), None);
+                final_revision
+            }
+            _ => unreachable!(),
+        })
     }
 }
