@@ -165,6 +165,10 @@ impl<X: Cx> NestedGoals<X> {
         self.nested_goals.extend(&goals.nested_goals);
     }
 
+    fn contains(&self, input: X::Input) -> bool {
+        self.nested_goals.contains(&input)
+    }
+
     fn referenced_by_stack(&self, stack: &IndexVec<StackDepth, StackEntry<X>>) -> bool {
         stack.iter().any(|e| self.nested_goals.contains(&e.input))
     }
@@ -458,7 +462,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
                         assert_eq!(
                             e.highest_cycle_head(),
                             detached_entry.highest_cycle_head(),
-                            "input: {:?}\ndeteached_entry: {detached_entry:?},\nentry: {entry:?}:\n{:?} != {:?}",
+                            "input: {:?}\ndetached_entry: {detached_entry:?},\nentry: {entry:?}:\n{:?} != {:?}",
                             stashed_entry.input,
                             self.stack[e.highest_cycle_head()].input,
                             self.stack[detached_entry.highest_cycle_head()].input,
@@ -472,11 +476,55 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
         })
     }
 
+    fn stash_invalidated_detached_entries(&mut self, cx: X, added_goal: X::Input) {
+        let mut stash_detached_entry = |input, entry: DetachedEntry<X>, is_coinductive| {
+            let mut heads = Vec::new();
+            for (head, usage_kind) in entry.heads.iter() {
+                let elem = &self.stack[head];
+                let Some(expected_result) = elem
+                    .provisional_result
+                    .or_else(|| cx.opt_initial_provisional_result(usage_kind, elem.input))
+                else {
+                    return;
+                };
+                heads.push(CycleHeadData { input: elem.input, usage_kind, expected_result });
+            }
+
+            let highest_cycle_head = heads.last().unwrap().input;
+            let stashed_entry = StashedDetachedEntry {
+                heads,
+                nested_goals: entry.nested_goals,
+                is_coinductive,
+                input,
+                result: entry.result,
+            };
+            debug!(?stashed_entry);
+
+            self.detached_entries_stash.entry(highest_cycle_head).or_default().push(stashed_entry);
+        };
+
+        #[allow(rustc::potential_query_instability)]
+        self.provisional_cache.retain(|input, entry| {
+            if let Some(e) =
+                entry.with_coinductive_stack.take_if(|p| p.nested_goals.contains(added_goal))
+            {
+                stash_detached_entry(*input, e, true);
+            }
+            if let Some(e) =
+                entry.with_inductive_stack.take_if(|p| p.nested_goals.contains(added_goal))
+            {
+                stash_detached_entry(*input, e, false);
+            }
+
+            !entry.is_empty()
+        });
+    }
+
     fn stash_dependent_detached_entries(&mut self, cx: X, stack_entry: &StackEntry<X>) {
         let mut stash_detached_entry = |input, entry: DetachedEntry<X>, is_coinductive| {
             let mut heads = Vec::new();
             for (head, usage_kind) in entry.heads.iter() {
-                let elem = &self.stack.get(head).unwrap_or_else(|| {
+                let elem = self.stack.get(head).unwrap_or_else(|| {
                     assert_eq!(head, self.stack.next_index());
                     stack_entry
                 });
@@ -490,15 +538,16 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
                 heads.push(CycleHeadData { input: elem.input, usage_kind, expected_result });
             }
 
-            self.detached_entries_stash.entry(stack_entry.input).or_default().push(
-                StashedDetachedEntry {
-                    heads,
-                    nested_goals: entry.nested_goals,
-                    is_coinductive,
-                    input,
-                    result: entry.result,
-                },
-            );
+            let stashed_entry = StashedDetachedEntry {
+                heads,
+                nested_goals: entry.nested_goals,
+                is_coinductive,
+                input,
+                result: entry.result,
+            };
+            debug!(?stashed_entry);
+
+            self.detached_entries_stash.entry(stack_entry.input).or_default().push(stashed_entry);
         };
 
         let head = self.stack.next_index();
@@ -719,6 +768,10 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             assert_eq!(self.stack.push(entry), depth);
             cache_entry.stack_depth = Some(depth);
         }
+
+        // In case the currently added goal is a nested goal of a detached entry,
+        // it has to get removed from the provisional cache.
+        self.stash_invalidated_detached_entries(cx, input);
 
         // This is for global caching, so we properly track query dependencies.
         // Everything that affects the `result` should be performed within this

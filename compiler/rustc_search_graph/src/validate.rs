@@ -2,10 +2,6 @@ use crate::*;
 use itertools::Itertools;
 
 impl<X: Cx> NestedGoals<X> {
-    fn contains(&self, input: X::Input) -> bool {
-        self.nested_goals.contains(&input)
-    }
-
     fn is_empty(&self) -> bool {
         self.nested_goals.is_empty()
     }
