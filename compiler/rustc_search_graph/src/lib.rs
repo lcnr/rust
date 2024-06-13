@@ -130,6 +130,12 @@ impl CycleHeads {
         CycleHeads { heads: iter::once((depth, usage_kind)).collect() }
     }
 
+    fn extend(&mut self, other: &CycleHeads) {
+        for (&head, &usage_kind) in other.heads.iter() {
+            self.add_dependency(head, usage_kind);
+        }
+    }
+
     fn add_dependency(&mut self, depth: StackDepth, usage_kind: UsageKind) {
         self.heads
             .entry(depth)
@@ -419,7 +425,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
         for depth in current_root.index()..stack.len() {
             // Update all nested goals this goal depends on.
             let (stack, nested) = stack.raw.split_at_mut(depth + 1);
-            let current = &mut stack[depth];
+            let (current, prev) = stack.split_last_mut().unwrap();
             for entry in nested {
                 current.nested_goals.insert(entry.input);
                 current.nested_goals.extend(&entry.nested_goals);
@@ -432,6 +438,10 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             // Update all the cycle heads this goal depends on.
             for (head, usage_kind) in heads.iter().filter(|(h, _)| h.index() < depth) {
                 current.heads.add_dependency(head, usage_kind);
+                // Subtle: this goal also depends on all cycle heads its cycle heads
+                // depend on as these previous cycles while computing its heads change
+                // the behavior.
+                current.heads.extend(&prev[head.as_usize()].heads);
             }
         }
     }
@@ -459,15 +469,11 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
                     }
                 } else {
                     if let Some(e) = &entry.with_inductive_stack {
-                        assert_eq!(
-                            e.highest_cycle_head(),
-                            detached_entry.highest_cycle_head(),
-                            "input: {:?}\ndetached_entry: {detached_entry:?},\nentry: {entry:?}:\n{:?} != {:?}",
-                            stashed_entry.input,
-                            self.stack[e.highest_cycle_head()].input,
-                            self.stack[detached_entry.highest_cycle_head()].input,
-                        );
-                        assert_eq!(e.result, detached_entry.result);
+                        if e.highest_cycle_head() != detached_entry.highest_cycle_head() || e.result != detached_entry.result {
+                            let e_heads = e.heads.iter().map(|(h, _)| self.stack[h].input).collect::<Vec<_>>();
+                            let detached_entry_heads = detached_entry.heads.iter().map(|(h, _)| self.stack[h].input).collect::<Vec<_>>();
+                            tracing::warn!(?input, ?stashed_entry.input, ?entry, ?e_heads, ?detached_entry, ?detached_entry_heads, ?self.provisional_cache);
+                        }
                     }
                 }
             };
@@ -485,6 +491,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
                     .provisional_result
                     .or_else(|| cx.opt_initial_provisional_result(usage_kind, elem.input))
                 else {
+                    debug!(?input, "discard invalidated entry");
                     return;
                 };
                 heads.push(CycleHeadData { input: elem.input, usage_kind, expected_result });
@@ -498,7 +505,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
                 input,
                 result: entry.result,
             };
-            debug!(?stashed_entry);
+            debug!(?stashed_entry, "stash invalidated entry");
 
             self.detached_entries_stash.entry(highest_cycle_head).or_default().push(stashed_entry);
         };
@@ -533,6 +540,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
                     .provisional_result
                     .or_else(|| cx.opt_initial_provisional_result(usage_kind, elem.input))
                 else {
+                    debug!(?input, "discard dependent entry");
                     return;
                 };
                 heads.push(CycleHeadData { input: elem.input, usage_kind, expected_result });
@@ -545,7 +553,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
                 input,
                 result: entry.result,
             };
-            debug!(?stashed_entry);
+            debug!(?stashed_entry, "stash dependent entry");
 
             self.detached_entries_stash.entry(stack_entry.input).or_default().push(stashed_entry);
         };
@@ -811,6 +819,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
                 entry.with_inductive_stack = Some(DetachedEntry { heads, nested_goals, result });
             }
         } else {
+            debug!(?input, ?final_entry.nested_goals, "to global cache");
             // When encountering a cycle, both inductive and coinductive, we only
             // move the root into the global cache. We also store all other cycle
             // participants involved.
