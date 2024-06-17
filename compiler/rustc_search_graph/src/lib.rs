@@ -141,6 +141,35 @@ impl UsageKind {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Default)]
+struct CycleHeads {
+    lowest_cycle_head: Option<StackDepth>,
+}
+
+impl CycleHeads {
+    fn is_empty(&self) -> bool {
+        self.lowest_cycle_head.is_none()
+    }
+
+    fn lowest_cycle_head(&self) -> Option<StackDepth> {
+        self.lowest_cycle_head
+    }
+
+    fn insert(&mut self, head: StackDepth) {
+        if let Some(curr) = &mut self.lowest_cycle_head {
+            *curr = head.min(*curr);
+        } else {
+            self.lowest_cycle_head = Some(head);
+        }
+    }
+
+    fn extend_from_child(&mut self, this: StackDepth, other: &CycleHeads) {
+        if let Some(head) = other.lowest_cycle_head.filter(|h| *h != this) {
+            self.insert(head);
+        }
+    }
+}
+
 #[derive(derivative::Derivative)]
 #[derivative(Debug(bound = ""), PartialEq(bound = ""), Eq(bound = ""), Default(bound = ""))]
 struct NestedGoals<X: Cx> {
@@ -175,9 +204,9 @@ struct StackEntry<X: Cx> {
     /// for the top of the stack and lazily updated for the rest.
     reached_depth: StackDepth,
 
-    /// The highest cycle head this goal depends on. This does not include this
+    /// The cycle heads this goal depends on. This does not include this
     /// goal itself, even if there's a self-cycle.
-    highest_cycle_head: Option<StackDepth>,
+    heads: CycleHeads,
 
     encountered_overflow: bool,
 
@@ -230,32 +259,21 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
         &mut self,
         input: X::Input,
         nested_goals: &NestedGoals<X>,
-        is_cycle_particiant: bool,
+        heads: &CycleHeads,
         reached_depth: StackDepth,
         encountered_overflow: bool,
     ) {
-        if let Some(parent) = self.stack.raw.last_mut() {
+        if let Some(parent_index) = self.stack.last_index() {
+            let parent = &mut self.stack[parent_index];
             parent.reached_depth = parent.reached_depth.max(reached_depth);
             parent.encountered_overflow |= encountered_overflow;
+
             parent.nested_goals.extend(nested_goals);
-            if is_cycle_particiant || encountered_overflow {
+            if !heads.is_empty() || encountered_overflow {
                 parent.nested_goals.insert(input);
             }
-        }
-    }
 
-    /// When encountering a solver cycle, the result of the current goal
-    /// depends on the result of any cycle heads lower on the stack.
-    fn tag_cycle_participants(
-        stack: &mut IndexVec<StackDepth, StackEntry<X>>,
-        usage_kind: UsageKind,
-        head: StackDepth,
-    ) {
-        stack[head].has_been_used =
-            Some(stack[head].has_been_used.map_or(usage_kind, |prev| prev.merge(usage_kind)));
-
-        for entry in stack.iter_mut().skip(head.index() + 1) {
-            entry.highest_cycle_head = entry.highest_cycle_head.max(Some(head));
+            parent.heads.extend_from_child(parent_index, &heads);
         }
     }
 
@@ -297,7 +315,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             self.update_parent_goal(
                 input,
                 nested_goals,
-                false,
+                &CycleHeads::default(),
                 reached_depth,
                 encountered_overflow,
             );
@@ -326,8 +344,13 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
         // Subtle: when encountering a cyclic goal, we still first checked for overflow,
         // so we have to update the reached depth.
         let next_index = self.stack.next_index();
-        let last = self.stack.raw.last_mut().unwrap();
+        let last_index = self.stack.last_index().unwrap();
+        let last = &mut self.stack[last_index];
         last.reached_depth = last.reached_depth.max(next_index);
+        last.heads.insert(depth);
+        if last_index != depth {
+            last.heads.insert(depth);
+        }
 
         let cycle_kind = if Self::stack_coinductive_from(cx, &self.stack, depth) {
             CycleKind::Coinductive
@@ -335,9 +358,12 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             CycleKind::Inductive
         };
 
-        debug!(?cycle_kind, "encountered cycle with depth {depth:?}");
-        Self::tag_cycle_participants(&mut self.stack, UsageKind::Single(cycle_kind), depth);
+        let usage_kind = UsageKind::Single(cycle_kind);
+        let head = &mut self.stack[depth];
+        head.has_been_used =
+            Some(head.has_been_used.map_or(usage_kind, |prev| prev.merge(usage_kind)));
 
+        debug!(?cycle_kind, "encountered cycle with depth {depth:?}");
         if let Some(result) = self.stack[depth].provisional_result {
             Some(result)
         } else {
@@ -451,17 +477,17 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
         }
         // No entry, we push this goal on the stack and try to prove it.
         let depth = self.stack.next_index();
-        let entry = StackEntry {
+        let actual_depth = self.stack.push(StackEntry {
             input,
             available_depth,
             reached_depth: depth,
-            highest_cycle_head: None,
+            heads: Default::default(),
             encountered_overflow: false,
             has_been_used: None,
             nested_goals: Default::default(),
             provisional_result: None,
-        };
-        assert_eq!(self.stack.push(entry), depth);
+        });
+        debug_assert_eq!(actual_depth, depth);
 
         // This is for global caching, so we properly track query dependencies.
         // Everything that affects the `result` should be performed within this
@@ -486,7 +512,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
 
         let proof_tree = inspect.finalize_canonical_goal_evaluation(cx);
 
-        if final_entry.highest_cycle_head.is_none() {
+        if final_entry.heads.is_empty() {
             // When encountering a cycle, both inductive and coinductive, we only
             // move the root into the global cache. We also store all other cycle
             // participants involved.
@@ -515,7 +541,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
         self.update_parent_goal(
             input,
             &final_entry.nested_goals,
-            final_entry.highest_cycle_head.is_some(),
+            &final_entry.heads,
             final_entry.reached_depth,
             final_entry.encountered_overflow,
         );
