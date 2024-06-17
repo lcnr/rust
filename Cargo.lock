@@ -4397,6 +4397,7 @@ dependencies = [
  "rustc_index",
  "rustc_macros",
  "rustc_query_system",
+ "rustc_search_graph",
  "rustc_serialize",
  "rustc_session",
  "rustc_span",
@@ -4503,6 +4504,7 @@ dependencies = [
 name = "rustc_next_trait_solver"
 version = "0.0.0"
 dependencies = [
+ "rustc_search_graph",
  "rustc_type_ir",
 ]
 
@@ -4688,6 +4690,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustc_search_graph"
+version = "0.1.0"
+dependencies = [
+ "derivative",
+ "itertools 0.12.1",
+ "rustc_data_structures",
+ "rustc_index",
+ "tracing",
+]
+
+[[package]]
 name = "rustc_serialize"
 version = "0.0.0"
 dependencies = [
@@ -4819,6 +4832,7 @@ dependencies = [
  "rustc_next_trait_solver",
  "rustc_parse_format",
  "rustc_query_system",
+ "rustc_search_graph",
  "rustc_serialize",
  "rustc_session",
  "rustc_span",
@@ -4891,6 +4905,7 @@ dependencies = [
  "rustc_data_structures",
  "rustc_index",
  "rustc_macros",
+ "rustc_search_graph",
  "rustc_serialize",
  "rustc_span",
  "rustc_type_ir_macros",

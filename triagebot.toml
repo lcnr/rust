@@ -405,6 +405,7 @@ exclude_labels = [
 trigger_files = [
     "compiler/rustc_middle/src/traits/solve",
     "compiler/rustc_next_trait_solver",
+    "compiler/rustc_search_graph",
     "compiler/rustc_trait_selection/src/solve",
     "compiler/rustc_type_ir/src/solve",
     "tests/ui/traits/next-solver",

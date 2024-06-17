@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 # tidy-alphabetical-start
+rustc_search_graph = { path = "../rustc_search_graph" }
 rustc_type_ir = { path = "../rustc_type_ir", default-features = false }
 # tidy-alphabetical-end
 

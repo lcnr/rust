@@ -1,17 +1,16 @@
 use rustc_ast_ir::try_visit;
 use rustc_data_structures::intern::Interned;
 use rustc_macros::{HashStable, TypeFoldable, TypeVisitable};
+use rustc_query_system::cache::WithDepNode;
+use rustc_search_graph::Cx;
 use rustc_type_ir as ir;
 pub use rustc_type_ir::solve::*;
 
+use crate::dep_graph::{dep_kinds, DepNodeIndex};
 use crate::infer::canonical::QueryRegionConstraints;
 use crate::ty::{
     self, FallibleTypeFolder, Ty, TyCtxt, TypeFoldable, TypeFolder, TypeVisitable, TypeVisitor,
 };
-
-mod cache;
-
-pub use cache::{CacheData, EvaluationCache};
 
 pub type Goal<'tcx, P> = ir::solve::Goal<TyCtxt<'tcx>, P>;
 pub type QueryInput<'tcx, P> = ir::solve::QueryInput<TyCtxt<'tcx>, P>;
@@ -141,5 +140,40 @@ impl<'tcx> TypeFoldable<TyCtxt<'tcx>> for PredefinedOpaques<'tcx> {
 impl<'tcx> TypeVisitable<TyCtxt<'tcx>> for PredefinedOpaques<'tcx> {
     fn visit_with<V: TypeVisitor<TyCtxt<'tcx>>>(&self, visitor: &mut V) -> V::Result {
         self.opaque_types.visit_with(visitor)
+    }
+}
+
+impl<'tcx> Cx for TyCtxt<'tcx> {
+    type ProofTree = Option<&'tcx inspect::CanonicalGoalEvaluationStep<TyCtxt<'tcx>>>;
+
+    type Input = CanonicalInput<'tcx>;
+    type Result = QueryResult<'tcx>;
+
+    type DepNode = DepNodeIndex;
+    type Tracked<T: Clone> = WithDepNode<T>;
+
+    fn mk_tracked<T: Clone>(self, data: T, dep_node: Self::DepNode) -> Self::Tracked<T> {
+        WithDepNode::new(dep_node, data)
+    }
+
+    fn get_tracked<T: Clone>(self, tracked: &Self::Tracked<T>) -> T {
+        tracked.get(self)
+    }
+
+    fn with_anon_task<R>(self, task: impl FnOnce() -> R) -> (R, Self::DepNode) {
+        self.dep_graph.with_anon_task(self, dep_kinds::TraitSelect, task)
+    }
+
+    fn with_global_cache<R>(
+        self,
+        mode: SolverMode,
+        f: impl FnOnce(&mut rustc_search_graph::GlobalCache<Self>) -> R,
+    ) -> R {
+        match mode {
+            SolverMode::Normal => f(&mut *self.new_solver_evaluation_cache.borrow_mut()),
+            SolverMode::Coherence => {
+                f(&mut *self.new_solver_coherence_evaluation_cache.borrow_mut())
+            }
+        }
     }
 }

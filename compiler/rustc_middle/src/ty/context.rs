@@ -873,8 +873,8 @@ pub struct GlobalCtxt<'tcx> {
     pub evaluation_cache: traits::EvaluationCache<'tcx>,
 
     /// Caches the results of goal evaluation in the new solver.
-    pub new_solver_evaluation_cache: solve::EvaluationCache<'tcx>,
-    pub new_solver_coherence_evaluation_cache: solve::EvaluationCache<'tcx>,
+    pub new_solver_evaluation_cache: Lock<rustc_search_graph::GlobalCache<TyCtxt<'tcx>>>,
+    pub new_solver_coherence_evaluation_cache: Lock<rustc_search_graph::GlobalCache<TyCtxt<'tcx>>>,
 
     pub canonical_param_env_cache: CanonicalParamEnvCache<'tcx>,
 
