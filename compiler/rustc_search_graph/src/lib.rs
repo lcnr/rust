@@ -121,7 +121,7 @@ pub enum CycleKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UsageKind {
     Single(CycleKind),
-    Multiple,
+    Mixed,
 }
 
 impl UsageKind {
@@ -131,12 +131,12 @@ impl UsageKind {
                 if lhs == rhs {
                     UsageKind::Single(lhs)
                 } else {
-                    UsageKind::Multiple
+                    UsageKind::Mixed
                 }
             }
-            (UsageKind::Multiple, UsageKind::Multiple)
-            | (UsageKind::Multiple, UsageKind::Single(_))
-            | (UsageKind::Single(_), UsageKind::Multiple) => UsageKind::Multiple,
+            (UsageKind::Mixed, UsageKind::Mixed)
+            | (UsageKind::Mixed, UsageKind::Single(_))
+            | (UsageKind::Single(_), UsageKind::Mixed) => UsageKind::Mixed,
         }
     }
 }
