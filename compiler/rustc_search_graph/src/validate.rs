@@ -78,13 +78,14 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
 
             for entry in entries {
                 let StashedDetachedEntry {
-                    heads,
+                    ref heads,
                     nested_goals: _,
-                    is_coinductive: _,
+                    coinductive_until,
                     input: _,
                     result: _,
-                } = entry;
+                } = *entry;
                 assert_eq!(input, heads.last().unwrap().input);
+                assert!(heads.len() >= coinductive_until);
             }
         }
     }

@@ -143,6 +143,10 @@ impl CycleHeads {
             .or_insert(usage_kind);
     }
 
+    fn len(&self) -> usize {
+        self.heads.len()
+    }
+
     fn iter(&self) -> impl Iterator<Item = (StackDepth, UsageKind)> + '_ {
         self.heads.iter().map(|(depth, usage_kind)| (*depth, *usage_kind))
     }
@@ -180,6 +184,8 @@ impl<X: Cx> NestedGoals<X> {
     }
 }
 
+#[derive(derivative::Derivative)]
+#[derivative(Debug(bound = ""))]
 struct StackEntry<X: Cx> {
     input: X::Input,
     available_depth: AvailableDepth,
@@ -226,9 +232,9 @@ struct CycleHeadData<X: Cx> {
 #[derivative(Debug(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
 struct StashedDetachedEntry<X: Cx> {
     heads: Vec<CycleHeadData<X>>,
+    coinductive_until: usize,
     nested_goals: NestedGoals<X>,
 
-    is_coinductive: bool,
     input: X::Input,
     result: X::Result,
 }
@@ -246,22 +252,37 @@ impl<X: Cx> StashedDetachedEntry<X> {
         // All stack entries used by this stashed entry still have the same
         // provisional result.
         let mut cycle_heads = CycleHeads::default();
-        for &CycleHeadData { input, usage_kind, expected_result } in self.heads.iter().rev() {
-            let Some(depth) = provisional_cache.get(&input).and_then(|e| e.stack_depth) else {
-                return None;
-            };
+        let mut stack_iter = stack.iter_enumerated().rev();
+        let mut coinductive_stack = true;
+        'cycle_heads: for (i, &CycleHeadData { input, usage_kind, expected_result }) in
+            self.heads.iter().enumerate().rev()
+        {
+            'stack_entries: while let Some((depth, entry)) = stack_iter.next() {
+                coinductive_stack = coinductive_stack && cx.step_is_coinductive(entry.input);
 
-            let result_matches = if let Some(actual) = stack[depth].provisional_result {
-                actual == expected_result
-            } else {
-                cx.is_initial_provisional_result(usage_kind, expected_result)
-            };
+                if input != entry.input {
+                    continue 'stack_entries;
+                }
 
-            if result_matches {
-                cycle_heads.add_dependency(depth, usage_kind)
-            } else {
-                return None;
+                if (i >= self.coinductive_until) != coinductive_stack {
+                    return None;
+                }
+
+                let result_matches = if let Some(actual) = entry.provisional_result {
+                    actual == expected_result
+                } else {
+                    cx.is_initial_provisional_result(usage_kind, expected_result)
+                };
+
+                if !result_matches {
+                    return None;
+                }
+
+                cycle_heads.add_dependency(depth, usage_kind);
+                continue 'cycle_heads;
             }
+
+            return None;
         }
 
         // This entry did not use any current stack entry as a nested goal.
@@ -462,17 +483,23 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             };
 
             if let Some(entry) = self.provisional_cache.get(&stashed_entry.input) {
-                if stashed_entry.is_coinductive {
+                // The path from the highest cycle head to the stashed goal is coinductive.
+                if stashed_entry.coinductive_until < stashed_entry.heads.len() {
                     if let Some(e) = &entry.with_coinductive_stack {
-                        assert_eq!(e.highest_cycle_head(), detached_entry.highest_cycle_head());
-                        assert_eq!(e.result, detached_entry.result);
+                        if e.highest_cycle_head() != detached_entry.highest_cycle_head() || e.result != detached_entry.result {
+                            let e_heads = e.heads.iter().map(|(h, _)| self.stack[h].input).collect::<Vec<_>>();
+                            let detached_entry_heads = detached_entry.heads.iter().map(|(h, _)| self.stack[h].input).collect::<Vec<_>>();
+                            tracing::warn!(?stashed_entry.input, ?entry, ?e_heads, ?detached_entry, ?detached_entry_heads, ?stashed_entry, ?self.stack, ?self.provisional_cache);
+                            panic!()
+                        }
                     }
                 } else {
                     if let Some(e) = &entry.with_inductive_stack {
                         if e.highest_cycle_head() != detached_entry.highest_cycle_head() || e.result != detached_entry.result {
                             let e_heads = e.heads.iter().map(|(h, _)| self.stack[h].input).collect::<Vec<_>>();
                             let detached_entry_heads = detached_entry.heads.iter().map(|(h, _)| self.stack[h].input).collect::<Vec<_>>();
-                            tracing::warn!(?input, ?stashed_entry.input, ?entry, ?e_heads, ?detached_entry, ?detached_entry_heads, ?self.provisional_cache);
+                            tracing::warn!(?stashed_entry.input, ?entry, ?e_heads, ?detached_entry, ?detached_entry_heads, ?stashed_entry, ?self.stack, ?self.provisional_cache);
+                            panic!()
                         }
                     }
                 }
@@ -484,6 +511,19 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
 
     fn stash_invalidated_detached_entries(&mut self, cx: X, added_goal: X::Input) {
         let mut stash_detached_entry = |input, entry: DetachedEntry<X>, is_coinductive| {
+            let coinductive_until = if is_coinductive {
+                let highest_cycle_head = entry.heads.highest_cycle_head().unwrap().as_usize();
+                let enumerated_heads = entry.heads.iter().enumerate();
+                let coinductive_heads = enumerated_heads.filter(|(_, (head, _))| {
+                    self.stack.raw[head.as_usize()..highest_cycle_head]
+                        .iter()
+                        .all(|e| cx.step_is_coinductive(e.input))
+                });
+                coinductive_heads.last().unwrap().0
+            } else {
+                entry.heads.len()
+            };
+
             let mut heads = Vec::new();
             for (head, usage_kind) in entry.heads.iter() {
                 let elem = &self.stack[head];
@@ -501,7 +541,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             let stashed_entry = StashedDetachedEntry {
                 heads,
                 nested_goals: entry.nested_goals,
-                is_coinductive,
+                coinductive_until,
                 input,
                 result: entry.result,
             };
@@ -512,9 +552,9 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
 
         #[allow(rustc::potential_query_instability)]
         self.provisional_cache.retain(|input, entry| {
-            if let Some(e) =
-                entry.with_coinductive_stack.take_if(|p| p.nested_goals.contains(added_goal))
-            {
+            if let Some(e) = entry.with_coinductive_stack.take_if(|p| {
+                p.nested_goals.contains(added_goal) || !cx.step_is_coinductive(added_goal)
+            }) {
                 stash_detached_entry(*input, e, true);
             }
             if let Some(e) =
@@ -529,6 +569,23 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
 
     fn stash_dependent_detached_entries(&mut self, cx: X, stack_entry: &StackEntry<X>) {
         let mut stash_detached_entry = |input, entry: DetachedEntry<X>, is_coinductive| {
+            let coinductive_until = if is_coinductive {
+                let highest_cycle_head = entry.heads.highest_cycle_head().unwrap().as_usize();
+                let enumerated_heads = entry
+                    .heads
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, (h, _))| h.as_usize() != highest_cycle_head);
+                let coinductive_heads = enumerated_heads.filter(|(_, (head, _))| {
+                    self.stack.raw[head.as_usize()..]
+                        .iter()
+                        .all(|e| cx.step_is_coinductive(e.input))
+                });
+                coinductive_heads.last().map_or(entry.heads.len() - 1, |(i, _)| i)
+            } else {
+                entry.heads.len()
+            };
+
             let mut heads = Vec::new();
             for (head, usage_kind) in entry.heads.iter() {
                 let elem = self.stack.get(head).unwrap_or_else(|| {
@@ -549,7 +606,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             let stashed_entry = StashedDetachedEntry {
                 heads,
                 nested_goals: entry.nested_goals,
-                is_coinductive,
+                coinductive_until,
                 input,
                 result: entry.result,
             };
@@ -741,7 +798,6 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             );
             return entry.result;
         } else if let Some(stack_depth) = cache_entry.stack_depth {
-            debug!("encountered cycle with depth {stack_depth:?}");
             // We have a nested goal which directly relies on a goal deeper in the stack.
             //
             // We start by tagging all cycle participants, as that's necessary for caching.
@@ -752,6 +808,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             let is_coinductive_cycle = Self::stack_coinductive_from(cx, &self.stack, stack_depth);
             let usage_kind =
                 if is_coinductive_cycle { UsageKind::Coinductive } else { UsageKind::Inductive };
+            debug!(?usage_kind, "encountered cycle with depth {stack_depth:?}");
             let heads = CycleHeads::new_head(stack_depth, usage_kind);
             Self::tag_cycle_participants(&mut self.stack, &heads, None);
 
