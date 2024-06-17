@@ -22,6 +22,7 @@ use rustc_middle::bug;
 use rustc_middle::infer::canonical::CanonicalVarInfos;
 use rustc_middle::traits::solve::{
     CanonicalResponse, Certainty, ExternalConstraintsData, Goal, GoalSource, QueryResult, Response,
+    SolverMode,
 };
 use rustc_middle::ty::{
     self, AliasRelationDirection, CoercePredicate, RegionOutlivesPredicate, SubtypePredicate, Ty,
@@ -55,19 +56,6 @@ pub use normalize::{deeply_normalize, deeply_normalize_with_skipped_universes};
 /// recursion limit again. However, this feels very unlikely.
 const FIXPOINT_STEP_LIMIT: usize = 8;
 
-#[derive(Debug, Clone, Copy)]
-enum SolverMode {
-    /// Ordinary trait solving, using everywhere except for coherence.
-    Normal,
-    /// Trait solving during coherence. There are a few notable differences
-    /// between coherence and ordinary trait solving.
-    ///
-    /// Most importantly, trait solving during coherence must not be incomplete,
-    /// i.e. return `Err(NoSolution)` for goals for which a solution exists.
-    /// This means that we must not make any guesses or arbitrary choices.
-    Coherence,
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum GoalEvaluationKind {
     Root,
@@ -77,9 +65,15 @@ enum GoalEvaluationKind {
 #[extension(trait CanonicalResponseExt)]
 impl<'tcx> Canonical<'tcx, Response<TyCtxt<'tcx>>> {
     fn has_no_inference_or_external_constraints(&self) -> bool {
-        self.value.external_constraints.region_constraints.is_empty()
-            && self.value.var_values.is_identity()
-            && self.value.external_constraints.opaque_types.is_empty()
+        let ExternalConstraintsData {
+            ref region_constraints,
+            ref opaque_types,
+            ref normalization_nested_goals,
+        } = *self.value.external_constraints;
+        self.value.var_values.is_identity()
+            && region_constraints.is_empty()
+            && opaque_types.is_empty()
+            && normalization_nested_goals.is_empty()
     }
 }
 
