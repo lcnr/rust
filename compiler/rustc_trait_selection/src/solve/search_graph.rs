@@ -3,7 +3,8 @@ use crate::solve::{CanonicalResponseExt, FIXPOINT_STEP_LIMIT};
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::traits::solve::{CanonicalInput, Certainty, QueryResult};
 use rustc_middle::ty::TyCtxt;
-use rustc_search_graph::{self as sg, CycleKind, Delegate, UsageKind};
+use rustc_search_graph::{self as sg, Delegate, PathKind, UsageKind};
+use rustc_type_ir::solve::MaybeCause;
 
 pub(super) struct SearchGraphDelegate;
 pub(super) type SearchGraph<I> = sg::SearchGraph<I, SearchGraphDelegate>;
@@ -17,17 +18,34 @@ impl<'tcx> Delegate<SearchGraphDelegate> for TyCtxt<'tcx> {
         self.recursion_limit().0
     }
 
-    fn initial_provisional_result(self, cycle_kind: CycleKind, input: Self::Input) -> Self::Result {
+    fn initial_provisional_result(self, cycle_kind: PathKind, input: Self::Input) -> Self::Result {
         match cycle_kind {
-            CycleKind::Coinductive => response_no_constraints(self, input, Certainty::Yes),
-            CycleKind::Inductive => {
-                response_no_constraints(self, input, Certainty::overflow(false))
+            PathKind::Coinductive => response_no_constraints(self, input, Certainty::Yes),
+            PathKind::Inductive => response_no_constraints(self, input, Certainty::overflow(false)),
+        }
+    }
+
+    fn is_initial_provisional_result(
+        self,
+        _input: Self::Input,
+        result: Self::Result,
+    ) -> Option<PathKind> {
+        // FIXME(trait-system-refactor-initiative#117): This is currently slightly
+        // broken. Add an assert that the result actually matches the initial
+        // provisional result once that issue is fixed.
+        let r = result.ok().filter(|r| r.has_no_inference_or_external_constraints())?;
+        match r.value.certainty {
+            Certainty::Yes => Some(PathKind::Coinductive),
+            Certainty::Maybe(MaybeCause::Overflow { suggest_increasing_limit: false }) => {
+                Some(PathKind::Inductive)
             }
+            _ => None,
         }
     }
 
     fn reached_fixpoint(
         self,
+        input: Self::Input,
         usage_kind: UsageKind,
         provisional_result: Option<Self::Result>,
         result: Self::Result,
@@ -47,14 +65,11 @@ impl<'tcx> Delegate<SearchGraphDelegate> for TyCtxt<'tcx> {
             // If we already have a provisional result for this cycle head from
             // a previous iteration, simply check for a fixpoint.
             r == result
-        } else if usage_kind == UsageKind::Single(CycleKind::Coinductive) {
-            // If we only used this cycle head with inductive cycles, and the final
-            // response is trivially true, no need to rerun.
-            is_response_no_constraints(result, |c| c == Certainty::Yes)
         } else {
-            // No need to check exclusively inductive cycles, as these are covered by the
-            // general overflow branch above.
-            false
+            match self.is_initial_provisional_result(input, result) {
+                Some(path_kind) => usage_kind == UsageKind::Single(path_kind),
+                None => false,
+            }
         }
     }
 
@@ -71,8 +86,12 @@ impl<'tcx> Delegate<SearchGraphDelegate> for TyCtxt<'tcx> {
         response_no_constraints(self, input, Certainty::overflow(false))
     }
 
-    fn step_is_coinductive(self, input: Self::Input) -> bool {
-        input.value.goal.predicate.is_coinductive(self)
+    fn step_kind(self, input: Self::Input) -> PathKind {
+        if input.value.goal.predicate.is_coinductive(self) {
+            PathKind::Coinductive
+        } else {
+            PathKind::Inductive
+        }
     }
 }
 

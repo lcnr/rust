@@ -25,7 +25,7 @@ pub trait Interner:
     + IrPrint<ty::SubtypePredicate<Self>>
     + IrPrint<ty::CoercePredicate<Self>>
     + IrPrint<ty::FnSig<Self>>
-    + rustc_search_graph::Cx<ProofTree = Option<Self::CanonicalGoalEvaluationStepRef>>
+    + rustc_search_graph::Cx
 {
     type DefId: Copy + Debug + Hash + Eq + TypeFoldable<Self>;
     type AdtDef: AdtDef<Self>;

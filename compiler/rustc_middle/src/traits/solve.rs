@@ -5,6 +5,7 @@ use rustc_query_system::cache::WithDepNode;
 use rustc_search_graph::Cx;
 use rustc_type_ir as ir;
 pub use rustc_type_ir::solve::*;
+use std::fmt::Debug;
 
 use crate::dep_graph::{dep_kinds, DepNodeIndex};
 use crate::infer::canonical::QueryRegionConstraints;
@@ -144,19 +145,17 @@ impl<'tcx> TypeVisitable<TyCtxt<'tcx>> for PredefinedOpaques<'tcx> {
 }
 
 impl<'tcx> Cx for TyCtxt<'tcx> {
-    type ProofTree = Option<&'tcx inspect::CanonicalGoalEvaluationStep<TyCtxt<'tcx>>>;
-
     type Input = CanonicalInput<'tcx>;
     type Result = QueryResult<'tcx>;
 
     type DepNode = DepNodeIndex;
-    type Tracked<T: Clone> = WithDepNode<T>;
+    type Tracked<T: Debug + Clone> = WithDepNode<T>;
 
-    fn mk_tracked<T: Clone>(self, data: T, dep_node: Self::DepNode) -> Self::Tracked<T> {
+    fn mk_tracked<T: Debug + Clone>(self, data: T, dep_node: Self::DepNode) -> Self::Tracked<T> {
         WithDepNode::new(dep_node, data)
     }
 
-    fn get_tracked<T: Clone>(self, tracked: &Self::Tracked<T>) -> T {
+    fn get_tracked<T: Debug + Clone>(self, tracked: &Self::Tracked<T>) -> T {
         tracked.get(self)
     }
 

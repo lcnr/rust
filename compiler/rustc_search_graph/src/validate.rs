@@ -17,26 +17,15 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
 
         for (depth, entry) in stack.iter_enumerated() {
             let StackEntry {
-                input,
+                input: _,
                 available_depth: _,
                 reached_depth: _,
-                ref heads,
+                heads: _,
                 encountered_overflow: _,
                 has_been_used: _,
                 ref nested_goals,
                 provisional_result: _,
             } = *entry;
-
-            if let Some(head) = heads.lowest_cycle_head() {
-                let mut current_root = head;
-                while let Some(parent) = stack[current_root].heads.lowest_cycle_head() {
-                    current_root = parent;
-                }
-
-                for entry in &stack.raw[current_root.index()..depth.index()] {
-                    assert!(entry.nested_goals.contains(input));
-                }
-            }
 
             if !nested_goals.is_empty() {
                 for entry in stack.iter().take(depth.as_usize()) {
