@@ -1,4 +1,4 @@
-use rustc_data_structures::fx::FxHashSet;
+use rustc_data_structures::fx::FxHashMap;
 use rustc_index::IndexVec;
 use std::{cmp::Ordering, collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData};
 use tracing::debug;
@@ -165,6 +165,14 @@ impl CycleHeads {
         self.heads.is_empty()
     }
 
+    fn contains<X: Cx>(
+        &self,
+        stack: &IndexVec<StackDepth, StackEntry<X>>,
+        input: X::Input,
+    ) -> bool {
+        self.heads.iter().any(|(h, _)| stack[*h].input == input)
+    }
+
     fn iter(&self) -> impl Iterator<Item = (StackDepth, UsageKind)> + '_ {
         self.heads.iter().map(|(h, u)| (*h, *u))
     }
@@ -196,26 +204,133 @@ impl CycleHeads {
 }
 
 #[derive(derivative::Derivative)]
+#[derivative(Debug(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
+#[derivative(Clone(bound = ""), Copy(bound = ""))]
+enum ExpectedResult<X: Cx> {
+    Value(X::Result),
+    Initial(UsageKind),
+}
+
+impl<X: Cx> ExpectedResult<X> {
+    fn from_known<D>(cx: X, input: X::Input, result: X::Result) -> ExpectedResult<X>
+    where
+        X: Delegate<D>,
+    {
+        match cx.is_initial_provisional_result(input, result) {
+            Some(path_kind) => ExpectedResult::Initial(UsageKind::Single(path_kind)),
+            None => ExpectedResult::Value(result),
+        }
+    }
+}
+
+#[derive(derivative::Derivative)]
+#[derivative(
+    Debug(bound = ""),
+    PartialEq(bound = ""),
+    Eq(bound = ""),
+    Clone(bound = ""),
+    Copy(bound = "")
+)]
+struct NestedGoal<X: Cx> {
+    path_from_entry: UsageKind,
+    expected_result: Option<ExpectedResult<X>>,
+}
+
+impl<X: Cx> NestedGoal<X> {
+    fn after_step(self, step_kind: PathKind) -> Self {
+        match step_kind {
+            PathKind::Coinductive => self,
+            PathKind::Inductive => {
+                let path_from_entry = UsageKind::Single(PathKind::Inductive);
+                match self.expected_result {
+                    None
+                    | Some(ExpectedResult::Value(_))
+                    | Some(ExpectedResult::Initial(UsageKind::Single(PathKind::Inductive))) => {
+                        NestedGoal { path_from_entry, expected_result: self.expected_result }
+                    }
+                    Some(ExpectedResult::Initial(
+                        UsageKind::Single(PathKind::Coinductive) | UsageKind::Mixed,
+                    )) => NestedGoal { path_from_entry, expected_result: None },
+                }
+            }
+        }
+    }
+
+    fn merge_expected_results(self, other: NestedGoal<X>) -> Option<ExpectedResult<X>> {
+        match (self.expected_result?, other.expected_result?) {
+            (ExpectedResult::Value(lhs), ExpectedResult::Value(rhs)) => {
+                if lhs == rhs {
+                    Some(ExpectedResult::Value(lhs))
+                } else {
+                    None
+                }
+            }
+
+            (ExpectedResult::Value(_), ExpectedResult::Initial(_))
+            | (ExpectedResult::Initial(_), ExpectedResult::Value(_)) => None,
+
+            (
+                ExpectedResult::Initial(UsageKind::Single(PathKind::Coinductive)),
+                ExpectedResult::Initial(UsageKind::Single(PathKind::Coinductive)),
+            ) => Some(ExpectedResult::Initial(UsageKind::Single(PathKind::Coinductive))),
+            (
+                ExpectedResult::Initial(UsageKind::Single(PathKind::Inductive)),
+                ExpectedResult::Initial(UsageKind::Single(PathKind::Inductive)),
+            ) => Some(ExpectedResult::Initial(UsageKind::Single(PathKind::Inductive))),
+            (ExpectedResult::Initial(lhs), ExpectedResult::Initial(rhs)) => {
+                // TODO: fuzz after enabling this and show that it errors + test
+                if lhs == self.path_from_entry && rhs == other.path_from_entry {
+                    Some(ExpectedResult::Initial(UsageKind::Mixed))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn merge(self, other: NestedGoal<X>) -> NestedGoal<X> {
+        let path_from_entry = self.path_from_entry.merge(other.path_from_entry);
+        let expected_result = self.merge_expected_results(other);
+        NestedGoal { path_from_entry, expected_result }
+    }
+
+    fn and_merge(&mut self, other: NestedGoal<X>) {
+        *self = self.merge(other);
+    }
+}
+
+#[derive(derivative::Derivative)]
 #[derivative(Debug(bound = ""), PartialEq(bound = ""), Eq(bound = ""), Default(bound = ""))]
 struct NestedGoals<X: Cx> {
-    nested_goals: FxHashSet<X::Input>,
+    nested_goals: FxHashMap<X::Input, NestedGoal<X>>,
 }
 
 impl<X: Cx> NestedGoals<X> {
-    fn insert(&mut self, goal: X::Input) {
-        self.nested_goals.insert(goal);
+    fn insert<D>(
+        &mut self,
+        input: X::Input,
+        path_from_entry: UsageKind,
+        expected_result: Option<ExpectedResult<X>>,
+    ) where
+        X: Delegate<D>,
+    {
+        let nested_goal = NestedGoal { path_from_entry, expected_result };
+        self.nested_goals.entry(input).or_insert(nested_goal).and_merge(nested_goal);
     }
 
-    fn extend(&mut self, goals: &NestedGoals<X>) {
-        self.nested_goals.extend(&goals.nested_goals);
+    fn extend_from_child(&mut self, step_kind: PathKind, nested_goals: &NestedGoals<X>) {
+        #[allow(rustc::potential_query_instability)]
+        for (&input, nested_goal) in nested_goals.nested_goals.iter() {
+            let updated_nested_goal = nested_goal.after_step(step_kind);
+            self.nested_goals
+                .entry(input)
+                .or_insert(updated_nested_goal)
+                .and_merge(updated_nested_goal)
+        }
     }
 
     fn contains(&self, input: X::Input) -> bool {
-        self.nested_goals.contains(&input)
-    }
-
-    fn referenced_by_stack(&self, stack: &IndexVec<StackDepth, StackEntry<X>>) -> bool {
-        stack.iter().any(|e| self.nested_goals.contains(&e.input))
+        self.nested_goals.contains_key(&input)
     }
 }
 
@@ -292,18 +407,22 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
         heads: &CycleHeads,
         reached_depth: StackDepth,
         encountered_overflow: bool,
+        result: X::Result,
     ) {
         if let Some(parent_index) = self.stack.last_index() {
             let parent = &mut self.stack[parent_index];
             parent.reached_depth = parent.reached_depth.max(reached_depth);
             parent.encountered_overflow |= encountered_overflow;
 
-            parent.nested_goals.extend(nested_goals);
-            if !heads.is_empty() || encountered_overflow {
-                parent.nested_goals.insert(input);
-            }
+            let step_kind = cx.step_kind(parent.input);
+            parent.heads.extend_from_child(parent_index, step_kind, &heads);
 
-            parent.heads.extend_from_child(parent_index, cx.step_kind(parent.input), &heads);
+            parent.nested_goals.extend_from_child(step_kind, nested_goals);
+            if !heads.is_empty() || encountered_overflow {
+                let usage_kind = UsageKind::Single(cx.step_kind(parent.input));
+                let expected_result = ExpectedResult::from_known(cx, input, result);
+                parent.nested_goals.insert(input, usage_kind, Some(expected_result));
+            }
         }
     }
 
@@ -466,10 +585,10 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
         // not tracked by the cache key and from outside of this anon task, it
         // must not be added to the global cache. Notably, this is the case for
         // trait solver cycles participants.
-        let ((final_entry, result), dep_node) = cx.with_anon_task(|| {
+        let ((final_entry, meh, result), dep_node) = cx.with_anon_task(|| {
             for _ in 0..X::FIXPOINT_STEP_LIMIT {
                 match self.fixpoint_step_in_task(cx, input, inspect, &mut prove_goal) {
-                    StepResult::Done(final_entry, result) => return (final_entry, result),
+                    StepResult::Done(final_entry, result) => return (final_entry, false, result),
                     StepResult::HasChanged => {}
                 }
             }
@@ -478,7 +597,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             let current_entry = self.stack.pop().unwrap();
             debug_assert!(current_entry.has_been_used.is_none());
             let result = cx.on_fixpoint_overflow(input);
-            (current_entry, result)
+            (current_entry, true, result)
         });
 
         inspect.finalize_canonical_goal_evaluation(cx);
@@ -490,14 +609,15 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             &final_entry.nested_goals,
             &final_entry.heads,
             final_entry.reached_depth,
-            final_entry.encountered_overflow,
+            final_entry.encountered_overflow ||meh,
+            result,
         );
 
         // WARNING: We move a goal into the global cache after updating its parents.
         // We have to make sure that updating the parent doesn't impact the cache
         // entry. This is necessary as `update_parent_goal` relies on `final_entry`.
         if let Some(expected) = verify_result {
-            assert_eq!(result, expected);
+            assert_eq!(result, expected, "input={input:?}, result={result:?}, expected={expected:?}");
         } else if inspect.is_noop() {
             self.insert_global_cache(cx, input, final_entry, result, dep_node)
         }

@@ -1,6 +1,6 @@
 use crate::{
-    AvailableDepth, Cx, CycleHeads, Delegate, NestedGoals, PathKind, SearchGraph, StackDepth,
-    StackEntry, UsageKind,
+    AvailableDepth, Cx, CycleHeads, Delegate, ExpectedResult, NestedGoal, NestedGoals, PathKind,
+    SearchGraph, StackDepth, StackEntry, UsageKind,
 };
 use rustc_data_structures::fx::FxHashMap;
 use rustc_index::{Idx, IndexVec};
@@ -8,30 +8,25 @@ use std::fmt::Debug;
 use tracing::debug;
 
 #[derive(derivative::Derivative)]
-#[derivative(Debug(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
-#[derivative(Clone(bound = ""), Copy(bound = ""))]
-enum ExpectedResult<X: Cx> {
-    Value(X::Result),
-    Initial(UsageKind),
-}
-
-#[derive(derivative::Derivative)]
-#[derivative(Debug(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
-struct Head<X: Cx> {
-    input: X::Input,
-    /// How this entries uses a given head. Note
-    /// that this only tracks paths from the entry
-    /// to the head.
+#[derivative(
+    Debug(bound = ""),
+    PartialEq(bound = ""),
+    Eq(bound = ""),
+    Clone(bound = ""),
+    Copy(bound = "")
+)]
+struct Dependency<X: Cx> {
+    on_stack: bool,
     path_from_entry: UsageKind,
-    expected_result: ExpectedResult<X>,
+    expected_result: Option<ExpectedResult<X>>,
 }
 
 #[derive(derivative::Derivative)]
 #[derivative(Debug(bound = "DEPTH: Debug"))]
 struct Candidate<X: Cx, DEPTH> {
     additional_depth: DEPTH,
-    heads: Vec<Head<X>>,
-    nested_goals: NestedGoals<X>,
+    dependencies: FxHashMap<X::Input, Dependency<X>>,
+
     result: X::Tracked<X::Result>,
 }
 
@@ -49,12 +44,12 @@ struct CacheEntry<X: Cx> {
 
 #[derive(derivative::Derivative)]
 #[derivative(Debug(bound = ""))]
-struct CacheData<'a, X: Cx> {
+struct CacheData<X: Cx> {
     result: X::Result,
     additional_depth: usize,
     encountered_overflow: bool,
     heads: CycleHeads,
-    nested_goals: &'a NestedGoals<X>,
+    nested_goals: NestedGoals<X>,
 }
 
 #[derive(derivative::Derivative)]
@@ -67,24 +62,22 @@ fn insert<X: Delegate<D>, D>(
     cache: &mut GlobalCache<X>,
     cx: X,
     input: X::Input,
+    dependencies: FxHashMap<X::Input, Dependency<X>>,
 
     result: X::Result,
     dep_node: X::DepNode,
 
     additional_depth: usize,
     encountered_overflow: bool,
-
-    heads: Vec<Head<X>>,
-    nested_goals: NestedGoals<X>,
 ) {
     let result = cx.mk_tracked(result, dep_node);
     let entry = cache.map.entry(input).or_default();
     if encountered_overflow {
-        let candidate = Candidate { additional_depth: (), heads, nested_goals, result };
+        let candidate = Candidate { additional_depth: (), dependencies, result };
         let entry = entry.with_overflow.entry(additional_depth).or_default();
         entry.push(candidate);
     } else {
-        let candidate = Candidate { additional_depth, heads, nested_goals, result };
+        let candidate = Candidate { additional_depth, dependencies, result };
         entry.success.push(candidate);
     }
 }
@@ -142,33 +135,49 @@ fn result_matches_expected<X: Delegate<D>, D>(
     }
 }
 
-fn consider_candidate<'a, X: Delegate<D>, D, DEPTH: Debug + Copy>(
+fn consider_candidate<X: Delegate<D>, D, DEPTH: Debug + Copy>(
     cx: X,
-    candidate: &'a Candidate<X, DEPTH>,
+    candidate: &Candidate<X, DEPTH>,
     stack: &IndexVec<StackDepth, StackEntry<X>>,
     check_depth: impl Fn(DEPTH) -> bool,
     overflow_data: impl Fn(DEPTH) -> (usize, bool),
-) -> Option<CacheData<'a, X>> {
+) -> Option<CacheData<X>> {
     if !check_depth(candidate.additional_depth) {
         return None;
     }
 
     let mut heads = CycleHeads::default();
-    for head in &candidate.heads {
-        let &Head { input, path_from_entry, expected_result } = head;
-        let Some((head, entry)) = stack.iter_enumerated().find(|(_, e)| e.input == input) else {
-            return None;
+    for (head, entry) in stack.iter_enumerated() {
+        let Some(&Dependency { path_from_entry, expected_result, .. }) =
+            candidate.dependencies.get(&entry.input)
+        else {
+            continue;
         };
 
-        if !result_matches_expected(cx, stack, path_from_entry, expected_result, head, entry) {
+        if !expected_result.is_some_and(|expected_result| {
+            result_matches_expected(cx, stack, path_from_entry, expected_result, head, entry)
+        }) {
             return None;
         }
 
         heads.insert(head, path_from_entry);
     }
 
-    if candidate.nested_goals.referenced_by_stack(stack) {
-        return None;
+    let mut nested_goals = NestedGoals::default();
+    #[allow(rustc::potential_query_instability)]
+    for (&input, &dependency) in &candidate.dependencies {
+        if heads.contains(stack, input) {
+            continue;
+        }
+
+        // If a dependency was on the stack when computing the cache entry
+        // then we can only use that cache entry if it is also on the stack
+        // during lookup.
+        if dependency.on_stack {
+            return None;
+        }
+
+        nested_goals.insert(input, dependency.path_from_entry, dependency.expected_result);
     }
 
     let (additional_depth, encountered_overflow) = overflow_data(candidate.additional_depth);
@@ -178,25 +187,27 @@ fn consider_candidate<'a, X: Delegate<D>, D, DEPTH: Debug + Copy>(
         additional_depth,
         encountered_overflow,
         heads,
-        nested_goals: &candidate.nested_goals,
+        nested_goals,
     })
 }
 
-fn consider_candidates<'a, X: Delegate<D>, D, DEPTH: Debug + Copy>(
+fn consider_candidates<X: Delegate<D>, D, DEPTH: Debug + Copy>(
     cx: X,
-    candidates: &'a [Candidate<X, DEPTH>],
+    candidates: &[Candidate<X, DEPTH>],
     stack: &IndexVec<StackDepth, StackEntry<X>>,
     check_depth: impl Fn(DEPTH) -> bool,
     overflow_data: impl Fn(DEPTH) -> (usize, bool),
-) -> Option<CacheData<'a, X>> {
-    let mut results = candidates.iter().filter_map(|candidate| {
+) -> Option<CacheData<X>> {
+    let mut results = candidates.iter().rev().filter_map(|candidate| {
         consider_candidate(cx, candidate, stack, &check_depth, &overflow_data)
     });
 
     let result = results.next();
     if cfg!(debug_assertions) {
-        if let Some(second) = results.next() {
-            panic!("multiple applicable candidates: first={result:?}, second={second:?}");
+        for other in results {
+            if other.result != result.as_ref().unwrap().result {
+                panic!("inconsistent results: first={result:?}, second={other:?}");
+            }
         }
     }
     result
@@ -206,13 +217,13 @@ fn consider_candidates<'a, X: Delegate<D>, D, DEPTH: Debug + Copy>(
 /// and handling root goals of coinductive cycles.
 ///
 /// If this returns `Some` the cache result can be used.
-fn get<'a, X: Delegate<D>, D>(
-    cache: &'a GlobalCache<X>,
+fn get<X: Delegate<D>, D>(
+    cache: &GlobalCache<X>,
     cx: X,
     input: X::Input,
     stack: &IndexVec<StackDepth, StackEntry<X>>,
     available_depth: AvailableDepth,
-) -> Option<CacheData<'a, X>> {
+) -> Option<CacheData<X>> {
     let entry = cache.map.get(&input)?;
     if let Some(data) = consider_candidates(
         cx,
@@ -276,10 +287,11 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             self.update_parent_goal(
                 cx,
                 input,
-                nested_goals,
+                &nested_goals,
                 &heads,
                 reached_depth,
                 encountered_overflow,
+                result,
             );
 
             debug!("global cache hit");
@@ -295,14 +307,11 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
         result: X::Result,
         dep_node: X::DepNode,
     ) {
-        let mut heads = vec![];
+        let mut dependencies = FxHashMap::default();
         for (head, path_from_entry) in final_entry.heads.iter() {
             let input = self.stack[head].input;
             let expected_result = if let Some(result) = self.stack[head].provisional_result {
-                match cx.is_initial_provisional_result(input, result) {
-                    Some(path_kind) => ExpectedResult::Initial(UsageKind::Single(path_kind)),
-                    None => ExpectedResult::Value(result),
-                }
+                ExpectedResult::from_known(cx, input, result)
             } else {
                 let expected = match path_from_entry {
                     UsageKind::Single(PathKind::Inductive) => path_from_entry,
@@ -318,22 +327,37 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
 
                 ExpectedResult::Initial(expected)
             };
-            heads.push(Head { input, path_from_entry, expected_result })
+            let prev = dependencies.insert(
+                input,
+                Dependency {
+                    on_stack: true,
+                    path_from_entry,
+                    expected_result: Some(expected_result),
+                },
+            );
+            debug_assert_eq!(prev, None);
+        }
+
+        #[allow(rustc::potential_query_instability)]
+        for (input, nested_goal) in final_entry.nested_goals.nested_goals {
+            let NestedGoal { path_from_entry, expected_result } = nested_goal;
+            let prev = dependencies
+                .insert(input, Dependency { on_stack: false, path_from_entry, expected_result });
+            debug_assert_eq!(prev, None);
         }
 
         let additional_depth = final_entry.reached_depth.as_usize() - self.stack.len();
-        debug!(?input, ?heads, ?final_entry.nested_goals,  "to global cache");
+        debug!(?input, ?dependencies, "to global cache");
         cx.with_global_cache(self.mode, |cache| {
             insert(
                 cache,
                 cx,
                 input,
+                dependencies,
                 result,
                 dep_node,
                 additional_depth,
                 final_entry.encountered_overflow,
-                heads,
-                final_entry.nested_goals,
             )
         });
 
