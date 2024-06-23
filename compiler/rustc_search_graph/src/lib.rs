@@ -232,6 +232,7 @@ impl<X: Cx> ExpectedResult<X> {
     Copy(bound = "")
 )]
 struct NestedGoal<X: Cx> {
+    is_tainted: bool,
     path_from_entry: UsageKind,
     expected_result: Option<ExpectedResult<X>>,
 }
@@ -246,11 +247,19 @@ impl<X: Cx> NestedGoal<X> {
                     None
                     | Some(ExpectedResult::Value(_))
                     | Some(ExpectedResult::Initial(UsageKind::Single(PathKind::Inductive))) => {
-                        NestedGoal { path_from_entry, expected_result: self.expected_result }
+                        NestedGoal {
+                            is_tainted: self.is_tainted,
+                            path_from_entry,
+                            expected_result: self.expected_result,
+                        }
                     }
                     Some(ExpectedResult::Initial(
                         UsageKind::Single(PathKind::Coinductive) | UsageKind::Mixed,
-                    )) => NestedGoal { path_from_entry, expected_result: None },
+                    )) => NestedGoal {
+                        is_tainted: self.is_tainted,
+                        path_from_entry,
+                        expected_result: None,
+                    },
                 }
             }
         }
@@ -291,7 +300,11 @@ impl<X: Cx> NestedGoal<X> {
     fn merge(self, other: NestedGoal<X>) -> NestedGoal<X> {
         let path_from_entry = self.path_from_entry.merge(other.path_from_entry);
         let expected_result = self.merge_expected_results(other);
-        NestedGoal { path_from_entry, expected_result }
+        NestedGoal {
+            is_tainted: self.is_tainted || other.is_tainted,
+            path_from_entry,
+            expected_result,
+        }
     }
 
     fn and_merge(&mut self, other: NestedGoal<X>) {
@@ -309,12 +322,13 @@ impl<X: Cx> NestedGoals<X> {
     fn insert<D>(
         &mut self,
         input: X::Input,
+        is_tainted: bool,
         path_from_entry: UsageKind,
         expected_result: Option<ExpectedResult<X>>,
     ) where
         X: Delegate<D>,
     {
-        let nested_goal = NestedGoal { path_from_entry, expected_result };
+        let nested_goal = NestedGoal { is_tainted, path_from_entry, expected_result };
         self.nested_goals.entry(input).or_insert(nested_goal).and_merge(nested_goal);
     }
 
@@ -421,7 +435,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             if !heads.is_empty() || encountered_overflow {
                 let usage_kind = UsageKind::Single(cx.step_kind(parent.input));
                 let expected_result = ExpectedResult::from_known(cx, input, result);
-                parent.nested_goals.insert(input, usage_kind, Some(expected_result));
+                parent.nested_goals.insert(input, true, usage_kind, Some(expected_result));
             }
         }
     }
@@ -585,10 +599,10 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
         // not tracked by the cache key and from outside of this anon task, it
         // must not be added to the global cache. Notably, this is the case for
         // trait solver cycles participants.
-        let ((final_entry, meh, result), dep_node) = cx.with_anon_task(|| {
+        let ((final_entry, result), dep_node) = cx.with_anon_task(|| {
             for _ in 0..X::FIXPOINT_STEP_LIMIT {
                 match self.fixpoint_step_in_task(cx, input, inspect, &mut prove_goal) {
-                    StepResult::Done(final_entry, result) => return (final_entry, false, result),
+                    StepResult::Done(final_entry, result) => return (final_entry, result),
                     StepResult::HasChanged => {}
                 }
             }
@@ -597,7 +611,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             let current_entry = self.stack.pop().unwrap();
             debug_assert!(current_entry.has_been_used.is_none());
             let result = cx.on_fixpoint_overflow(input);
-            (current_entry, true, result)
+            (current_entry, result)
         });
 
         inspect.finalize_canonical_goal_evaluation(cx);
@@ -609,7 +623,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             &final_entry.nested_goals,
             &final_entry.heads,
             final_entry.reached_depth,
-            final_entry.encountered_overflow ||meh,
+            final_entry.encountered_overflow,
             result,
         );
 
@@ -617,7 +631,10 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
         // We have to make sure that updating the parent doesn't impact the cache
         // entry. This is necessary as `update_parent_goal` relies on `final_entry`.
         if let Some(expected) = verify_result {
-            assert_eq!(result, expected, "input={input:?}, result={result:?}, expected={expected:?}");
+            assert_eq!(
+                result, expected,
+                "input={input:?}, result={result:?}, expected={expected:?}"
+            );
         } else if inspect.is_noop() {
             self.insert_global_cache(cx, input, final_entry, result, dep_node)
         }

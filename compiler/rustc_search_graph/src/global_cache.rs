@@ -15,8 +15,22 @@ use tracing::debug;
     Clone(bound = ""),
     Copy(bound = "")
 )]
+enum DependencyKind {
+    OnStack,
+    Nested,
+    Tainted,
+}
+
+#[derive(derivative::Derivative)]
+#[derivative(
+    Debug(bound = ""),
+    PartialEq(bound = ""),
+    Eq(bound = ""),
+    Clone(bound = ""),
+    Copy(bound = "")
+)]
 struct Dependency<X: Cx> {
-    on_stack: bool,
+    kind: DependencyKind,
     path_from_entry: UsageKind,
     expected_result: Option<ExpectedResult<X>>,
 }
@@ -36,7 +50,7 @@ struct Candidate<X: Cx, DEPTH> {
 /// recursion limit in `success`, and all results which hit
 /// the recursion limit in `with_overflow`.
 #[derive(derivative::Derivative)]
-#[derivative(Default(bound = ""))]
+#[derivative(Default(bound = ""), Debug(bound = ""))]
 struct CacheEntry<X: Cx> {
     success: Vec<Candidate<X, usize>>,
     with_overflow: FxHashMap<usize, Vec<Candidate<X, ()>>>,
@@ -146,13 +160,20 @@ fn consider_candidate<X: Delegate<D>, D, DEPTH: Debug + Copy>(
         return None;
     }
 
+    debug!(?candidate, "consider");
+
     let mut heads = CycleHeads::default();
     for (head, entry) in stack.iter_enumerated() {
-        let Some(&Dependency { path_from_entry, expected_result, .. }) =
+        let Some(&Dependency { kind, path_from_entry, expected_result, .. }) =
             candidate.dependencies.get(&entry.input)
         else {
             continue;
         };
+
+        match kind {
+            DependencyKind::Tainted => return None,
+            DependencyKind::OnStack | DependencyKind::Nested => {}
+        }
 
         if !expected_result.is_some_and(|expected_result| {
             result_matches_expected(cx, stack, path_from_entry, expected_result, head, entry)
@@ -173,11 +194,18 @@ fn consider_candidate<X: Delegate<D>, D, DEPTH: Debug + Copy>(
         // If a dependency was on the stack when computing the cache entry
         // then we can only use that cache entry if it is also on the stack
         // during lookup.
-        if dependency.on_stack {
-            return None;
-        }
+        let is_tainted = match dependency.kind {
+            DependencyKind::OnStack => return None,
+            DependencyKind::Nested => false,
+            DependencyKind::Tainted => true,
+        };
 
-        nested_goals.insert(input, dependency.path_from_entry, dependency.expected_result);
+        nested_goals.insert(
+            input,
+            is_tainted,
+            dependency.path_from_entry,
+            dependency.expected_result,
+        );
     }
 
     let (additional_depth, encountered_overflow) = overflow_data(candidate.additional_depth);
@@ -330,7 +358,7 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
             let prev = dependencies.insert(
                 input,
                 Dependency {
-                    on_stack: true,
+                    kind: DependencyKind::OnStack,
                     path_from_entry,
                     expected_result: Some(expected_result),
                 },
@@ -340,9 +368,10 @@ impl<X: Delegate<D>, D> SearchGraph<X, D> {
 
         #[allow(rustc::potential_query_instability)]
         for (input, nested_goal) in final_entry.nested_goals.nested_goals {
-            let NestedGoal { path_from_entry, expected_result } = nested_goal;
-            let prev = dependencies
-                .insert(input, Dependency { on_stack: false, path_from_entry, expected_result });
+            let NestedGoal { is_tainted, path_from_entry, expected_result } = nested_goal;
+            let kind = if is_tainted { DependencyKind::Tainted } else { DependencyKind::Nested };
+            let prev =
+                dependencies.insert(input, Dependency { kind, path_from_entry, expected_result });
             debug_assert_eq!(prev, None);
         }
 
