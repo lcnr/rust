@@ -57,17 +57,17 @@ impl<'tcx> rustc_type_ir::inherent::EvaluationCache<TyCtxt<'tcx>> for &'tcx Eval
         &self,
         tcx: TyCtxt<'tcx>,
         key: CanonicalInput<'tcx>,
-        stack_entries: impl IntoIterator<Item = CanonicalInput<'tcx>>,
+        _stack_entries: impl IntoIterator<Item = CanonicalInput<'tcx>>,
         available_depth: usize,
     ) -> Option<CacheData<TyCtxt<'tcx>>> {
         let map = self.map.borrow();
         let entry = map.get(&key)?;
 
-        for stack_entry in stack_entries {
+        /*for stack_entry in stack_entries {
             if entry.cycle_participants.contains(&stack_entry) {
                 return None;
             }
-        }
+        }*/
 
         if let Some(ref success) = entry.success {
             if Limit(available_depth).value_within_limit(success.additional_depth) {
