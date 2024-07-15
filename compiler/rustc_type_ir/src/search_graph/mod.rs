@@ -50,6 +50,19 @@ pub trait ProofTreeBuilder<X: Cx> {
 }
 
 pub trait Delegate {
+    /// If this returns `true` we do not use the global cache entry
+    /// in case it exists and instead check that recomputing the goal
+    /// matches the cache entry.
+    ///
+    /// Note that the fuzzer must track which cache entries we didn't try
+    /// to use and then consistently not use that cache entry
+    #[inline]
+    fn validate_global_cache(_cx: Self::Cx, _input: <Self::Cx as Cx>::Input) -> bool {
+        false
+    }
+    #[inline]
+    fn finalize_validate(_cx: Self::Cx, _input: <Self::Cx as Cx>::Input) {}
+
     type Cx: Cx;
     const FIXPOINT_STEP_LIMIT: usize;
     type ProofTreeBuilder: ProofTreeBuilder<Self::Cx>;
@@ -363,9 +376,13 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             return D::on_stack_overflow(cx, inspect, input);
         };
 
-        if let Some(result) = self.lookup_global_cache(cx, input, available_depth, inspect) {
+        let verify_result = if D::validate_global_cache(cx, input) {
+            self.lookup_global_cache_untracked(cx, input, available_depth)
+        } else if let Some(result) = self.lookup_global_cache(cx, input, available_depth, inspect) {
             return result;
-        }
+        } else {
+            None
+        };
 
         // Check whether the goal is in the provisional cache.
         // The provisional result may rely on the path to its cycle roots,
@@ -443,7 +460,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             for _ in 0..D::FIXPOINT_STEP_LIMIT {
                 match self.fixpoint_step_in_task(cx, input, inspect, &mut prove_goal) {
                     StepResult::Done(final_entry, result) => return (final_entry, result),
-                    StepResult::HasChanged => debug!("fixpoint changed provisional results"),
+                    StepResult::HasChanged => {}
                 }
             }
 
@@ -462,6 +479,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         // do not remove it from the provisional cache and update its provisional result.
         // We only add the root of cycles to the global cache.
         if let Some(head) = final_entry.non_root_cycle_participant {
+            debug_assert!(verify_result.is_none());
             let coinductive_stack = Self::stack_coinductive_from(cx, &self.stack, head);
 
             let entry = self.provisional_cache.get_mut(&input).unwrap();
@@ -481,24 +499,53 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             // results. See the comment of `StackEntry::nested_goals` for
             // more details.
             self.provisional_cache.remove(&input);
-            let additional_depth = final_entry.reached_depth.as_usize() - self.stack.len();
-            cx.with_global_cache(self.mode, |cache| {
-                cache.insert(
-                    cx,
-                    input,
-                    result,
-                    proof_tree,
-                    dep_node,
-                    additional_depth,
-                    final_entry.encountered_overflow,
-                    &final_entry.nested_goals,
-                )
-            })
+            if let Some(expected) = verify_result {
+                // Do not try to move a goal into the cache again if we're testing the
+                // global cache. We also need to notify the validator that we've
+                // popped a goal from the stack as it must always disable the global
+                // cache for a given goal while we're computing it as it would
+                // otherwise hide cycles.
+                assert_eq!(result, expected, "input={input:?}");
+            } else {
+                debug!(?input, ?result, ?final_entry, "to global cache");
+                let additional_depth = final_entry.reached_depth.as_usize() - self.stack.len();
+                cx.with_global_cache(self.mode, |cache| {
+                    cache.insert(
+                        cx,
+                        input,
+                        result,
+                        proof_tree,
+                        dep_node,
+                        additional_depth,
+                        final_entry.encountered_overflow,
+                        final_entry.nested_goals,
+                    )
+                });
+
+                if cfg!(debug_assertions) {
+                    let actual = self.lookup_global_cache_untracked(cx, input, available_depth);
+                    if actual != Some(result) {
+                        debug!(?input, ?actual, ?result);
+                        panic!();
+                    }
+                }
+            }
         }
 
         self.check_invariants();
 
         result
+    }
+
+    fn lookup_global_cache_untracked(
+        &self,
+        cx: X,
+        input: X::Input,
+        available_depth: AvailableDepth,
+    ) -> Option<X::Result> {
+        cx.with_global_cache(self.mode, |cache| {
+            cache.get(cx, input, &self.stack, available_depth).map(|c| c.result)
+        })
     }
 
     /// Try to fetch a previously computed result from the global cache,
@@ -593,6 +640,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         if D::reached_fixpoint(cx, usage_kind, input, stack_entry.provisional_result, result) {
             StepResult::Done(stack_entry, result)
         } else {
+            debug!(?result, "fixpoint changed provisional results");
             let depth = self.stack.push(StackEntry {
                 has_been_used: None,
                 provisional_result: Some(result),
