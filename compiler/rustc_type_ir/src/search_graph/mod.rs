@@ -280,10 +280,16 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         self.mode
     }
 
-    fn update_parent_goal(&mut self, reached_depth: StackDepth, encountered_overflow: bool) {
+    fn update_parent_goal(
+        &mut self,
+        reached_depth: StackDepth,
+        encountered_overflow: bool,
+        nested_goals: &HashSet<X::Input>,
+    ) {
         if let Some(parent) = self.stack.raw.last_mut() {
             parent.reached_depth = parent.reached_depth.max(reached_depth);
             parent.encountered_overflow |= encountered_overflow;
+            parent.nested_goals.extend(nested_goals);
         }
     }
 
@@ -368,8 +374,11 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         // Check for overflow.
         let Some(available_depth) = AvailableDepth::allowed_depth_for_nested::<D>(cx, &self.stack)
         else {
-            if let Some(last) = self.stack.raw.last_mut() {
+            if let Some((last, start)) = self.stack.raw.split_last_mut() {
                 last.encountered_overflow = true;
+                if let Some(prev) = start.last_mut() {
+                    prev.nested_goals.insert(last.input);
+                }
             }
 
             debug!("encountered stack overflow");
@@ -473,7 +482,11 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
         let proof_tree = inspect.finalize_canonical_goal_evaluation(cx);
 
-        self.update_parent_goal(final_entry.reached_depth, final_entry.encountered_overflow);
+        self.update_parent_goal(
+            final_entry.reached_depth,
+            final_entry.encountered_overflow,
+            &final_entry.nested_goals,
+        );
 
         // We're now done with this goal. In case this goal is involved in a larger cycle
         // do not remove it from the provisional cache and update its provisional result.
@@ -564,7 +577,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 proof_tree,
                 additional_depth,
                 encountered_overflow,
-                nested_goals: _, // FIXME: consider nested goals here.
+                nested_goals,
             } = cache.get(cx, input, &self.stack, available_depth)?;
 
             // If we're building a proof tree and the current cache entry does not
@@ -579,7 +592,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             // its state is the same regardless of whether we've used the
             // global cache or not.
             let reached_depth = self.stack.next_index().plus(additional_depth);
-            self.update_parent_goal(reached_depth, encountered_overflow);
+            self.update_parent_goal(reached_depth, encountered_overflow, nested_goals);
 
             debug!("global cache hit");
             Some(result)
