@@ -19,15 +19,14 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 reached_depth: _,
                 non_root_cycle_participant,
                 encountered_overflow: _,
-                has_been_used,
+                has_been_used: _,
                 ref nested_goals,
-                provisional_result,
+                provisional_result: _,
             } = *entry;
             let cache_entry = provisional_cache.get(&entry.input).unwrap();
             assert_eq!(cache_entry.stack_depth, Some(depth));
             if let Some(head) = non_root_cycle_participant {
                 assert!(head < depth);
-                assert!(nested_goals.is_empty());
                 assert_ne!(stack[head].has_been_used, None);
 
                 let mut current_root = head;
@@ -38,7 +37,6 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             }
 
             if !nested_goals.is_empty() {
-                assert!(provisional_result.is_some() || has_been_used.is_some());
                 for entry in stack.iter().take(depth.as_usize()) {
                     assert_eq!(nested_goals.get(&entry.input), None);
                 }

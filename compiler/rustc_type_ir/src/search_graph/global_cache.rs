@@ -11,8 +11,14 @@ struct QueryData<X: Cx> {
 }
 
 struct Success<X: Cx> {
-    data: X::Tracked<QueryData<X>>,
     additional_depth: usize,
+    nested_goals: HashSet<X::Input>,
+    data: X::Tracked<QueryData<X>>,
+}
+
+struct WithOverflow<X: Cx> {
+    nested_goals: HashSet<X::Input>,
+    data: X::Tracked<QueryData<X>>,
 }
 
 /// The cache entry for a given input.
@@ -24,12 +30,7 @@ struct Success<X: Cx> {
 #[derivative(Default(bound = ""))]
 struct CacheEntry<X: Cx> {
     success: Option<Success<X>>,
-    /// We have to be careful when caching roots of cycles.
-    ///
-    /// See the doc comment of `StackEntry::cycle_participants` for more
-    /// details.
-    nested_goals: HashSet<X::Input>,
-    with_overflow: HashMap<usize, X::Tracked<QueryData<X>>>,
+    with_overflow: HashMap<usize, WithOverflow<X>>,
 }
 
 #[derive(derivative::Derivative)]
@@ -63,15 +64,18 @@ impl<X: Cx> GlobalCache<X> {
 
         additional_depth: usize,
         encountered_overflow: bool,
-        nested_goals: &HashSet<X::Input>,
+        nested_goals: HashSet<X::Input>,
     ) {
         let data = cx.mk_tracked(QueryData { result, proof_tree }, dep_node);
         let entry = self.map.entry(input).or_default();
-        entry.nested_goals.extend(nested_goals);
         if encountered_overflow {
-            entry.with_overflow.insert(additional_depth, data);
+            let with_overflow = WithOverflow { nested_goals, data };
+            let prev = entry.with_overflow.insert(additional_depth, with_overflow);
+            assert!(prev.is_none());
         } else {
-            entry.success = Some(Success { data, additional_depth });
+            let success = Success { additional_depth, nested_goals, data };
+            let prev = entry.success.replace(success);
+            assert!(prev.is_none());
         }
     }
 
@@ -87,32 +91,41 @@ impl<X: Cx> GlobalCache<X> {
         available_depth: AvailableDepth,
     ) -> Option<CacheData<'a, X>> {
         let entry = self.map.get(&input)?;
-        if stack.iter().any(|e| entry.nested_goals.contains(&e.input)) {
-            return None;
-        }
 
-        if let Some(ref success) = entry.success {
-            if available_depth.cache_entry_is_applicable(success.additional_depth) {
-                let QueryData { result, proof_tree } = cx.get_tracked(&success.data);
+        let nested_goal_on_stack = |nested_goals: &HashSet<X::Input>| {
+            stack.iter().any(|e| nested_goals.contains(&e.input))
+        };
+        if let Some(Success { additional_depth, ref nested_goals, ref data }) = entry.success {
+            if available_depth.cache_entry_is_applicable(additional_depth)
+                && !nested_goal_on_stack(nested_goals)
+            {
+                let QueryData { result, proof_tree } = cx.get_tracked(&data);
                 return Some(CacheData {
                     result,
                     proof_tree,
-                    additional_depth: success.additional_depth,
+                    additional_depth,
                     encountered_overflow: false,
-                    nested_goals: &entry.nested_goals,
+                    nested_goals,
                 });
             }
         }
 
-        entry.with_overflow.get(&available_depth.0).map(|e| {
-            let QueryData { result, proof_tree } = cx.get_tracked(e);
-            CacheData {
-                result,
-                proof_tree,
-                additional_depth: available_depth.0,
-                encountered_overflow: true,
-                nested_goals: &entry.nested_goals,
+        let additional_depth = available_depth.0;
+        if let Some(WithOverflow { nested_goals, data }) =
+            entry.with_overflow.get(&additional_depth)
+        {
+            if !nested_goal_on_stack(nested_goals) {
+                let QueryData { result, proof_tree } = cx.get_tracked(data);
+                return Some(CacheData {
+                    result,
+                    proof_tree,
+                    additional_depth,
+                    encountered_overflow: true,
+                    nested_goals,
+                });
             }
-        })
+        }
+
+        None
     }
 }
