@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -120,6 +121,56 @@ impl UsageKind {
             }
         }
     }
+    fn and_merge(&mut self, other: Self) {
+        *self = self.merge(other);
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Default)]
+struct CycleHeads {
+    heads: BTreeSet<StackDepth>,
+}
+
+impl<X: Cx> CycleHeads<X> {
+    fn is_empty(&self) -> bool {
+        self.heads.is_empty()
+    }
+
+    fn contains(&sef, input: StackDepth) -> bool {
+        self.heads.contains_key(&input)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = StackDepth> + '_ {
+        self.heads.iter().copied()
+    }
+
+    fn insert(&mut self, head: X::Input) {
+        self.heads
+            .entry(head)
+            .and_modify(|paths| paths.and_merge(usage_kind))
+            .or_insert(usage_kind);
+    }
+
+    fn extend_from_child(
+        &mut self,
+        this: X::Input,
+        step_kind: CycleKind,
+        child_heads: impl Iterator<Item = (X::Input, UsageKind)>,
+    ) {
+        for (head, usage_kind) in child_heads {
+            if head == this {
+                continue;
+            }
+
+            let updated_usage_kind = match step_kind {
+                // If this step is inductive, then all cycles using this step are inductive.
+                CycleKind::Inductive => UsageKind::Single(CycleKind::Inductive),
+                // If this step is coinductive, then it doesn't impact the cycle kind.
+                CycleKind::Coinductive => usage_kind,
+            };
+            self.insert(head, updated_usage_kind);
+        }
+    }l
 }
 
 #[derive(derivative::Derivative)]
@@ -135,10 +186,6 @@ impl<X: Cx> NestedGoals<X> {
 
     fn extend(&mut self, nested_goals: &NestedGoals<X>) {
         self.nested_goals.extend(nested_goals.nested_goals.iter());
-    }
-
-    fn clear(&mut self) {
-        self.nested_goals.clear();
     }
 
     fn contains(&self, input: X::Input) -> bool {
@@ -198,13 +245,7 @@ struct StackEntry<X: Cx> {
     /// for the top of the stack and lazily updated for the rest.
     reached_depth: StackDepth,
 
-    /// Whether this entry is a non-root cycle participant.
-    ///
-    /// We must not move the result of non-root cycle participants to the
-    /// global cache. We store the highest stack depth of a head of a cycle
-    /// this goal is involved in. This necessary to soundly cache its
-    /// provisional result.
-    non_root_cycle_participant: Option<StackDepth>,
+    cycle_heads: CycleHeads<X>,
 
     encountered_overflow: bool,
 
@@ -233,47 +274,16 @@ struct StackEntry<X: Cx> {
 }
 
 /// The provisional result for a goal which is not on the stack.
-#[derive(Debug)]
+#[derive(derivative::Derivative)]
+#[derivative(Debug(bound = ""))]
 struct DetachedEntry<X: Cx> {
-    /// The head of the smallest non-trivial cycle involving this entry.
-    ///
-    /// Given the following rules, when proving `A` the head for
-    /// the provisional entry of `C` would be `B`.
-    /// ```plain
-    /// A :- B
-    /// B :- C
-    /// C :- A + B + C
-    /// ```
-    head: StackDepth,
+    cycle_heads: CycleHeads<X>,
     result: X::Result,
 }
 
-/// Stores the stack depth of a currently evaluated goal *and* already
-/// computed results for goals which depend on other goals still on the stack.
-///
-/// The provisional result may depend on whether the stack above it is inductive
-/// or coinductive. Because of this, we store separate provisional results for
-/// each case. If an provisional entry is not applicable, it may be the case
-/// that we already have provisional result while computing a goal. In this case
-/// we prefer the provisional result to potentially avoid fixpoint iterations.
-/// See tests/ui/traits/next-solver/cycles/mixed-cycles-2.rs for an example.
-///
-/// The provisional cache can theoretically result in changes to the observable behavior,
-/// see tests/ui/traits/next-solver/cycles/provisional-cache-impacts-behavior.rs.
-#[derive(derivative::Derivative)]
-#[derivative(Default(bound = ""))]
-struct ProvisionalCacheEntry<X: Cx> {
-    stack_depth: Option<StackDepth>,
-    with_inductive_stack: Option<DetachedEntry<X>>,
-    with_coinductive_stack: Option<DetachedEntry<X>>,
-}
-
-impl<X: Cx> ProvisionalCacheEntry<X> {
-    fn is_empty(&self) -> bool {
-        self.stack_depth.is_none()
-            && self.with_inductive_stack.is_none()
-            && self.with_coinductive_stack.is_none()
-    }
+struct CycleCache<X: Cx> {
+    root: StackDepth,
+    entries: HashMap<X::Input, Vec<DetachedEntry<X>>>,
 }
 
 pub struct SearchGraph<D: Delegate<Cx = X>, X: Cx = <D as Delegate>::Cx> {
@@ -282,7 +292,7 @@ pub struct SearchGraph<D: Delegate<Cx = X>, X: Cx = <D as Delegate>::Cx> {
     ///
     /// An element is *deeper* in the stack if its index is *lower*.
     stack: IndexVec<StackDepth, StackEntry<X>>,
-    provisional_cache: HashMap<X::Input, ProvisionalCacheEntry<X>>,
+    cycle_caches: Vec<CycleCache<X>>,
 
     _marker: PhantomData<D>,
 }
@@ -301,16 +311,49 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         self.mode
     }
 
+    fn step_kind(cx: X, input: X::Input) -> CycleKind {
+        if D::step_is_coinductive(cx, input) {
+            CycleKind::Coinductive
+        } else {
+            CycleKind::Inductive
+        }
+    }
+
+    fn update_parent_goal_on_provisional(
+        cx: X,
+        provisional_cache: &HashMap<X::Input, ProvisionalCacheEntry<X>>,
+        stack: &mut IndexVec<StackDepth, StackEntry<X>>,
+        cycle_heads: &CycleHeads<X>,
+    ) {
+        assert!(!cycle_heads.is_empty());
+        let last_index = stack.last_index().unwrap();
+        let parent = &mut stack[last_index];
+        let step_kind = Self::step_kind(cx, parent.input);
+        let child_heads = cycle_heads
+            .iter()
+            .filter(|(key, _)| provisional_cache.get(key).is_some_and(|e| e.stack_depth.is_some()));
+        parent.cycle_heads.extend_from_child(parent.input, step_kind, child_heads);
+    }
+
     fn update_parent_goal(
         &mut self,
+        cx: X,
+        input: X::Input,
         reached_depth: StackDepth,
+        cycle_heads: &CycleHeads<X>,
         encountered_overflow: bool,
         nested_goals: &NestedGoals<X>,
     ) {
-        if let Some(parent) = self.stack.raw.last_mut() {
+        if let Some(last_index) = self.stack.last_index() {
+            let parent = &mut self.stack[last_index];
             parent.reached_depth = parent.reached_depth.max(reached_depth);
             parent.encountered_overflow |= encountered_overflow;
             parent.nested_goals.extend(nested_goals);
+            if !cycle_heads.is_empty() {
+                let step_kind = Self::step_kind(cx, parent.input);
+                parent.cycle_heads.extend_from_child(parent.input, step_kind, cycle_heads.iter());
+                parent.nested_goals.insert(input);
+            }
         }
     }
 
@@ -318,65 +361,36 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         self.stack.is_empty()
     }
 
-    fn stack_coinductive_from(
+    fn stack_path_kind(
         cx: X,
         stack: &IndexVec<StackDepth, StackEntry<X>>,
         head: StackDepth,
-    ) -> bool {
-        stack.raw[head.index()..].iter().all(|entry| D::step_is_coinductive(cx, entry.input))
+    ) -> CycleKind {
+        let is_coinductive =
+            stack.raw[head.index()..].iter().all(|entry| D::step_is_coinductive(cx, entry.input));
+        if is_coinductive { CycleKind::Coinductive } else { CycleKind::Inductive }
     }
 
-    // When encountering a solver cycle, the result of the current goal
-    // depends on goals lower on the stack.
-    //
-    // We have to therefore be careful when caching goals. Only the final result
-    // of the cycle root, i.e. the lowest goal on the stack involved in this cycle,
-    // is moved to the global cache while all others are stored in a provisional cache.
-    //
-    // We update both the head of this cycle to rerun its evaluation until
-    // we reach a fixpoint and all other cycle participants to make sure that
-    // their result does not get moved to the global cache.
-    fn tag_cycle_participants(
-        stack: &mut IndexVec<StackDepth, StackEntry<X>>,
-        usage_kind: Option<UsageKind>,
-        head: StackDepth,
-    ) {
-        if let Some(usage_kind) = usage_kind {
-            stack[head].has_been_used =
-                Some(stack[head].has_been_used.map_or(usage_kind, |prev| prev.merge(usage_kind)));
-        }
-        debug_assert!(stack[head].has_been_used.is_some());
-
-        // The current root of these cycles. Note that this may not be the final
-        // root in case a later goal depends on a goal higher up the stack.
-        let mut current_root = head;
-        while let Some(parent) = stack[current_root].non_root_cycle_participant {
-            current_root = parent;
-            debug_assert!(stack[current_root].has_been_used.is_some());
-        }
-
-        let (stack, cycle_participants) = stack.raw.split_at_mut(head.index() + 1);
-        let current_cycle_root = &mut stack[current_root.as_usize()];
-        for entry in cycle_participants {
-            entry.non_root_cycle_participant = entry.non_root_cycle_participant.max(Some(head));
-            current_cycle_root.nested_goals.insert(entry.input);
-            current_cycle_root.nested_goals.extend(&entry.nested_goals);
-            entry.nested_goals.clear();
-        }
-    }
-
-    fn clear_dependent_provisional_results(
-        provisional_cache: &mut HashMap<X::Input, ProvisionalCacheEntry<X>>,
-        head: StackDepth,
+    fn clear_dependent_cache(
+        cycle_cache: &mut CycleCache<X>,
+        input: X::Input,
     ) {
         #[allow(rustc::potential_query_instability)]
-        provisional_cache.retain(|_, entry| {
-            if entry.with_coinductive_stack.as_ref().is_some_and(|p| p.head == head) {
-                entry.with_coinductive_stack.take();
+        cycle_cache.retain(|_, entry| {
+            entry.detached_entries.retain(|e| e.cycle_heads.contains(input));
+            !entry.is_empty()
+        });
+    }
+
+    fn clear_provisional_cache_after_computing_goal(&mut self, input: X::Input) {
+        #[allow(rustc::potential_query_instability)]
+        self.provisional_cache.retain(|&key, entry| {
+            if key == input {
+                entry.stack_depth = None;
             }
-            if entry.with_inductive_stack.as_ref().is_some_and(|p| p.head == head) {
-                entry.with_inductive_stack.take();
-            }
+            entry.detached_entries.retain(|detached| {
+                self.stack.iter().any(|e| detached.cycle_heads.contains(e.input))
+            });
             !entry.is_empty()
         });
     }
@@ -419,26 +433,12 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         // The provisional result may rely on the path to its cycle roots,
         // so we have to check the path of the current goal matches that of
         // the cache entry.
+        if let Some(result) = self.lookup_provisional_cache(cx, input, inspect) {
+            return result;
+        }
+
         let cache_entry = self.provisional_cache.entry(input).or_default();
-        if let Some(entry) = cache_entry
-            .with_coinductive_stack
-            .as_ref()
-            .filter(|p| Self::stack_coinductive_from(cx, &self.stack, p.head))
-            .or_else(|| {
-                cache_entry
-                    .with_inductive_stack
-                    .as_ref()
-                    .filter(|p| !Self::stack_coinductive_from(cx, &self.stack, p.head))
-            })
-        {
-            debug!("provisional cache hit");
-            // We have a nested goal which is already in the provisional cache, use
-            // its result. We do not provide any usage kind as that should have been
-            // already set correctly while computing the cache entry.
-            inspect.on_provisional_cache_hit();
-            Self::tag_cycle_participants(&mut self.stack, None, entry.head);
-            return entry.result;
-        } else if let Some(stack_depth) = cache_entry.stack_depth {
+        if let Some(stack_depth) = cache_entry.stack_depth {
             debug!("encountered cycle with depth {stack_depth:?}");
             // We have a nested goal which directly relies on a goal deeper in the stack.
             //
@@ -448,15 +448,20 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             // in case we're in the first fixpoint iteration for this goal.
             inspect.on_cycle_in_stack();
 
-            let is_coinductive_cycle = Self::stack_coinductive_from(cx, &self.stack, stack_depth);
-            let cycle_kind =
-                if is_coinductive_cycle { CycleKind::Coinductive } else { CycleKind::Inductive };
-            Self::tag_cycle_participants(
-                &mut self.stack,
-                Some(UsageKind::Single(cycle_kind)),
-                stack_depth,
-            );
+            // Subtle: when encountering a cyclic goal, we still first checked for overflow,
+            // so we have to update the reached depth.
+            let next_index = self.stack.next_index();
+            let last = &mut self.stack.raw.last_mut().unwrap();
+            last.reached_depth = last.reached_depth.max(next_index);
 
+            if last.input != input {
+                let path_from_entry = Self::step_kind(cx, last.input);
+                last.cycle_heads.insert(input, UsageKind::Single(path_from_entry));
+            }
+
+            let cycle_kind = Self::stack_path_kind(cx, &self.stack, stack_depth);
+            let usage_kind = UsageKind::Single(cycle_kind);
+            self.stack[stack_depth].has_been_used.get_or_insert(usage_kind).and_merge(usage_kind);
             // Return the provisional result or, if we're in the first iteration,
             // start with no constraints.
             return if let Some(result) = self.stack[stack_depth].provisional_result {
@@ -471,7 +476,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 input,
                 available_depth,
                 reached_depth: depth,
-                non_root_cycle_participant: None,
+                cycle_heads: Default::default(),
                 encountered_overflow: false,
                 has_been_used: None,
                 nested_goals: Default::default(),
@@ -505,7 +510,10 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         let proof_tree = inspect.finalize_canonical_goal_evaluation(cx);
 
         self.update_parent_goal(
+            cx,
+            input,
             final_entry.reached_depth,
+            &final_entry.cycle_heads,
             final_entry.encountered_overflow,
             &final_entry.nested_goals,
         );
@@ -513,17 +521,13 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         // We're now done with this goal. In case this goal is involved in a larger cycle
         // do not remove it from the provisional cache and update its provisional result.
         // We only add the root of cycles to the global cache.
-        if let Some(head) = final_entry.non_root_cycle_participant {
+        if !final_entry.cycle_heads.is_empty() {
             debug_assert!(verify_result.is_none());
-            let coinductive_stack = Self::stack_coinductive_from(cx, &self.stack, head);
-
             let entry = self.provisional_cache.get_mut(&input).unwrap();
             entry.stack_depth = None;
-            if coinductive_stack {
-                entry.with_coinductive_stack = Some(DetachedEntry { head, result });
-            } else {
-                entry.with_inductive_stack = Some(DetachedEntry { head, result });
-            }
+            entry
+                .detached_entries
+                .push(DetachedEntry { cycle_heads: final_entry.cycle_heads, result });
         } else {
             // When encountering a cycle, both inductive and coinductive, we only
             // move the root into the global cache. We also store all other cycle
@@ -533,6 +537,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             // participant is on the stack. This is necessary to prevent unstable
             // results. See the comment of `StackEntry::nested_goals` for
             // more details.
+            self.clear_provisional_cache_after_computing_goal(input);
             self.provisional_cache.remove(&input);
             if let Some(expected) = verify_result {
                 // Do not try to move a goal into the cache again if we're testing the
@@ -559,7 +564,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
                 if cfg!(debug_assertions) {
                     let actual = self.lookup_global_cache_untracked(cx, input, available_depth);
-                    if actual != Some(result) {
+                    if actual.is_some_and(|actual| actual != result) {
                         debug!(?input, ?actual, ?result);
                         panic!();
                     }
@@ -621,10 +626,62 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             // its state is the same regardless of whether we've used the
             // global cache or not.
             let reached_depth = self.stack.next_index().plus(additional_depth);
-            self.update_parent_goal(reached_depth, encountered_overflow, nested_goals);
+            self.update_parent_goal(
+                cx,
+                input,
+                reached_depth,
+                &Default::default(),
+                encountered_overflow,
+                nested_goals,
+            );
 
             debug!("global cache hit");
             Some(result)
+        })
+    }
+
+    fn lookup_provisional_cache(
+        &mut self,
+        cx: X,
+        input: X::Input,
+        inspect: &mut D::ProofTreeBuilder,
+    ) -> Option<X::Result> {
+        for detached_entry in &self.provisional_cache.get(&input)?.detached_entries {
+            if self.detached_entry_is_applicable(cx, detached_entry) {
+                // We have a nested goal which is already in the provisional cache, use
+                // its result. We do not provide any usage kind as that should have been
+                // already set correctly while computing the cache entry.
+                debug!(?detached_entry, "provisional cache hit");
+                inspect.on_provisional_cache_hit();
+                Self::update_parent_goal_on_provisional(
+                    cx,
+                    &self.provisional_cache,
+                    &mut self.stack,
+                    &detached_entry.cycle_heads,
+                );
+                return Some(detached_entry.result);
+            }
+        }
+
+        None
+    }
+
+    fn detached_entry_is_applicable(&self, cx: X, detached_entry: &DetachedEntry<X>) -> bool {
+        detached_entry.cycle_heads.iter().all(|(head, path_segment)| {
+            let Some(head) = self.provisional_cache.get(&head).and_then(|e| e.stack_depth) else {
+                return true;
+            };
+
+            if self.stack[head].provisional_result.is_some() {
+                return true;
+            }
+
+            match path_segment {
+                UsageKind::Mixed => false,
+                UsageKind::Single(path_segment) => {
+                    SearchGraph::<D, X>::stack_path_kind(cx, &self.stack, head) == path_segment
+                }
+            }
         })
     }
 }
@@ -668,10 +725,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
         // Start by clearing all provisional cache entries which depend on this
         // the current goal.
-        Self::clear_dependent_provisional_results(
-            &mut self.provisional_cache,
-            self.stack.next_index(),
-        );
+        Self::clear_dependent_cache(&mut self.cycle_caches.last_mut().unwrap(), input);
 
         // Check whether we reached a fixpoint, either because the final result
         // is equal to the provisional result of the previous iteration, or because
@@ -688,7 +742,6 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 provisional_result: Some(result),
                 ..stack_entry
             });
-            debug_assert_eq!(self.provisional_cache[&input].stack_depth, Some(depth));
             StepResult::HasChanged
         }
     }

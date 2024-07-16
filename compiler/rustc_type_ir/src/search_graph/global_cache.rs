@@ -38,8 +38,6 @@ pub(super) struct CacheData<'a, X: Cx> {
     pub(super) proof_tree: X::ProofTree,
     pub(super) additional_depth: usize,
     pub(super) encountered_overflow: bool,
-    // FIXME: This is currently unused, but impacts the design
-    // by requiring a closure for `Cx::with_global_cache`.
     pub(super) nested_goals: &'a NestedGoals<X>,
 }
 

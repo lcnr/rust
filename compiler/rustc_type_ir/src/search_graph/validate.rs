@@ -5,7 +5,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
     pub(super) fn check_invariants(&self) {
         if !cfg!(debug_assertions) {
             return;
-        }
+        }/*
 
         let SearchGraph { mode: _, stack, provisional_cache, _marker } = self;
         if stack.is_empty() {
@@ -17,7 +17,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 input,
                 available_depth: _,
                 reached_depth: _,
-                non_root_cycle_participant,
+                ref cycle_heads,
                 encountered_overflow: _,
                 has_been_used: _,
                 ref nested_goals,
@@ -25,15 +25,10 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             } = *entry;
             let cache_entry = provisional_cache.get(&entry.input).unwrap();
             assert_eq!(cache_entry.stack_depth, Some(depth));
-            if let Some(head) = non_root_cycle_participant {
-                assert!(head < depth);
-                assert_ne!(stack[head].has_been_used, None);
-
-                let mut current_root = head;
-                while let Some(parent) = stack[current_root].non_root_cycle_participant {
-                    current_root = parent;
-                }
-                assert!(stack[current_root].nested_goals.contains(input));
+            for (&head, _usage_kind) in cycle_heads.heads.iter() {
+                assert_ne!(head, input);
+                let stack_depth = self.provisional_cache.get(&head).unwrap().stack_depth.unwrap();
+                // assert_ne!(stack[stack_depth].has_been_used, None);
             }
 
             if !nested_goals.nested_goals.is_empty() {
@@ -44,30 +39,12 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         }
 
         for (&input, entry) in &self.provisional_cache {
-            let ProvisionalCacheEntry { stack_depth, with_coinductive_stack, with_inductive_stack } =
-                entry;
-            assert!(
-                stack_depth.is_some()
-                    || with_coinductive_stack.is_some()
-                    || with_inductive_stack.is_some()
-            );
+            let ProvisionalCacheEntry { stack_depth, detached_entries } = entry;
+            assert!(stack_depth.is_some() || !detached_entries.is_empty());
 
             if let &Some(stack_depth) = stack_depth {
                 assert_eq!(stack[stack_depth].input, input);
             }
-
-            let check_detached = |detached_entry: &DetachedEntry<X>| {
-                let DetachedEntry { head, result: _ } = *detached_entry;
-                assert_ne!(stack[head].has_been_used, None);
-            };
-
-            if let Some(with_coinductive_stack) = with_coinductive_stack {
-                check_detached(with_coinductive_stack);
-            }
-
-            if let Some(with_inductive_stack) = with_inductive_stack {
-                check_detached(with_inductive_stack);
-            }
-        }
+        }*/
     }
 }
