@@ -1,5 +1,5 @@
-use super::{AvailableDepth, Cx};
-use crate::data_structures::{HashMap, HashSet};
+use super::{AvailableDepth, Cx, NestedGoals};
+use crate::data_structures::HashMap;
 
 #[derive(derivative::Derivative)]
 #[derivative(Debug(bound = ""), Clone(bound = ""), Copy(bound = ""))]
@@ -10,12 +10,12 @@ struct QueryData<X: Cx> {
 
 struct Success<X: Cx> {
     additional_depth: usize,
-    nested_goals: HashSet<X::Input>,
+    nested_goals: NestedGoals<X>,
     data: X::Tracked<QueryData<X>>,
 }
 
 struct WithOverflow<X: Cx> {
-    nested_goals: HashSet<X::Input>,
+    nested_goals: NestedGoals<X>,
     data: X::Tracked<QueryData<X>>,
 }
 
@@ -40,7 +40,7 @@ pub(super) struct CacheData<'a, X: Cx> {
     pub(super) encountered_overflow: bool,
     // FIXME: This is currently unused, but impacts the design
     // by requiring a closure for `Cx::with_global_cache`.
-    pub(super) nested_goals: &'a HashSet<X::Input>,
+    pub(super) nested_goals: &'a NestedGoals<X>,
 }
 
 #[derive(derivative::Derivative)]
@@ -62,7 +62,7 @@ impl<X: Cx> GlobalCache<X> {
 
         additional_depth: usize,
         encountered_overflow: bool,
-        nested_goals: HashSet<X::Input>,
+        nested_goals: NestedGoals<X>,
     ) {
         let data = cx.mk_tracked(QueryData { result, proof_tree }, dep_node);
         let entry = self.map.entry(input).or_default();
@@ -86,7 +86,7 @@ impl<X: Cx> GlobalCache<X> {
         cx: X,
         input: X::Input,
         available_depth: AvailableDepth,
-        references_nested: impl Fn(&HashSet<X::Input>) -> bool,
+        references_nested: impl Fn(&NestedGoals<X>) -> bool,
     ) -> Option<CacheData<'a, X>> {
         let entry = self.map.get(&input)?;
         if let Some(Success { additional_depth, ref nested_goals, ref data }) = entry.success {

@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use std::mem;
 
 use rustc_index::{Idx, IndexVec};
 use tracing::debug;
@@ -123,6 +122,30 @@ impl UsageKind {
     }
 }
 
+#[derive(derivative::Derivative)]
+#[derivative(Debug(bound = ""), PartialEq(bound = ""), Eq(bound = ""), Default(bound = ""))]
+struct NestedGoals<X: Cx> {
+    nested_goals: HashSet<X::Input>,
+}
+
+impl<X: Cx> NestedGoals<X> {
+    fn insert(&mut self, input: X::Input) {
+        self.nested_goals.insert(input);
+    }
+
+    fn extend(&mut self, nested_goals: &NestedGoals<X>) {
+        self.nested_goals.extend(nested_goals.nested_goals.iter());
+    }
+
+    fn clear(&mut self) {
+        self.nested_goals.clear();
+    }
+
+    fn contains(&self, input: X::Input) -> bool {
+        self.nested_goals.contains(&input)
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct AvailableDepth(usize);
 impl AvailableDepth {
@@ -203,7 +226,7 @@ struct StackEntry<X: Cx> {
     /// C :- D
     /// D :- C
     /// ```
-    nested_goals: HashSet<X::Input>,
+    nested_goals: NestedGoals<X>,
     /// Starts out as `None` and gets set when rerunning this
     /// goal in case we encounter a cycle.
     provisional_result: Option<X::Result>,
@@ -282,7 +305,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         &mut self,
         reached_depth: StackDepth,
         encountered_overflow: bool,
-        nested_goals: &HashSet<X::Input>,
+        nested_goals: &NestedGoals<X>,
     ) {
         if let Some(parent) = self.stack.raw.last_mut() {
             parent.reached_depth = parent.reached_depth.max(reached_depth);
@@ -337,7 +360,8 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         for entry in cycle_participants {
             entry.non_root_cycle_participant = entry.non_root_cycle_participant.max(Some(head));
             current_cycle_root.nested_goals.insert(entry.input);
-            current_cycle_root.nested_goals.extend(mem::take(&mut entry.nested_goals));
+            current_cycle_root.nested_goals.extend(&entry.nested_goals);
+            entry.nested_goals.clear();
         }
     }
 
@@ -555,8 +579,8 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         available_depth: AvailableDepth,
     ) -> Option<X::Result> {
         cx.with_global_cache(self.mode, |cache| {
-            let references_nested = |nested_goals: &HashSet<X::Input>| {
-                nested_goals.iter().any(|g| self.provisional_cache.contains_key(&g))
+            let references_nested = |nested_goals: &NestedGoals<X>| {
+                self.provisional_cache.keys().any(|&g| nested_goals.contains(g))
             };
             cache.get(cx, input, available_depth, references_nested).map(|c| c.result)
         })
@@ -574,8 +598,8 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
     ) -> Option<X::Result> {
         cx.with_global_cache(self.mode, |cache| {
             // TODO: explain
-            let references_nested = |nested_goals: &HashSet<X::Input>| {
-                nested_goals.iter().any(|g| self.provisional_cache.contains_key(&g))
+            let references_nested = |nested_goals: &NestedGoals<X>| {
+                self.provisional_cache.keys().any(|&g| nested_goals.contains(g))
             };
             let CacheData {
                 result,
