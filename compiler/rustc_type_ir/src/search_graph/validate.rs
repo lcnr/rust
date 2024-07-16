@@ -33,12 +33,12 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 while let Some(parent) = stack[current_root].non_root_cycle_participant {
                     current_root = parent;
                 }
-                assert!(stack[current_root].nested_goals.contains(&input));
+                assert!(stack[current_root].nested_goals.contains(input));
             }
 
-            if !nested_goals.is_empty() {
+            if !nested_goals.nested_goals.is_empty() {
                 for entry in stack.iter().take(depth.as_usize()) {
-                    assert_eq!(nested_goals.get(&entry.input), None);
+                    assert_eq!(nested_goals.nested_goals.get(&entry.input), None);
                 }
             }
         }

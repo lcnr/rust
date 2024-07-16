@@ -1,7 +1,7 @@
 use rustc_index::IndexVec;
 
-use super::{AvailableDepth, Cx, StackDepth, StackEntry};
-use crate::data_structures::{HashMap, HashSet};
+use super::{AvailableDepth, Cx, NestedGoals, StackDepth, StackEntry};
+use crate::data_structures::HashMap;
 
 #[derive(derivative::Derivative)]
 #[derivative(Debug(bound = ""), Clone(bound = ""), Copy(bound = ""))]
@@ -12,12 +12,12 @@ struct QueryData<X: Cx> {
 
 struct Success<X: Cx> {
     additional_depth: usize,
-    nested_goals: HashSet<X::Input>,
+    nested_goals: NestedGoals<X>,
     data: X::Tracked<QueryData<X>>,
 }
 
 struct WithOverflow<X: Cx> {
-    nested_goals: HashSet<X::Input>,
+    nested_goals: NestedGoals<X>,
     data: X::Tracked<QueryData<X>>,
 }
 
@@ -40,9 +40,7 @@ pub(super) struct CacheData<'a, X: Cx> {
     pub(super) proof_tree: X::ProofTree,
     pub(super) additional_depth: usize,
     pub(super) encountered_overflow: bool,
-    // FIXME: This is currently unused, but impacts the design
-    // by requiring a closure for `Cx::with_global_cache`.
-    pub(super) nested_goals: &'a HashSet<X::Input>,
+    pub(super) nested_goals: &'a NestedGoals<X>,
 }
 
 #[derive(derivative::Derivative)]
@@ -64,7 +62,7 @@ impl<X: Cx> GlobalCache<X> {
 
         additional_depth: usize,
         encountered_overflow: bool,
-        nested_goals: HashSet<X::Input>,
+        nested_goals: NestedGoals<X>,
     ) {
         let data = cx.mk_tracked(QueryData { result, proof_tree }, dep_node);
         let entry = self.map.entry(input).or_default();
@@ -92,9 +90,8 @@ impl<X: Cx> GlobalCache<X> {
     ) -> Option<CacheData<'a, X>> {
         let entry = self.map.get(&input)?;
 
-        let nested_goal_on_stack = |nested_goals: &HashSet<X::Input>| {
-            stack.iter().any(|e| nested_goals.contains(&e.input))
-        };
+        let nested_goal_on_stack =
+            |nested_goals: &NestedGoals<X>| stack.iter().any(|e| nested_goals.contains(e.input));
         if let Some(Success { additional_depth, ref nested_goals, ref data }) = entry.success {
             if available_depth.cache_entry_is_applicable(additional_depth)
                 && !nested_goal_on_stack(nested_goals)
