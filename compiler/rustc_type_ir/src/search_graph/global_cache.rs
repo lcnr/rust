@@ -1,6 +1,4 @@
-use rustc_index::IndexVec;
-
-use super::{AvailableDepth, Cx, StackDepth, StackEntry};
+use super::{AvailableDepth, Cx};
 use crate::data_structures::{HashMap, HashSet};
 
 #[derive(derivative::Derivative)]
@@ -87,17 +85,13 @@ impl<X: Cx> GlobalCache<X> {
         &'a self,
         cx: X,
         input: X::Input,
-        stack: &IndexVec<StackDepth, StackEntry<X>>,
         available_depth: AvailableDepth,
+        references_nested: impl Fn(&HashSet<X::Input>) -> bool,
     ) -> Option<CacheData<'a, X>> {
         let entry = self.map.get(&input)?;
-
-        let nested_goal_on_stack = |nested_goals: &HashSet<X::Input>| {
-            stack.iter().any(|e| nested_goals.contains(&e.input))
-        };
         if let Some(Success { additional_depth, ref nested_goals, ref data }) = entry.success {
             if available_depth.cache_entry_is_applicable(additional_depth)
-                && !nested_goal_on_stack(nested_goals)
+                && !references_nested(nested_goals)
             {
                 let QueryData { result, proof_tree } = cx.get_tracked(&data);
                 return Some(CacheData {
@@ -114,7 +108,7 @@ impl<X: Cx> GlobalCache<X> {
         if let Some(WithOverflow { nested_goals, data }) =
             entry.with_overflow.get(&additional_depth)
         {
-            if !nested_goal_on_stack(nested_goals) {
+            if !references_nested(nested_goals) {
                 let QueryData { result, proof_tree } = cx.get_tracked(data);
                 return Some(CacheData {
                     result,

@@ -557,7 +557,10 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         available_depth: AvailableDepth,
     ) -> Option<X::Result> {
         cx.with_global_cache(self.mode, |cache| {
-            cache.get(cx, input, &self.stack, available_depth).map(|c| c.result)
+            let references_nested = |nested_goals: &HashSet<X::Input>| {
+                nested_goals.iter().any(|g| self.provisional_cache.contains_key(&g))
+            };
+            cache.get(cx, input, available_depth, references_nested).map(|c| c.result)
         })
     }
 
@@ -572,13 +575,17 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         inspect: &mut D::ProofTreeBuilder,
     ) -> Option<X::Result> {
         cx.with_global_cache(self.mode, |cache| {
+            /// TODO: explain
+            let references_nested = |nested_goals: &HashSet<X::Input>| {
+                nested_goals.iter().any(|g| self.provisional_cache.contains_key(&g))
+            };
             let CacheData {
                 result,
                 proof_tree,
                 additional_depth,
                 encountered_overflow,
                 nested_goals,
-            } = cache.get(cx, input, &self.stack, available_depth)?;
+            } = cache.get(cx, input, available_depth, references_nested)?;
 
             // If we're building a proof tree and the current cache entry does not
             // contain a proof tree, we do not use the entry but instead recompute
