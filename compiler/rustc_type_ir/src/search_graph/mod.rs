@@ -575,7 +575,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         inspect: &mut D::ProofTreeBuilder,
     ) -> Option<X::Result> {
         cx.with_global_cache(self.mode, |cache| {
-            /// TODO: explain
+            // TODO: explain
             let references_nested = |nested_goals: &HashSet<X::Input>| {
                 nested_goals.iter().any(|g| self.provisional_cache.contains_key(&g))
             };
