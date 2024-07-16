@@ -111,6 +111,7 @@ pub enum UsageKind {
 impl UsageKind {
     fn merge(self, other: Self) -> Self {
         match (self, other) {
+            (UsageKind::Mixed, _) | (_, UsageKind::Mixed) => UsageKind::Mixed,
             (UsageKind::Single(lhs), UsageKind::Single(rhs)) => {
                 if lhs == rhs {
                     UsageKind::Single(lhs)
@@ -118,9 +119,6 @@ impl UsageKind {
                     UsageKind::Mixed
                 }
             }
-            (UsageKind::Mixed, UsageKind::Mixed)
-            | (UsageKind::Mixed, UsageKind::Single(_))
-            | (UsageKind::Single(_), UsageKind::Mixed) => UsageKind::Mixed,
         }
     }
 }
