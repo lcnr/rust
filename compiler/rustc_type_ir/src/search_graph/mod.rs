@@ -137,6 +137,7 @@ impl<X: Cx> NestedGoals<X> {
     }
 
     fn extend(&mut self, nested_goals: &NestedGoals<X>) {
+        #[allow(rustc::potential_query_instability)]
         self.nested_goals.extend(nested_goals.nested_goals.iter());
     }
 
@@ -266,16 +267,13 @@ struct DetachedEntry<X: Cx> {
 #[derive(derivative::Derivative)]
 #[derivative(Default(bound = ""))]
 struct ProvisionalCacheEntry<X: Cx> {
-    stack_depth: Option<StackDepth>,
     with_inductive_stack: Option<DetachedEntry<X>>,
     with_coinductive_stack: Option<DetachedEntry<X>>,
 }
 
 impl<X: Cx> ProvisionalCacheEntry<X> {
     fn is_empty(&self) -> bool {
-        self.stack_depth.is_none()
-            && self.with_inductive_stack.is_none()
-            && self.with_coinductive_stack.is_none()
+        self.with_inductive_stack.is_none() && self.with_coinductive_stack.is_none()
     }
 }
 
@@ -339,16 +337,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
     // We update both the head of this cycle to rerun its evaluation until
     // we reach a fixpoint and all other cycle participants to make sure that
     // their result does not get moved to the global cache.
-    fn tag_cycle_participants(
-        stack: &mut IndexVec<StackDepth, StackEntry<X>>,
-        usage_kind: Option<UsageKind>,
-        head: StackDepth,
-    ) {
-        if let Some(usage_kind) = usage_kind {
-            stack[head].has_been_used.get_or_insert(usage_kind).and_merge(usage_kind);
-        }
-        debug_assert!(stack[head].has_been_used.is_some());
-
+    fn tag_cycle_participants(stack: &mut IndexVec<StackDepth, StackEntry<X>>, head: StackDepth) {
         // The current root of these cycles. Note that this may not be the final
         // root in case a later goal depends on a goal higher up the stack.
         let mut current_root = head;
@@ -417,71 +406,27 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             None
         };
 
-        // Check whether the goal is in the provisional cache.
-        // The provisional result may rely on the path to its cycle roots,
-        // so we have to check the path of the current goal matches that of
-        // the cache entry.
-        let cache_entry = self.provisional_cache.entry(input).or_default();
-        if let Some(entry) = cache_entry
-            .with_coinductive_stack
-            .as_ref()
-            .filter(|p| Self::stack_coinductive_from(cx, &self.stack, p.head))
-            .or_else(|| {
-                cache_entry
-                    .with_inductive_stack
-                    .as_ref()
-                    .filter(|p| !Self::stack_coinductive_from(cx, &self.stack, p.head))
-            })
-        {
-            debug!("provisional cache hit");
-            // We have a nested goal which is already in the provisional cache, use
-            // its result. We do not provide any usage kind as that should have been
-            // already set correctly while computing the cache entry.
-            inspect.on_provisional_cache_hit();
-            Self::tag_cycle_participants(&mut self.stack, None, entry.head);
-            return entry.result;
-        } else if let Some(stack_depth) = cache_entry.stack_depth {
-            debug!("encountered cycle with depth {stack_depth:?}");
-            // We have a nested goal which directly relies on a goal deeper in the stack.
-            //
-            // We start by tagging all cycle participants, as that's necessary for caching.
-            //
-            // Finally we can return either the provisional response or the initial response
-            // in case we're in the first fixpoint iteration for this goal.
-            inspect.on_cycle_in_stack();
+        if let Some(result) = self.lookup_provisional_cache(cx, input, inspect) {
+            return result;
+        }
 
-            let is_coinductive_cycle = Self::stack_coinductive_from(cx, &self.stack, stack_depth);
-            let cycle_kind =
-                if is_coinductive_cycle { CycleKind::Coinductive } else { CycleKind::Inductive };
-            Self::tag_cycle_participants(
-                &mut self.stack,
-                Some(UsageKind::Single(cycle_kind)),
-                stack_depth,
-            );
+        if let Some(result) = self.handle_cyclic_goal(cx, input, inspect) {
+            return result;
+        }
 
-            // Return the provisional result or, if we're in the first iteration,
-            // start with no constraints.
-            return if let Some(result) = self.stack[stack_depth].provisional_result {
-                result
-            } else {
-                D::initial_provisional_result(cx, cycle_kind, input)
-            };
-        } else {
-            // No entry, we push this goal on the stack and try to prove it.
-            let depth = self.stack.next_index();
-            let entry = StackEntry {
-                input,
-                available_depth,
-                reached_depth: depth,
-                non_root_cycle_participant: None,
-                encountered_overflow: false,
-                has_been_used: None,
-                nested_goals: Default::default(),
-                provisional_result: None,
-            };
-            assert_eq!(self.stack.push(entry), depth);
-            cache_entry.stack_depth = Some(depth);
+        // No entry, we push this goal on the stack and try to prove it.
+        let depth = self.stack.next_index();
+        let entry = StackEntry {
+            input,
+            available_depth,
+            reached_depth: depth,
+            non_root_cycle_participant: None,
+            encountered_overflow: false,
+            has_been_used: None,
+            nested_goals: Default::default(),
+            provisional_result: None,
         };
+        assert_eq!(self.stack.push(entry), depth);
 
         // This is for global caching, so we properly track query dependencies.
         // Everything that affects the `result` should be performed within this
@@ -517,10 +462,8 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         // We only add the root of cycles to the global cache.
         if let Some(head) = final_entry.non_root_cycle_participant {
             debug_assert!(verify_result.is_none());
+            let entry = self.provisional_cache.entry(input).or_default();
             let coinductive_stack = Self::stack_coinductive_from(cx, &self.stack, head);
-
-            let entry = self.provisional_cache.get_mut(&input).unwrap();
-            entry.stack_depth = None;
             if coinductive_stack {
                 entry.with_coinductive_stack = Some(DetachedEntry { head, result });
             } else {
@@ -535,7 +478,6 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             // participant is on the stack. This is necessary to prevent unstable
             // results. See the comment of `StackEntry::nested_goals` for
             // more details.
-            self.provisional_cache.remove(&input);
             if let Some(expected) = verify_result {
                 // Do not try to move a goal into the cache again if we're testing the
                 // global cache. We also need to notify the validator that we've
@@ -622,6 +564,66 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             Some(result)
         })
     }
+
+    fn lookup_provisional_cache(
+        &mut self,
+        cx: X,
+        input: X::Input,
+        inspect: &mut D::ProofTreeBuilder,
+    ) -> Option<X::Result> {
+        let cache_entry = self.provisional_cache.get(&input)?;
+        let &DetachedEntry { head, result } = cache_entry
+            .with_coinductive_stack
+            .as_ref()
+            .filter(|p| Self::stack_coinductive_from(cx, &self.stack, p.head))
+            .or_else(|| {
+                cache_entry
+                    .with_inductive_stack
+                    .as_ref()
+                    .filter(|p| !Self::stack_coinductive_from(cx, &self.stack, p.head))
+            })?;
+
+        debug!("provisional cache hit");
+        // We have a nested goal which is already in the provisional cache, use
+        // its result. We do not provide any usage kind as that should have been
+        // already set correctly while computing the cache entry.
+        inspect.on_provisional_cache_hit();
+        Self::tag_cycle_participants(&mut self.stack, head);
+        debug_assert!(self.stack[head].has_been_used.is_some());
+        Some(result)
+    }
+
+    fn handle_cyclic_goal(
+        &mut self,
+        cx: X,
+        input: X::Input,
+        inspect: &mut D::ProofTreeBuilder,
+    ) -> Option<X::Result> {
+        let (head, _stack_entry) = self.stack.iter_enumerated().find(|(_, e)| e.input == input)?;
+        debug!("encountered cycle with depth {head:?}");
+        // We have a nested goal which directly relies on a goal deeper in the stack.
+        //
+        // We start by tagging all cycle participants, as that's necessary for caching.
+        //
+        // Finally we can return either the provisional response or the initial response
+        // in case we're in the first fixpoint iteration for this goal.
+        inspect.on_cycle_in_stack();
+
+        let is_coinductive_cycle = Self::stack_coinductive_from(cx, &self.stack, head);
+        let cycle_kind =
+            if is_coinductive_cycle { CycleKind::Coinductive } else { CycleKind::Inductive };
+        let usage_kind = UsageKind::Single(cycle_kind);
+        self.stack[head].has_been_used.get_or_insert(usage_kind).and_merge(usage_kind);
+        Self::tag_cycle_participants(&mut self.stack, head);
+
+        // Return the provisional result or, if we're in the first iteration,
+        // start with no constraints.
+        if let Some(result) = self.stack[head].provisional_result {
+            Some(result)
+        } else {
+            Some(D::initial_provisional_result(cx, cycle_kind, input))
+        }
+    }
 }
 
 enum StepResult<X: Cx> {
@@ -678,12 +680,11 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             StepResult::Done(stack_entry, result)
         } else {
             debug!(?result, "fixpoint changed provisional results");
-            let depth = self.stack.push(StackEntry {
+            self.stack.push(StackEntry {
                 has_been_used: None,
                 provisional_result: Some(result),
                 ..stack_entry
             });
-            debug_assert_eq!(self.provisional_cache[&input].stack_depth, Some(depth));
             StepResult::HasChanged
         }
     }
