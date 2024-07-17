@@ -120,6 +120,9 @@ impl UsageKind {
             }
         }
     }
+    fn and_merge(&mut self, other: Self) {
+        *self = self.merge(other);
+    }
 }
 
 #[derive(derivative::Derivative)]
@@ -342,8 +345,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         head: StackDepth,
     ) {
         if let Some(usage_kind) = usage_kind {
-            stack[head].has_been_used =
-                Some(stack[head].has_been_used.map_or(usage_kind, |prev| prev.merge(usage_kind)));
+            stack[head].has_been_used.get_or_insert(usage_kind).and_merge(usage_kind);
         }
         debug_assert!(stack[head].has_been_used.is_some());
 
