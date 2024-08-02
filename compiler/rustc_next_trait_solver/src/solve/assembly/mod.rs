@@ -731,6 +731,7 @@ where
         goal: Goal<I, G>,
         candidates: &mut Vec<Candidate<I>>,
     ) {
+        return;
         let cx = self.cx();
         let trait_goal: Goal<I, ty::TraitPredicate<I>> =
             goal.with(cx, goal.predicate.trait_ref(cx));
@@ -780,8 +781,31 @@ where
         let responses = candidates.iter().map(|c| c.result).collect::<Vec<_>>();
         if let Some(result) = self.try_merge_responses(&responses) {
             return Ok(result);
-        } else {
-            self.flounder(&responses)
         }
+
+        match self.solver_mode() {
+            SolverMode::Coherence => (),
+            // Prioritize `ParamEnv` candidates only if they do not guide inference.
+            //
+            // This is still incomplete as we may add incorrect region bounds.
+            SolverMode::Normal => {
+                let param_env_responses = candidates
+                    .iter()
+                    .filter(|c| {
+                        matches!(
+                            c.source,
+                            CandidateSource::ParamEnv(_) | CandidateSource::AliasBound
+                        )
+                    })
+                    .map(|c| c.result)
+                    .collect::<Vec<_>>();
+                if let Some(result) = self.try_merge_responses(&param_env_responses) {
+                    // We strongly prefer alias and param-env bounds here, even if they affect inference.
+                    // See https://github.com/rust-lang/trait-system-refactor-initiative/issues/11.
+                    return Ok(result);
+                }
+            }
+        }
+        self.flounder(&responses)
     }
 }
