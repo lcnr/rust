@@ -197,7 +197,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     )
                 );
                 let result_operand = Operand::Move(Place::from(result));
-                this.record_operands_moved(slice::from_ref(&result_operand));
+                this.record_move_operands(slice::from_ref(&result_operand));
                 block.and(Rvalue::Use(result_operand))
             }
             ExprKind::Cast { source } => {
@@ -366,7 +366,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     })
                     .collect();
 
-                this.record_operands_moved(&fields.raw);
+                this.record_move_operands(&fields.raw);
                 block.and(Rvalue::Aggregate(Box::new(AggregateKind::Array(el_ty)), fields))
             }
             ExprKind::Tuple { ref fields } => {
@@ -388,7 +388,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     })
                     .collect();
 
-                this.record_operands_moved(&fields.raw);
+                this.record_move_operands(&fields.raw);
                 block.and(Rvalue::Aggregate(Box::new(AggregateKind::Tuple), fields))
             }
             ExprKind::Closure(box ClosureExpr {
@@ -491,7 +491,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                         Box::new(AggregateKind::CoroutineClosure(closure_id.to_def_id(), args))
                     }
                 };
-                this.record_operands_moved(&operands.raw);
+                this.record_move_operands(&operands.raw);
                 block.and(Rvalue::Aggregate(result, operands))
             }
             ExprKind::Assign { .. } | ExprKind::AssignOp { .. } => {
@@ -747,7 +747,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 this.diverge_from(block);
                 block = success;
             }
-            this.record_operands_moved(&[value_operand]);
+            this.record_move_operands(&[value_operand]);
         }
         block.and(Rvalue::Aggregate(Box::new(AggregateKind::Array(elem_ty)), IndexVec::new()))
     }

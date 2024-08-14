@@ -314,11 +314,13 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 );
                 this.diverge_from(block);
 
-                // This is here and not before `diverge_from` to avoid breaking
-                // the example in #80949.
+                // By only recording the moved operands after `diverge_from`, we emit redundant
+                // drop calls for the arguments of the call. While these should be unnecessary,
+                // they cause borrowck to shrink the required lifetime of some borrows which is
+                // necessary to avoid breaking the example in #80949.
                 // FIXME(matthewjasper): Look at this again if Polonius is
                 // stabilized.
-                this.record_operands_moved(&args);
+                this.record_move_operands(&args);
                 schedule_drop(this);
                 success.unit()
             }
@@ -419,7 +421,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     user_ty,
                     active_field_index,
                 ));
-                this.record_operands_moved(&fields.raw);
+                this.record_move_operands(&fields.raw);
                 this.cfg.push_assign(
                     block,
                     source_info,
@@ -602,7 +604,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     )
                 );
                 let resume = this.cfg.start_new_block();
-                this.record_operands_moved(slice::from_ref(&value));
+                this.record_move_operands(slice::from_ref(&value));
                 this.cfg.terminate(
                     block,
                     source_info,

@@ -1009,13 +1009,14 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
         region_scope: region::Scope,
         local: Local,
     ) {
+        // We first drop the value and then the underlying storage.
         self.schedule_drop(span, region_scope, local, DropKind::Storage);
         self.schedule_drop(span, region_scope, local, DropKind::Value);
     }
 
-    /// Indicates that `place` should be dropped on exit from `region_scope`.
+    /// Indicates that `local` should be dropped on exit from `region_scope`.
     ///
-    /// When called with `DropKind::Storage`, `place` shouldn't be the return
+    /// When called with `DropKind::Storage`, `local` shouldn't be the return
     /// place, or a function parameter.
     pub(crate) fn schedule_drop(
         &mut self,
@@ -1121,7 +1122,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
     }
 
     /// Unschedule a drop. Used for `break`, `return` and `match` expressions,
-    /// where `record_operands_moved` is not powerful enough.
+    /// where `record_move_operands` is not powerful enough.
     ///
     /// The given local is expected to have a value drop scheduled in the given
     /// scope and for that drop to be the most recent thing scheduled in that
@@ -1146,8 +1147,9 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     // type does not need drop.
                     None if self.local_decls[local].ty.has_opaque_types() => return,
                     _ => bug!(
-                        "found wrong drop, expected value drop of {:?}, found {:?}",
+                        "found wrong drop, expected value drop of {:?} in scope {:?}, found {:?}",
                         local,
+                        region_scope,
                         drop,
                     ),
                 }
@@ -1192,7 +1194,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
     /// spurious borrow-check errors -- the problem, ironically, is
     /// not the `DROP(_X)` itself, but the (spurious) unwind pathways
     /// that it creates. See #64391 for an example.
-    pub(crate) fn record_operands_moved(&mut self, operands: &[Operand<'tcx>]) {
+    pub(crate) fn record_move_operands(&mut self, operands: &[Operand<'tcx>]) {
         let local_scope = self.local_scope();
         let scope = self.scopes.scopes.last_mut().unwrap();
 

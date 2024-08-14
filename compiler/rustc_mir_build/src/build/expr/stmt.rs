@@ -116,7 +116,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                         .collect();
                     let args: Vec<_> = spanned_args.iter().map(|arg| arg.node.clone()).collect();
 
-                    this.record_operands_moved(&args);
+                    this.record_move_operands(&args);
 
                     debug!("expr_into_dest: fn_span={:?}", fn_span);
 
