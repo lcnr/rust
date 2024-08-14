@@ -90,7 +90,6 @@ use rustc_index::{IndexSlice, IndexVec};
 use rustc_middle::middle::region;
 use rustc_middle::mir::*;
 use rustc_middle::thir::{ExprId, LintLevel};
-use rustc_middle::ty::TypeVisitableExt;
 use rustc_middle::{bug, span_bug};
 use rustc_session::lint::Level;
 use rustc_span::{Span, DUMMY_SP};
@@ -1143,8 +1142,6 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     {
                         return;
                     }
-                    // Opaque type may not have been scheduled if its underlying
-                    // type does not need drop.
                     _ => bug!(
                         "found wrong drop, expected value drop of {:?} in scope {:?}, found {:?}, all scopes {:?}",
                         local,
@@ -1157,6 +1154,43 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
         }
 
         bug!("region scope {:?} not in scope to unschedule drop of {:?}", region_scope, local);
+    }
+
+    pub(crate) fn may_unschedule_drop(
+        &mut self,
+        region_scope: region::Scope,
+        local: Local,
+        x: &dyn std::fmt::Debug,
+    ) {
+        if !self.local_decls[local].ty.needs_drop(self.tcx, self.param_env) {
+            return;
+        }
+        for scope in self.scopes.scopes.iter().rev() {
+            if scope.region_scope == region_scope {
+                let drop = scope.drops.last();
+
+                match drop {
+                    Some(&DropData { local: removed_local, kind: DropKind::Value, .. })
+                        if removed_local == local =>
+                    {
+                        return;
+                    }
+                    _ => tracing::warn!(
+                        "expected drop to unschedule {x:?}, expected value drop of {:?} in scope {:?}, found {:?}, all scopes {:?}",
+                        local,
+                        region_scope,
+                        drop,
+                        self.scopes.scopes,
+                    ),
+                }
+            }
+        }
+
+        tracing::warn!(
+            "region scope {:?} to unschedule {x:?} not in scope to unschedule drop of {:?}",
+            region_scope,
+            local
+        );
     }
 
     /// Indicates that the "local operands" stored in `local` are

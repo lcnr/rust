@@ -136,6 +136,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     // Generate the implicit `else {}` by assigning unit.
                     let correct_si = this.source_info(expr_span.shrink_to_hi());
                     this.cfg.push_assign_unit(else_blk, correct_si, destination, this.tcx);
+                    schedule_drop(this);
                 }
 
                 // The `then` and `else` arms have been lowered into their respective
@@ -339,6 +340,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 };
                 let borrow = Rvalue::Ref(this.tcx.lifetimes.re_erased, borrow_kind, arg_place);
                 this.cfg.push_assign(block, source_info, destination, borrow);
+                schedule_drop(this);
                 block.unit()
             }
             ExprKind::AddressOf { mutability, arg } => {
@@ -652,6 +654,11 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 block.unit()
             }
         };
+
+        if let Some(drop_scope) = scope {
+            let local = destination.as_local().expect("cannot unschedule drop of non-Local place");
+            this.may_unschedule_drop(drop_scope, local, expr);
+        }
 
         if !expr_is_block_or_scope {
             let popped = this.block_context.pop();

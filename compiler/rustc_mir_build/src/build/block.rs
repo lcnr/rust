@@ -362,7 +362,9 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 // We only want to assign an implicit `()` as the return value of the block if the
                 // block does not diverge. (Otherwise, we may try to assign a unit to a `!`-type.)
                 this.cfg.push_assign_unit(block, source_info, destination, this.tcx);
-            } else if let Some(destination_local) = destination.as_local()
+            }
+
+            if let Some(destination_local) = destination.as_local()
                 && let Some(scope) = scope
             {
                 this.schedule_drop(span, scope, destination_local, DropKind::Value);
