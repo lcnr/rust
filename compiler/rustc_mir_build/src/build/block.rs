@@ -107,7 +107,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     // the pattern matching passes, in the MIR building the storages for them
                     // are declared as live any way.
                     // This is similar to `let x;` statements without an initializer expression,
-                    // where the value of `x` in this example may or may be assigned,
+                    // where the value of `x` in this example may or may not be assigned,
                     // because the storage for their values may not be live after all due to
                     // failure in pattern matching.
                     // For this reason, we declare those storages as live but we do not schedule

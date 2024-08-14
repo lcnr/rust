@@ -1145,12 +1145,12 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     }
                     // Opaque type may not have been scheduled if its underlying
                     // type does not need drop.
-                    None if self.local_decls[local].ty.has_opaque_types() => return,
                     _ => bug!(
-                        "found wrong drop, expected value drop of {:?} in scope {:?}, found {:?}",
+                        "found wrong drop, expected value drop of {:?} in scope {:?}, found {:?}, all scopes {:?}",
                         local,
                         region_scope,
                         drop,
+                        self.scopes.scopes,
                     ),
                 }
             }
