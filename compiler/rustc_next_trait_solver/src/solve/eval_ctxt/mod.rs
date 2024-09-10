@@ -10,7 +10,7 @@ use rustc_type_ir::relate::Relate;
 use rustc_type_ir::visit::{TypeSuperVisitable, TypeVisitable, TypeVisitableExt, TypeVisitor};
 use rustc_type_ir::{self as ty, CanonicalVarValues, InferCtxtLike, Interner};
 use rustc_type_ir_macros::{Lift_Generic, TypeFoldable_Generic, TypeVisitable_Generic};
-use tracing::{instrument, trace};
+use tracing::{instrument, trace, debug};
 
 use crate::coherence;
 use crate::delegate::SolverDelegate;
@@ -488,7 +488,7 @@ where
                     response = Ok(cert);
                     break;
                 }
-                Ok(None) => {}
+                Ok(None) => debug!("evaluate added goals has changed"),
                 Err(NoSolution) => {
                     response = Err(NoSolution);
                     break;
@@ -596,11 +596,11 @@ where
         self.delegate.cx()
     }
 
-    #[instrument(level = "trace", skip(self))]
+    #[instrument(level = "debug", skip(self))]
     pub(super) fn add_normalizes_to_goal(&mut self, mut goal: Goal<I, ty::NormalizesTo<I>>) {
         goal.predicate = goal
             .predicate
-            .fold_with(&mut ReplaceAliasWithInfer { ecx: self, param_env: goal.param_env });
+            .fold_with(&mut ReplaceAliasWithInfer { ecx: self, is_normalizes_to_goal: true, param_env: goal.param_env });
         self.inspect.add_normalizes_to_goal(self.delegate, self.max_input_universe, goal);
         self.nested_goals.normalizes_to_goals.push(goal);
     }
@@ -609,7 +609,7 @@ where
     pub(super) fn add_goal(&mut self, source: GoalSource, mut goal: Goal<I, I::Predicate>) {
         goal.predicate = goal
             .predicate
-            .fold_with(&mut ReplaceAliasWithInfer { ecx: self, param_env: goal.param_env });
+            .fold_with(&mut ReplaceAliasWithInfer { ecx: self, is_normalizes_to_goal: false, param_env: goal.param_env });
         self.inspect.add_goal(self.delegate, self.max_input_universe, source, goal);
         self.nested_goals.goals.push((source, goal));
     }
@@ -1034,6 +1034,7 @@ where
 {
     ecx: &'me mut EvalCtxt<'a, D>,
     param_env: I::ParamEnv,
+    is_normalizes_to_goal: bool,
 }
 
 impl<D, I> TypeFolder<I> for ReplaceAliasWithInfer<'_, '_, D, I>
@@ -1046,25 +1047,34 @@ where
     }
 
     fn fold_ty(&mut self, ty: I::Ty) -> I::Ty {
+        let ty = ty.super_fold_with(self);
         match ty.kind() {
-            ty::Alias(..) if !ty.has_escaping_bound_vars() => {
+            ty::Alias(_, alias) if !ty.has_escaping_bound_vars() => {
                 let infer_ty = self.ecx.next_ty_infer();
-                let normalizes_to = ty::PredicateKind::AliasRelate(
-                    ty.into(),
-                    infer_ty.into(),
-                    ty::AliasRelationDirection::Equate,
-                );
-                self.ecx.add_goal(
-                    GoalSource::Misc,
-                    Goal::new(self.cx(), self.param_env, normalizes_to),
-                );
+                if self.is_normalizes_to_goal {
+                    let normalizes_to = ty::NormalizesTo { alias: alias.into(), term: infer_ty.into() };
+                    self.ecx.add_normalizes_to_goal(
+                        Goal::new(self.cx(), self.param_env, normalizes_to),
+                    );
+                } else {
+                    let normalizes_to = ty::PredicateKind::AliasRelate(
+                        ty.into(),
+                        infer_ty.into(),
+                        ty::AliasRelationDirection::Equate,
+                    );
+                    self.ecx.add_goal(
+                        GoalSource::Misc,
+                        Goal::new(self.cx(), self.param_env, normalizes_to),
+                    );
+                }
                 infer_ty
             }
-            _ => ty.super_fold_with(self),
+            _ => ty,
         }
     }
 
     fn fold_const(&mut self, ct: I::Const) -> I::Const {
+        let ct = ct.super_fold_with(self);
         match ct.kind() {
             ty::ConstKind::Unevaluated(..) if !ct.has_escaping_bound_vars() => {
                 let infer_ct = self.ecx.next_const_infer();
@@ -1079,7 +1089,7 @@ where
                 );
                 infer_ct
             }
-            _ => ct.super_fold_with(self),
+            _ => ct,
         }
     }
 
