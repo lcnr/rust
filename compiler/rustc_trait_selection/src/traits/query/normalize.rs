@@ -2,7 +2,6 @@
 //! which folds deeply, invoking the underlying
 //! `normalize_canonicalized_projection_ty` query when it encounters projections.
 
-use rustc_data_structures::sso::SsoHashMap;
 use rustc_data_structures::stack::ensure_sufficient_stack;
 use rustc_macros::extension;
 pub use rustc_middle::traits::query::NormalizationResult;
@@ -10,6 +9,7 @@ use rustc_middle::ty::fold::{FallibleTypeFolder, TypeFoldable, TypeSuperFoldable
 use rustc_middle::ty::visit::{TypeSuperVisitable, TypeVisitable, TypeVisitableExt};
 use rustc_middle::ty::{self, Ty, TyCtxt, TypeVisitor};
 use rustc_span::DUMMY_SP;
+use rustc_type_ir::data_structures::FoldCache;
 use tracing::{debug, info, instrument};
 
 use super::NoSolution;
@@ -96,7 +96,7 @@ impl<'a, 'tcx> At<'a, 'tcx> {
             cause: self.cause,
             param_env: self.param_env,
             obligations: vec![],
-            cache: SsoHashMap::new(),
+            cache: Default::default(),
             anon_depth: 0,
             universes,
         };
@@ -165,7 +165,7 @@ struct QueryNormalizer<'a, 'tcx> {
     cause: &'a ObligationCause<'tcx>,
     param_env: ty::ParamEnv<'tcx>,
     obligations: Vec<PredicateObligation<'tcx>>,
-    cache: SsoHashMap<Ty<'tcx>, Ty<'tcx>>,
+    cache: FoldCache<(), Ty<'tcx>, false, TyCtxt<'tcx>>,
     anon_depth: usize,
     universes: Vec<Option<ty::UniverseIndex>>,
 }
@@ -193,15 +193,15 @@ impl<'a, 'tcx> FallibleTypeFolder<TyCtxt<'tcx>> for QueryNormalizer<'a, 'tcx> {
             return Ok(ty);
         }
 
-        if let Some(ty) = self.cache.get(&ty) {
-            return Ok(*ty);
+        if let Some(ty) = self.cache.get(ty, ()) {
+            return Ok(ty);
         }
 
         let (kind, data) = match *ty.kind() {
             ty::Alias(kind, data) => (kind, data),
             _ => {
                 let res = ty.try_super_fold_with(self)?;
-                self.cache.insert(ty, res);
+                self.cache.insert(ty, (), res);
                 return Ok(res);
             }
         };
@@ -322,7 +322,7 @@ impl<'a, 'tcx> FallibleTypeFolder<TyCtxt<'tcx>> for QueryNormalizer<'a, 'tcx> {
             }
         };
 
-        self.cache.insert(ty, res);
+        self.cache.insert(ty, (), res);
         Ok(res)
     }
 

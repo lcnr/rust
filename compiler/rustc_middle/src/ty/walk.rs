@@ -1,11 +1,11 @@
 //! An iterator over the type substructure.
 //! WARNING: this does not keep track of the region depth.
 
-use rustc_data_structures::sso::SsoHashSet;
+use rustc_type_ir::data_structures::FoldCache;
 use smallvec::{SmallVec, smallvec};
 use tracing::debug;
 
-use crate::ty::{self, GenericArg, GenericArgKind, Ty};
+use crate::ty::{self, GenericArg, GenericArgKind, Ty, TyCtxt};
 
 // The TypeWalker's stack is hot enough that it's worth going to some effort to
 // avoid heap allocations.
@@ -14,7 +14,7 @@ type TypeWalkerStack<'tcx> = SmallVec<[GenericArg<'tcx>; 8]>;
 pub struct TypeWalker<'tcx> {
     stack: TypeWalkerStack<'tcx>,
     last_subtree: usize,
-    pub visited: SsoHashSet<GenericArg<'tcx>>,
+    visited: FoldCache<(), (), false, TyCtxt<'tcx>>,
 }
 
 /// An iterator for walking the type tree.
@@ -27,7 +27,7 @@ pub struct TypeWalker<'tcx> {
 /// skips any types that are already there.
 impl<'tcx> TypeWalker<'tcx> {
     pub fn new(root: GenericArg<'tcx>) -> Self {
-        Self { stack: smallvec![root], last_subtree: 1, visited: SsoHashSet::new() }
+        Self { stack: smallvec![root], last_subtree: 1, visited: Default::default() }
     }
 
     /// Skips the subtree corresponding to the last type
@@ -55,7 +55,7 @@ impl<'tcx> Iterator for TypeWalker<'tcx> {
         loop {
             let next = self.stack.pop()?;
             self.last_subtree = self.stack.len();
-            if self.visited.insert(next) {
+            if next.as_type().is_some_and(|ty| self.visited.insert(ty, (), ())) {
                 push_inner(&mut self.stack, next);
                 debug!("next: stack={:?}", self.stack);
                 return Some(next);

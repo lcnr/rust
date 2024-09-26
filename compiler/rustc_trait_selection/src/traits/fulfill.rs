@@ -847,16 +847,8 @@ fn args_infer_vars<'a, 'tcx>(
         .skip_binder() // ok because this check doesn't care about regions
         .iter()
         .filter(|arg| arg.has_non_region_infer())
-        .flat_map(|arg| {
-            let mut walker = arg.walk();
-            while let Some(c) = walker.next() {
-                if !c.has_non_region_infer() {
-                    walker.visited.remove(&c);
-                    walker.skip_current_subtree();
-                }
-            }
-            walker.visited.into_iter()
-        })
+        .flat_map(|arg| arg.walk())
+        .filter(|arg| arg.has_non_region_infer())
         .filter_map(TyOrConstInferVar::maybe_from_generic_arg)
 }
 

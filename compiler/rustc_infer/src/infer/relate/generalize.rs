@@ -1,6 +1,5 @@
 use std::mem;
 
-use rustc_data_structures::sso::SsoHashMap;
 use rustc_data_structures::stack::ensure_sufficient_stack;
 use rustc_hir::def_id::DefId;
 use rustc_middle::bug;
@@ -11,6 +10,7 @@ use rustc_middle::ty::{
     self, AliasRelationDirection, InferConst, Term, Ty, TyCtxt, TypeVisitable, TypeVisitableExt,
 };
 use rustc_span::Span;
+use rustc_type_ir::data_structures::FoldCache;
 use tracing::{debug, instrument, warn};
 
 use super::{
@@ -318,7 +318,7 @@ struct Generalizer<'me, 'tcx> {
     /// hold by either normalizing the outer or the inner associated type.
     in_alias: bool,
 
-    cache: SsoHashMap<(Ty<'tcx>, ty::Variance, bool), Ty<'tcx>>,
+    cache: FoldCache<(ty::Variance, bool), Ty<'tcx>, true, TyCtxt<'tcx>>,
 
     /// See the field `has_unconstrained_ty_var` in `Generalization`.
     has_unconstrained_ty_var: bool,
@@ -451,7 +451,7 @@ impl<'tcx> TypeRelation<TyCtxt<'tcx>> for Generalizer<'_, 'tcx> {
     fn tys(&mut self, t: Ty<'tcx>, t2: Ty<'tcx>) -> RelateResult<'tcx, Ty<'tcx>> {
         assert_eq!(t, t2); // we are misusing TypeRelation here; both LHS and RHS ought to be ==
 
-        if let Some(&result) = self.cache.get(&(t, self.ambient_variance, self.in_alias)) {
+        if let Some(result) = self.cache.get(t, (self.ambient_variance, self.in_alias)) {
             return Ok(result);
         }
 
@@ -557,7 +557,7 @@ impl<'tcx> TypeRelation<TyCtxt<'tcx>> for Generalizer<'_, 'tcx> {
             _ => relate::structurally_relate_tys(self, t, t),
         }?;
 
-        self.cache.insert((t, self.ambient_variance, self.in_alias), g);
+        self.cache.insert(t, (self.ambient_variance, self.in_alias), g);
         Ok(g)
     }
 

@@ -60,6 +60,22 @@ impl FlagComputation {
         self.outer_exclusive_binder = self.outer_exclusive_binder.max(exclusive_binder);
     }
 
+    fn list_computation<T>(&mut self, nested: &[T], mut f: impl FnMut(&mut Self, &T)) {
+        let mut computation = FlagComputation::new();
+        for nested in nested {
+            f(&mut computation, nested);
+        }
+
+        if nested.len() > 1 {
+            if computation.flags.contains(TypeFlags::TYPE_COMPLEXITY_LOW) {
+                self.add_flags(TypeFlags::TYPE_COMPLEXITY_HIGH);
+            } else {
+                self.add_flags(TypeFlags::TYPE_COMPLEXITY_LOW);
+            }
+        }
+        self.add_flags(computation.flags);
+    }
+
     /// Adds the flags/depth from a set of types that appear within the current type, but within a
     /// region binder.
     fn bound_computation<T, F>(&mut self, value: ty::Binder<'_, T>, f: F)
@@ -327,9 +343,7 @@ impl FlagComputation {
     }
 
     fn add_tys(&mut self, tys: &[Ty<'_>]) {
-        for &ty in tys {
-            self.add_ty(ty);
-        }
+        self.list_computation(tys, |this, &ty| this.add_ty(ty));
     }
 
     fn add_region(&mut self, r: ty::Region<'_>) {
@@ -394,13 +408,11 @@ impl FlagComputation {
     }
 
     fn add_args(&mut self, args: &[GenericArg<'_>]) {
-        for kind in args {
-            match kind.unpack() {
-                GenericArgKind::Type(ty) => self.add_ty(ty),
-                GenericArgKind::Lifetime(lt) => self.add_region(lt),
-                GenericArgKind::Const(ct) => self.add_const(ct),
-            }
-        }
+        self.list_computation(args, |this, &kind| match kind.unpack() {
+            GenericArgKind::Type(ty) => this.add_ty(ty),
+            GenericArgKind::Lifetime(lt) => this.add_region(lt),
+            GenericArgKind::Const(ct) => this.add_const(ct),
+        })
     }
 
     fn add_term(&mut self, term: ty::Term<'_>) {

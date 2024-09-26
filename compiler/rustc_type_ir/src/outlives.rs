@@ -5,7 +5,7 @@
 use derive_where::derive_where;
 use smallvec::{SmallVec, smallvec};
 
-use crate::data_structures::SsoHashSet;
+use crate::data_structures::FoldCache;
 use crate::inherent::*;
 use crate::visit::{TypeSuperVisitable, TypeVisitable, TypeVisitableExt as _, TypeVisitor};
 use crate::{self as ty, Interner};
@@ -64,7 +64,7 @@ pub fn push_outlives_components<I: Interner>(
 struct OutlivesCollector<'a, I: Interner> {
     cx: I,
     out: &'a mut SmallVec<[Component<I>; 4]>,
-    visited: SsoHashSet<I::Ty>,
+    visited: FoldCache<(), (), false, I>,
 }
 
 impl<I: Interner> TypeVisitor<I> for OutlivesCollector<'_, I> {
@@ -72,7 +72,7 @@ impl<I: Interner> TypeVisitor<I> for OutlivesCollector<'_, I> {
     type Result = ();
 
     fn visit_ty(&mut self, ty: I::Ty) -> Self::Result {
-        if !self.visited.insert(ty) {
+        if !self.visited.insert(ty, (), ()) {
             return;
         }
         // Descend through the types, looking for the various "base"

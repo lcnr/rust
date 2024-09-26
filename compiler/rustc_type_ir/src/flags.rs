@@ -124,5 +124,13 @@ bitflags::bitflags! {
 
         /// Does this have any binders with bound vars (e.g. that need to be anonymized)?
         const HAS_BINDER_VARS             = 1 << 25;
+
+        /// Tracking the type complexity to disable the cache for trivial types.
+        ///
+        /// Type complexity is implemented via unary counting and has the following
+        /// distinct values. 0b00, 0b01 and 0b1x. This allows us to continue to simply
+        /// use binary-OR when looking at type flags.
+        const TYPE_COMPLEXITY_LOW         = 1 << 30;
+        const TYPE_COMPLEXITY_HIGH        = 1 << 31;
     }
 }
