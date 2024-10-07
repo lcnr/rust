@@ -2,7 +2,6 @@
 //@ build-fail
 //@ compile-flags: -Copt-level=0
 //@ normalize-stderr-test: "long-type-\d+" -> "long-type-hash"
-//@ ignore-compare-mode-next-solver (hangs)
 
 fn main() {
     let mut iter = 0u8..1;
