@@ -358,47 +358,22 @@ where
             // * Otherwise it may normalize to any non-type-generic type
             //   be it local or non-local.
             ty::Alias(kind, _) => {
-                if ty.has_type_flags(
-                    ty::TypeFlags::HAS_TY_PLACEHOLDER
-                        | ty::TypeFlags::HAS_TY_BOUND
-                        | ty::TypeFlags::HAS_TY_INFER,
-                ) {
-                    match self.in_crate {
-                        InCrate::Local { mode } => match kind {
-                            ty::Projection => {
-                                if let OrphanCheckMode::Compat = mode {
-                                    ControlFlow::Continue(())
-                                } else {
-                                    self.found_uncovered_ty_param(ty)
-                                }
+                match self.in_crate {
+                    InCrate::Local { mode } => match kind {
+                        ty::Projection => {
+                            if let OrphanCheckMode::Compat = mode {
+                                ControlFlow::Continue(())
+                            } else {
+                                self.found_uncovered_ty_param(ty)
                             }
-                            _ => self.found_uncovered_ty_param(ty),
-                        },
-                        InCrate::Remote => {
-                            // The inference variable might be unified with a local
-                            // type in that remote crate.
-                            ControlFlow::Break(OrphanCheckEarlyExit::LocalTy(ty))
                         }
+                        _ => self.found_uncovered_ty_param(ty),
+                    },
+                    InCrate::Remote => {
+                        // The inference variable might be unified with a local
+                        // type in that remote crate.
+                        ControlFlow::Break(OrphanCheckEarlyExit::LocalTy(ty))
                     }
-                } else {
-                    // Regarding *opaque types* specifically, we choose to treat them as non-local,
-                    // even those that appear within the same crate. This seems somewhat surprising
-                    // at first, but makes sense when you consider that opaque types are supposed
-                    // to hide the underlying type *within the same crate*. When an opaque type is
-                    // used from outside the module where it is declared, it should be impossible to
-                    // observe anything about it other than the traits that it implements.
-                    //
-                    // The alternative would be to look at the underlying type to determine whether
-                    // or not the opaque type itself should be considered local.
-                    //
-                    // However, this could make it a breaking change to switch the underlying hidden
-                    // type from a local type to a remote type. This would violate the rule that
-                    // opaque types should be completely opaque apart from the traits that they
-                    // implement, so we don't use this behavior.
-                    // Addendum: Moreover, revealing the underlying type is likely to cause cycle
-                    // errors as we rely on coherence / the specialization graph during typeck.
-
-                    self.found_non_local_ty(ty)
                 }
             }
 
