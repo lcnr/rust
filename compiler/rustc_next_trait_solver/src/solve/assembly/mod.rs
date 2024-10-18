@@ -8,6 +8,7 @@ use rustc_type_ir::inherent::*;
 use rustc_type_ir::lang_items::TraitSolverLangItem;
 use rustc_type_ir::visit::TypeVisitableExt as _;
 use rustc_type_ir::{self as ty, elaborate, Interner, Upcast as _};
+use rustc_type_ir_macros::TypeVisitable_Generic;
 use tracing::{debug, instrument};
 
 use crate::delegate::SolverDelegate;
@@ -22,6 +23,7 @@ use crate::solve::{
 /// It consists of both the `source`, which describes how that goal would be proven,
 /// and the `result` when using the given `source`.
 #[derive_where(Clone, Debug; I: Interner)]
+#[derive(TypeVisitable_Generic)]
 pub(super) struct Candidate<I: Interner> {
     pub(super) source: CandidateSource<I>,
     pub(super) result: CanonicalResponse<I>,

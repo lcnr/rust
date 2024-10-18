@@ -37,6 +37,7 @@ use rustc_trait_selection::traits::query::evaluate_obligation::InferCtxtExt as _
 use rustc_trait_selection::traits::{
     supertraits, FulfillmentError, Obligation, ObligationCause, ObligationCauseCode,
 };
+use rustc_type_ir::WithLeakedVars;
 use tracing::{debug, info, instrument};
 
 use super::probe::{AutorefOrPtrAdjustment, IsSuggestion, Mode, ProbeScope};
@@ -97,11 +98,9 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         &self,
         ty: Ty<'tcx>,
         span: Span,
-        unsatisfied_predicates: &Vec<(
-            ty::Predicate<'_>,
-            Option<ty::Predicate<'_>>,
-            Option<ObligationCause<'_>>,
-        )>,
+        unsatisfied_predicates: &WithLeakedVars<
+            Vec<(ty::Predicate<'_>, Option<ty::Predicate<'_>>, Option<ObligationCause<'_>>)>,
+        >,
     ) -> bool {
         fn predicate_bounds_generic_param<'tcx>(
             predicate: ty::Predicate<'_>,
@@ -154,7 +153,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             ty::Param(param) => {
                 let generics = self.tcx.generics_of(self.body_id);
                 let generic_param = generics.type_param(param, self.tcx);
-                for unsatisfied in unsatisfied_predicates.iter() {
+                for unsatisfied in unsatisfied_predicates.leaked_value_ref().iter() {
                     // The parameter implements `IntoIterator`
                     // but it has called a method that requires it to implement `Iterator`
                     if predicate_bounds_generic_param(
@@ -169,7 +168,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 }
             }
             ty::Slice(..) | ty::Adt(..) | ty::Alias(ty::Opaque, _) => {
-                for unsatisfied in unsatisfied_predicates.iter() {
+                for unsatisfied in unsatisfied_predicates.leaked_value_ref().iter() {
                     if is_iterator_predicate(unsatisfied.0, self.tcx) {
                         return true;
                     }
@@ -685,7 +684,10 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                     }
                 });
                 let has_deref = autoderef.step_count() > 0;
-                if !candidate_found && !has_deref && unsatisfied_predicates.is_empty() {
+                if !candidate_found
+                    && !has_deref
+                    && unsatisfied_predicates.leaked_value_ref().is_empty()
+                {
                     if let Some((path_string, _)) = ty_str.split_once('<') {
                         ty_str_reported = path_string.to_string();
                     }
@@ -788,7 +790,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 ProbeScope::TraitsInScope,
                 None,
             )
-            && let ty::Ref(_, _, sugg_mutbl) = *pick.self_ty.kind()
+            && let ty::Ref(_, _, sugg_mutbl) = *pick.self_ty.into_leaked_value().kind()
             && (sugg_mutbl.is_not() || ptr_mutbl.is_mut())
         {
             let (method, method_anchor) = match sugg_mutbl {
@@ -922,7 +924,9 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 Applicability::MaybeIncorrect,
             );
             return err.emit();
-        } else if !unsatisfied_predicates.is_empty() && matches!(rcvr_ty.kind(), ty::Param(_)) {
+        } else if !unsatisfied_predicates.leaked_value_ref().is_empty()
+            && matches!(rcvr_ty.kind(), ty::Param(_))
+        {
             // We special case the situation where we are looking for `_` in
             // `<TypeParam as _>::method` because otherwise the machinery will look for blanket
             // implementations that have unsatisfied trait bounds to suggest, leading us to claim
@@ -933,14 +937,14 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             // `TypeParam: Ord` or `TypeParam: Iterator`"". That is done further down when calling
             // `self.suggest_traits_to_import`, so we ignore the `unsatisfied_predicates`
             // suggestions.
-        } else if !unsatisfied_predicates.is_empty() {
+        } else if !unsatisfied_predicates.leaked_value_ref().is_empty() {
             let mut type_params = FxIndexMap::default();
 
             // Pick out the list of unimplemented traits on the receiver.
             // This is used for custom error messages with the `#[rustc_on_unimplemented]` attribute.
             let mut unimplemented_traits = FxIndexMap::default();
             let mut unimplemented_traits_only = true;
-            for (predicate, _parent_pred, cause) in unsatisfied_predicates {
+            for (predicate, _parent_pred, cause) in unsatisfied_predicates.leaked_value_ref() {
                 if let (ty::PredicateKind::Clause(ty::ClauseKind::Trait(p)), Some(cause)) =
                     (predicate.kind().skip_binder(), cause.as_ref())
                 {
@@ -966,7 +970,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             // we don't report an unimplemented trait.
             // We don't want to say that `iter::Cloned` is not an iterator, just
             // because of some non-Clone item being iterated over.
-            for (predicate, _parent_pred, _cause) in unsatisfied_predicates {
+            for (predicate, _parent_pred, _cause) in unsatisfied_predicates.leaked_value_ref() {
                 match predicate.kind().skip_binder() {
                     ty::PredicateKind::Clause(ty::ClauseKind::Trait(p))
                         if unimplemented_traits.contains_key(&p.trait_ref.def_id) => {}
@@ -1078,7 +1082,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             // Find all the requirements that come from a local `impl` block.
             let mut skip_list: UnordSet<_> = Default::default();
             let mut spanned_predicates = FxIndexMap::default();
-            for (p, parent_p, cause) in unsatisfied_predicates {
+            for (p, parent_p, cause) in unsatisfied_predicates.leaked_value_ref() {
                 // Extract the predicate span and parent def id of the cause,
                 // if we have one.
                 let (item_def_id, cause_span) = match cause.as_ref().map(|cause| cause.code()) {
@@ -1137,7 +1141,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                         ..
                     })) => {
                         let sized_pred =
-                            unsatisfied_predicates.iter().any(|(pred, _, _)| {
+                            unsatisfied_predicates.leaked_value_ref().iter().any(|(pred, _, _)| {
                                 match pred.kind().skip_binder() {
                                     ty::PredicateKind::Clause(ty::ClauseKind::Trait(pred)) => {
                                         self.tcx.is_lang_item(pred.def_id(), LangItem::Sized)
@@ -1244,6 +1248,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             let mut suggested_bounds = UnordSet::default();
             // The requirements that didn't have an `impl` span to show.
             let mut bound_list = unsatisfied_predicates
+                .leaked_value_ref()
                 .iter()
                 .filter_map(|(pred, parent_pred, _cause)| {
                     let mut suggested = false;
@@ -1406,7 +1411,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         let mut find_candidate_for_method = false;
 
         let mut label_span_not_found = |err: &mut Diag<'_>| {
-            if unsatisfied_predicates.is_empty() {
+            if unsatisfied_predicates.leaked_value_ref().is_empty() {
                 err.span_label(span, format!("{item_kind} not found in `{ty_str}`"));
                 let is_string_or_ref_str = match rcvr_ty.kind() {
                     ty::Ref(_, ty, _) => {
@@ -1522,7 +1527,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
         // Don't suggest (for example) `expr.field.clone()` if `expr.clone()`
         // can't be called due to `typeof(expr): Clone` not holding.
-        if unsatisfied_predicates.is_empty() {
+        if unsatisfied_predicates.leaked_value_ref().is_empty() {
             self.suggest_calling_method_on_field(
                 &mut err,
                 source,
@@ -1589,7 +1594,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
         // Don't emit a suggestion if we found an actual method
         // that had unsatisfied trait bounds
-        if unsatisfied_predicates.is_empty() && rcvr_ty.is_enum() {
+        if unsatisfied_predicates.leaked_value_ref().is_empty() && rcvr_ty.is_enum() {
             let adt_def = rcvr_ty.ty_adt_def().expect("enum is not an ADT");
             if let Some(var_name) = edit_distance::find_best_match_for_name(
                 &adt_def.variants().iter().map(|s| s.name).collect::<Vec<_>>(),
@@ -1732,7 +1737,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         } else if let Some(similar_candidate) = similar_candidate {
             // Don't emit a suggestion if we found an actual method
             // that had unsatisfied trait bounds
-            if unsatisfied_predicates.is_empty()
+            if unsatisfied_predicates.leaked_value_ref().is_empty()
                 // ...or if we already suggested that name because of `rustc_confusable` annotation.
                 && Some(similar_candidate.name) != confusable_suggested
             {
@@ -1769,7 +1774,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         source: SelfSource<'tcx>,
         no_match_data: &NoMatchData<'tcx>,
     ) {
-        if no_match_data.unsatisfied_predicates.is_empty()
+        if no_match_data.unsatisfied_predicates.leaked_value_ref().is_empty()
             && let Mode::MethodCall = no_match_data.mode
             && let SelfSource::MethodCall(mut source_expr) = source
         {
@@ -3051,10 +3056,12 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             err.span_note(foreign_spans, msg);
         }
 
-        let preds: Vec<_> = errors
-            .iter()
-            .map(|e| (e.obligation.predicate, None, Some(e.obligation.cause.clone())))
-            .collect();
+        let preds: WithLeakedVars<Vec<_>> = WithLeakedVars::new(
+            errors
+                .iter()
+                .map(|e| (e.obligation.predicate, None, Some(e.obligation.cause.clone())))
+                .collect(),
+        );
         if suggest_derive {
             self.suggest_derive(err, &preds);
         } else {
@@ -3066,15 +3073,13 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     fn note_predicate_source_and_get_derives(
         &self,
         err: &mut Diag<'_>,
-        unsatisfied_predicates: &[(
-            ty::Predicate<'tcx>,
-            Option<ty::Predicate<'tcx>>,
-            Option<ObligationCause<'tcx>>,
-        )],
+        unsatisfied_predicates: &WithLeakedVars<
+            Vec<(ty::Predicate<'tcx>, Option<ty::Predicate<'tcx>>, Option<ObligationCause<'tcx>>)>,
+        >,
     ) -> Vec<(String, Span, Symbol)> {
         let mut derives = Vec::<(String, Span, Symbol)>::new();
         let mut traits = Vec::new();
-        for (pred, _, _) in unsatisfied_predicates {
+        for (pred, _, _) in unsatisfied_predicates.leaked_value_ref() {
             let Some(ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_pred))) =
                 pred.kind().no_bound_vars()
             else {
@@ -3148,11 +3153,9 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     pub(crate) fn suggest_derive(
         &self,
         err: &mut Diag<'_>,
-        unsatisfied_predicates: &[(
-            ty::Predicate<'tcx>,
-            Option<ty::Predicate<'tcx>>,
-            Option<ObligationCause<'tcx>>,
-        )],
+        unsatisfied_predicates: &WithLeakedVars<
+            Vec<(ty::Predicate<'tcx>, Option<ty::Predicate<'tcx>>, Option<ObligationCause<'tcx>>)>,
+        >,
     ) -> bool {
         let mut derives = self.note_predicate_source_and_get_derives(err, unsatisfied_predicates);
         derives.sort();

@@ -68,9 +68,10 @@ pub trait Interner:
     type CanonicalVars: Copy
         + Debug
         + Hash
+        + Default
         + Eq
-        + SliceLike<Item = ty::CanonicalVarInfo<Self>>
-        + Default;
+        + TypeVisitable<Self>
+        + SliceLike<Item = ty::CanonicalVarInfo<Self>>;
     fn mk_canonical_var_infos(self, infos: &[ty::CanonicalVarInfo<Self>]) -> Self::CanonicalVars;
 
     type ExternalConstraints: Copy

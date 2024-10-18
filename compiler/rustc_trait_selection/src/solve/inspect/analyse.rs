@@ -17,7 +17,7 @@ use rustc_infer::infer::{DefineOpaqueTypes, InferCtxt, InferOk};
 use rustc_macros::extension;
 use rustc_middle::traits::solve::{Certainty, Goal, GoalSource, NoSolution, QueryResult};
 use rustc_middle::traits::ObligationCause;
-use rustc_middle::ty::{TyCtxt, TypeFoldable};
+use rustc_middle::ty::{TyCtxt, TypeFoldable, TypeVisitable};
 use rustc_middle::{bug, ty};
 use rustc_next_trait_solver::resolve::EagerResolver;
 use rustc_next_trait_solver::solve::inspect::{self, instantiate_canonical_state};
@@ -401,7 +401,7 @@ impl<'a, 'tcx> InspectGoal<'a, 'tcx> {
 
 /// The public API to interact with proof trees.
 pub trait ProofTreeVisitor<'tcx> {
-    type Result: VisitorResult = ();
+    type Result: VisitorResult + TypeVisitable<TyCtxt<'tcx>> = ();
 
     fn span(&self) -> Span;
 

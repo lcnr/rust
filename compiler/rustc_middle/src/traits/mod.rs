@@ -548,7 +548,7 @@ pub struct DerivedCause<'tcx> {
     pub parent_code: InternedObligationCauseCode<'tcx>,
 }
 
-#[derive(Clone, Debug, TypeVisitable)]
+#[derive(Clone, Debug)]
 pub enum SelectionError<'tcx> {
     /// The trait is not implemented.
     Unimplemented,
@@ -570,7 +570,7 @@ pub enum SelectionError<'tcx> {
     ConstArgHasWrongType { ct: ty::Const<'tcx>, ct_ty: Ty<'tcx>, expected_ty: Ty<'tcx> },
 }
 
-#[derive(Clone, Debug, TypeVisitable)]
+#[derive(Clone, Debug)]
 pub struct SignatureMismatchData<'tcx> {
     pub found_trait_ref: ty::TraitRef<'tcx>,
     pub expected_trait_ref: ty::TraitRef<'tcx>,

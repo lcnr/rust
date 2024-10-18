@@ -7,7 +7,9 @@ use rustc_macros::extension;
 use rustc_middle::arena::ArenaAllocatable;
 use rustc_middle::infer::canonical::{Canonical, CanonicalQueryResponse, QueryResponse};
 use rustc_middle::traits::query::NoSolution;
-use rustc_middle::ty::{self, GenericArg, Ty, TyCtxt, TypeFoldable, TypeVisitableExt, Upcast};
+use rustc_middle::ty::{
+    self, GenericArg, Ty, TyCtxt, TypeFoldable, TypeVisitableExt, Upcast, WithLeakedVars,
+};
 use rustc_span::DUMMY_SP;
 use tracing::instrument;
 
@@ -92,7 +94,7 @@ impl<'tcx> InferCtxt<'tcx> {
         trait_def_id: DefId,
         ty: Ty<'tcx>,
         param_env: ty::ParamEnv<'tcx>,
-    ) -> Option<Vec<traits::FulfillmentError<'tcx>>> {
+    ) -> Option<WithLeakedVars<Vec<traits::FulfillmentError<'tcx>>>> {
         self.probe(|_snapshot| {
             let mut selcx = SelectionContext::new(self);
             match selcx.select(&Obligation::new(
@@ -104,7 +106,7 @@ impl<'tcx> InferCtxt<'tcx> {
                 Ok(Some(selection)) => {
                     let ocx = ObligationCtxt::new_with_diagnostics(self);
                     ocx.register_obligations(selection.nested_obligations());
-                    Some(ocx.select_all_or_error())
+                    Some(WithLeakedVars::new(ocx.select_all_or_error()))
                 }
                 Ok(None) | Err(_) => None,
             }

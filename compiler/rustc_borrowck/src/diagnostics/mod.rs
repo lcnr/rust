@@ -1260,7 +1260,7 @@ impl<'infcx, 'tcx> MirBorrowckCtxt<'_, '_, 'infcx, 'tcx> {
                                 self.param_env,
                             ) && !has_sugg
                             {
-                                let msg = match &errors[..] {
+                                let msg = match &errors.leaked_value_ref()[..] {
                                     [] => "you can `clone` the value and consume it, but this \
                                            might not be your desired behavior"
                                         .to_string(),
@@ -1290,7 +1290,7 @@ impl<'infcx, 'tcx> MirBorrowckCtxt<'_, '_, 'infcx, 'tcx> {
                                     sugg,
                                     Applicability::MaybeIncorrect,
                                 );
-                                for error in errors {
+                                for error in errors.into_leaked_value() {
                                     if let FulfillmentErrorCode::Select(
                                         SelectionError::Unimplemented,
                                     ) = error.code

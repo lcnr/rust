@@ -161,6 +161,7 @@ pub struct PredefinedOpaquesData<I: Interner> {
 
 /// Possible ways the given goal can be proven.
 #[derive_where(Clone, Copy, Hash, PartialEq, Eq, Debug; I: Interner)]
+#[derive(TypeVisitable_Generic)]
 pub enum CandidateSource<I: Interner> {
     /// A user written impl.
     ///

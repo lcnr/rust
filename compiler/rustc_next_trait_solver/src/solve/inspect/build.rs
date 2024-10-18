@@ -14,7 +14,7 @@ use crate::delegate::SolverDelegate;
 use crate::solve::eval_ctxt::canonical;
 use crate::solve::{
     inspect, CanonicalInput, Certainty, GenerateProofTree, Goal, GoalEvaluationKind, GoalSource,
-    QueryInput, QueryResult,
+    QueryResult,
 };
 
 /// The core data structure when building proof trees.
@@ -128,7 +128,6 @@ struct WipCanonicalGoalEvaluationStep<I: Interner> {
     /// This is necessary as we otherwise don't unify these
     /// vars when instantiating multiple `CanonicalState`.
     var_values: Vec<I::GenericArg>,
-    instantiated_goal: QueryInput<I, I::Predicate>,
     probe_depth: usize,
     evaluation: WipProbe<I>,
 }
@@ -151,10 +150,7 @@ impl<I: Interner> WipCanonicalGoalEvaluationStep<I> {
             inspect::ProbeKind::Root { .. } => (),
             _ => unreachable!("unexpected root evaluation: {evaluation:?}"),
         }
-        inspect::CanonicalGoalEvaluationStep {
-            instantiated_goal: self.instantiated_goal,
-            evaluation,
-        }
+        inspect::CanonicalGoalEvaluationStep { evaluation }
     }
 }
 
@@ -328,11 +324,9 @@ impl<D: SolverDelegate<Interner = I>, I: Interner> ProofTreeBuilder<D> {
     pub(crate) fn new_goal_evaluation_step(
         &mut self,
         var_values: ty::CanonicalVarValues<I>,
-        instantiated_goal: QueryInput<I, I::Predicate>,
     ) -> ProofTreeBuilder<D> {
         self.nested(|| WipCanonicalGoalEvaluationStep {
             var_values: var_values.var_values.to_vec(),
-            instantiated_goal,
             evaluation: WipProbe {
                 initial_num_var_values: var_values.len(),
                 steps: vec![],

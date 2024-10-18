@@ -12,12 +12,13 @@ use rustc_hir_analysis::autoderef::{self, Autoderef};
 use rustc_infer::infer::canonical::{Canonical, OriginalQueryValues, QueryResponse};
 use rustc_infer::infer::{self, DefineOpaqueTypes, InferOk, TyCtxtInferExt};
 use rustc_infer::traits::ObligationCauseCode;
+use rustc_macros::TypeVisitable;
 use rustc_middle::middle::stability;
 use rustc_middle::query::Providers;
 use rustc_middle::ty::fast_reject::{simplify_type, TreatParams};
 use rustc_middle::ty::{
     self, AssocItem, AssocItemContainer, GenericArgs, GenericArgsRef, GenericParamDefKind,
-    ParamEnvAnd, Ty, TyCtxt, TypeVisitableExt, Upcast,
+    ParamEnvAnd, Ty, TyCtxt, TypeVisitable, TypeVisitableExt, Upcast,
 };
 use rustc_middle::{bug, span_bug};
 use rustc_session::lint;
@@ -35,6 +36,7 @@ use rustc_trait_selection::traits::query::method_autoderef::{
 };
 use rustc_trait_selection::traits::query::CanonicalTyGoal;
 use rustc_trait_selection::traits::{self, ObligationCause, ObligationCtxt};
+use rustc_type_ir::WithLeakedVars;
 use smallvec::{smallvec, SmallVec};
 use tracing::{debug, instrument};
 
@@ -100,14 +102,15 @@ impl<'a, 'tcx> Deref for ProbeContext<'a, 'tcx> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, TypeVisitable)]
 pub(crate) struct Candidate<'tcx> {
     pub(crate) item: ty::AssocItem,
     pub(crate) kind: CandidateKind<'tcx>,
+    #[type_visitable(ignore)]
     pub(crate) import_ids: SmallVec<[LocalDefId; 1]>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, TypeVisitable)]
 pub(crate) enum CandidateKind<'tcx> {
     InherentImplCandidate(DefId),
     ObjectCandidate(ty::PolyTraitRef<'tcx>),
@@ -116,6 +119,7 @@ pub(crate) enum CandidateKind<'tcx> {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(TypeVisitable)]
 enum ProbeResult {
     NoMatch,
     BadReturnType,
@@ -158,10 +162,12 @@ impl AutorefOrPtrAdjustment {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, TypeVisitable)]
 pub(crate) struct Pick<'tcx> {
     pub item: ty::AssocItem,
     pub kind: PickKind<'tcx>,
+
+    #[type_visitable(ignore)]
     pub import_ids: SmallVec<[LocalDefId; 1]>,
 
     /// Indicates that the source expression should be autoderef'd N times
@@ -172,14 +178,15 @@ pub(crate) struct Pick<'tcx> {
 
     /// Indicates that we want to add an autoref (and maybe also unsize it), or if the receiver is
     /// `*mut T`, convert it to `*const T`.
+    #[type_visitable(ignore)]
     pub autoref_or_ptr_adjustment: Option<AutorefOrPtrAdjustment>,
-    pub self_ty: Ty<'tcx>,
+    pub self_ty: WithLeakedVars<Ty<'tcx>>,
 
     /// Unstable candidates alongside the stable ones.
     unstable_candidates: Vec<(Candidate<'tcx>, Symbol)>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, TypeVisitable)]
 pub(crate) enum PickKind<'tcx> {
     InherentImplPick,
     ObjectPick,
@@ -193,6 +200,7 @@ pub(crate) enum PickKind<'tcx> {
 pub(crate) type PickResult<'tcx> = Result<Pick<'tcx>, MethodError<'tcx>>;
 
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(TypeVisitable)]
 pub(crate) enum Mode {
     // An expression of the form `receiver.method_name(...)`.
     // Autoderefs are performed on `receiver`, lookup is done based on the
@@ -334,6 +342,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     ) -> Result<R, MethodError<'tcx>>
     where
         OP: FnOnce(ProbeContext<'_, 'tcx>) -> Result<R, MethodError<'tcx>>,
+        R: TypeVisitable<TyCtxt<'tcx>>,
     {
         let mut orig_values = OriginalQueryValues::default();
         let param_env_and_self_ty = self.canonicalize_query(
@@ -397,7 +406,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 // not much use in suggesting methods in this case.
                 return Err(MethodError::NoMatch(NoMatchData {
                     static_candidates: Vec::new(),
-                    unsatisfied_predicates: Vec::new(),
+                    unsatisfied_predicates: WithLeakedVars::new(Vec::new()),
                     out_of_scope_traits: Vec::new(),
                     similar_candidate: None,
                     mode,
@@ -448,7 +457,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 self.demand_eqtype(span, ty, Ty::new_error(self.tcx, guar));
                 return Err(MethodError::NoMatch(NoMatchData {
                     static_candidates: Vec::new(),
-                    unsatisfied_predicates: Vec::new(),
+                    unsatisfied_predicates: WithLeakedVars::new(Vec::new()),
                     out_of_scope_traits: Vec::new(),
                     similar_candidate: None,
                     mode,
@@ -992,7 +1001,7 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
         if self.is_suggestion.0 {
             return Err(MethodError::NoMatch(NoMatchData {
                 static_candidates: vec![],
-                unsatisfied_predicates: vec![],
+                unsatisfied_predicates: WithLeakedVars::new(vec![]),
                 out_of_scope_traits: vec![],
                 similar_candidate: None,
                 mode: self.mode,
@@ -1041,7 +1050,7 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
 
         Err(MethodError::NoMatch(NoMatchData {
             static_candidates,
-            unsatisfied_predicates,
+            unsatisfied_predicates: WithLeakedVars::new(unsatisfied_predicates),
             out_of_scope_traits,
             similar_candidate,
             mode: self.mode,
@@ -1674,7 +1683,7 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
             import_ids: probes[0].0.import_ids.clone(),
             autoderefs: 0,
             autoref_or_ptr_adjustment: None,
-            self_ty,
+            self_ty: WithLeakedVars::new(self_ty),
             unstable_candidates: vec![],
         })
     }
@@ -1967,7 +1976,7 @@ impl<'tcx> Candidate<'tcx> {
             import_ids: self.import_ids.clone(),
             autoderefs: 0,
             autoref_or_ptr_adjustment: None,
-            self_ty,
+            self_ty: WithLeakedVars::new(self_ty),
             unstable_candidates,
         }
     }

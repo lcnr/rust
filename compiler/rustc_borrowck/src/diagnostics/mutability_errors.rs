@@ -1231,16 +1231,12 @@ impl<'infcx, 'tcx> MirBorrowckCtxt<'_, '_, 'infcx, 'tcx> {
                         && let Some(ty) = ty
                         && let ty::Ref(..) = ty.kind()
                     {
-                        match self
-                            .infcx
-                            .type_implements_trait_shallow(
-                                clone_trait,
-                                ty.peel_refs(),
-                                self.param_env,
-                            )
-                            .as_deref()
-                        {
-                            Some([]) => {
+                        match self.infcx.type_implements_trait_shallow(
+                            clone_trait,
+                            ty.peel_refs(),
+                            self.param_env,
+                        ) {
+                            Some(errors) if errors.leaked_value_ref().is_empty() => {
                                 // FIXME: This error message isn't useful, since we're just
                                 // vaguely suggesting to clone a value that already
                                 // implements `Clone`.
@@ -1299,6 +1295,7 @@ impl<'infcx, 'tcx> MirBorrowckCtxt<'_, '_, 'infcx, 'tcx> {
                                     err.note(format!(
                                         "the following trait bounds weren't met: {}",
                                         errors
+                                            .leaked_value_ref()
                                             .iter()
                                             .map(|e| e.obligation.predicate.to_string())
                                             .collect::<Vec<_>>()
@@ -1306,7 +1303,7 @@ impl<'infcx, 'tcx> MirBorrowckCtxt<'_, '_, 'infcx, 'tcx> {
                                     ));
                                 }
                                 // The type doesn't implement Clone because of unmet obligations.
-                                for error in errors {
+                                for error in errors.into_leaked_value() {
                                     if let traits::FulfillmentErrorCode::Select(
                                         traits::SelectionError::Unimplemented,
                                     ) = error.code

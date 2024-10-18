@@ -165,6 +165,15 @@ impl<I: Interner, T: TypeVisitable<I>, E: TypeVisitable<I>> TypeVisitable<I> for
     }
 }
 
+impl<I: Interner, B: TypeVisitable<I>, C: TypeVisitable<I>> TypeVisitable<I> for ControlFlow<B, C> {
+    fn visit_with<V: TypeVisitor<I>>(&self, visitor: &mut V) -> V::Result {
+        match self {
+            ControlFlow::Continue(c) => c.visit_with(visitor),
+            ControlFlow::Break(b) => b.visit_with(visitor),
+        }
+    }
+}
+
 impl<I: Interner, T: TypeVisitable<I>> TypeVisitable<I> for Lrc<T> {
     fn visit_with<V: TypeVisitor<I>>(&self, visitor: &mut V) -> V::Result {
         (**self).visit_with(visitor)

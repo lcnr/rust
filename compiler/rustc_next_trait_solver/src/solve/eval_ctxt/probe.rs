@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use rustc_type_ir::visit::TypeVisitable;
 use rustc_type_ir::{InferCtxtLike, Interner};
 use tracing::instrument;
 
@@ -24,6 +25,7 @@ where
     F: FnOnce(&T) -> inspect::ProbeKind<I>,
     D: SolverDelegate<Interner = I>,
     I: Interner,
+    T: TypeVisitable<I>,
 {
     pub(in crate::solve) fn enter(self, f: impl FnOnce(&mut EvalCtxt<'_, D>) -> T) -> T {
         let ProbeCtxt { ecx: outer_ecx, probe_kind, _result } = self;

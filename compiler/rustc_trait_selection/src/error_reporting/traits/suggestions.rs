@@ -3896,14 +3896,16 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                     && let Some(failed_pred) = failed_pred.as_projection_clause()
                     && let Some(found) = failed_pred.skip_binder().term.as_type()
                 {
-                    type_diffs = vec![TypeError::Sorts(ty::error::ExpectedFound {
-                        expected: where_pred
+                    let expected_found = ty::error::ExpectedFound::new(
+                        true,
+                        where_pred
                             .skip_binder()
                             .projection_term
                             .expect_ty(self.tcx)
                             .to_ty(self.tcx),
                         found,
-                    })];
+                    );
+                    type_diffs = vec![TypeError::Sorts(expected_found)];
                 }
             }
             if let hir::ExprKind::Path(hir::QPath::Resolved(None, path)) = expr.kind
@@ -4044,7 +4046,11 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                 };
                 if tcx.is_diagnostic_item(sym::IteratorItem, *def_id)
                     && path_segment.ident.name == sym::map
-                    && self.can_eq(param_env, expected_found.found, *ty)
+                    && self.can_eq(
+                        param_env,
+                        expected_found.found.get_fudged_value(self.infcx),
+                        *ty,
+                    )
                     && let [arg] = args
                     && let hir::ExprKind::Closure(closure) = arg.kind
                 {
@@ -4056,7 +4062,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                         // FIXME: actually check the expected vs found types, but right now
                         // the expected is a projection that we need to resolve.
                         // && let Some(tail_ty) = typeck_results.expr_ty_opt(expr)
-                        && expected_found.found.is_unit()
+                        && expected_found.found.into_leaked_value().is_unit()
                     {
                         err.span_suggestion_verbose(
                             expr.span.shrink_to_hi().with_hi(stmt.span.hi()),
@@ -4222,7 +4228,11 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                             let TypeError::Sorts(expected_found) = diff else {
                                 return false;
                             };
-                            self.can_eq(param_env, expected_found.found, ty)
+                            self.can_eq(
+                                param_env,
+                                expected_found.found.get_fudged_value(self.infcx),
+                                ty,
+                            )
                         })
                     {
                         // FIXME: this doesn't quite work for `Iterator::collect`
@@ -4255,7 +4265,11 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                                 let TypeError::Sorts(expected_found) = diff else {
                                     return false;
                                 };
-                                self.can_eq(param_env, expected_found.found, ty)
+                                self.can_eq(
+                                    param_env,
+                                    expected_found.found.get_fudged_value(self.infcx),
+                                    ty,
+                                )
                             }) {
                                 primary_spans.push(span);
                             }
@@ -4305,14 +4319,17 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
             let TypeError::Sorts(expected_found) = diff else {
                 continue;
             };
-            let ty::Alias(ty::Projection, proj) = expected_found.expected.kind() else {
+            let ty::Alias(ty::Projection, proj_with_leaking_vars) =
+                expected_found.expected.into_leaked_value().kind()
+            else {
                 continue;
             };
+            let proj_def_id = proj_with_leaking_vars.def_id;
 
             // Make `Self` be equivalent to the type of the call chain
             // expression we're looking at now, so that we can tell what
             // for example `Iterator::Item` is at this point in the chain.
-            let args = GenericArgs::for_item(self.tcx, proj.def_id, |param, _| {
+            let args = GenericArgs::for_item(self.tcx, proj_def_id, |param, _| {
                 if param.index == 0 {
                     debug_assert_matches!(param.kind, ty::GenericParamDefKind::Type { .. });
                     return prev_ty.into();
@@ -4326,7 +4343,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
             // This corresponds to `<ExprTy as Iterator>::Item = _`.
             let projection = ty::Binder::dummy(ty::PredicateKind::Clause(
                 ty::ClauseKind::Projection(ty::ProjectionPredicate {
-                    projection_term: ty::AliasTerm::new_from_args(self.tcx, proj.def_id, args),
+                    projection_term: ty::AliasTerm::new_from_args(self.tcx, proj_def_id, args),
                     term: ty.into(),
                 }),
             ));
@@ -4343,7 +4360,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                 && let ty = self.resolve_vars_if_possible(ty)
                 && !ty.is_ty_var()
             {
-                assocs_in_this_method.push(Some((span, (proj.def_id, ty))));
+                assocs_in_this_method.push(Some((span, (proj_def_id, ty))));
             } else {
                 // `<ExprTy as Iterator>` didn't select, so likely we've
                 // reached the end of the iterator chain, like the originating

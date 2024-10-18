@@ -95,7 +95,9 @@ impl<'tcx> TypeRelation<TyCtxt<'tcx>> for MatchAgainstFreshVars<'tcx> {
             }
 
             (ty::ConstKind::Infer(_), _) | (_, ty::ConstKind::Infer(_)) => {
-                return Err(TypeError::ConstMismatch(ExpectedFound::new(true, a, b)));
+                return Err(TypeError::ConstMismatch(ExpectedFound::new(
+                    true, a, b,
+                )));
             }
 
             _ => {}

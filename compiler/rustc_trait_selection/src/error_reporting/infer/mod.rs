@@ -68,6 +68,7 @@ use rustc_middle::ty::{
 };
 use rustc_span::{sym, BytePos, DesugaringKind, Pos, Span};
 use rustc_target::spec::abi;
+use rustc_type_ir::WithLeakedVars;
 use tracing::{debug, instrument};
 
 use crate::error_reporting::TypeErrCtxt;
@@ -1562,7 +1563,10 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
             }
         }
         let exp_found = match exp_found {
-            Mismatch::Variable(exp_found) => Some(exp_found),
+            Mismatch::Variable(ExpectedFound { expected, found }) => Some(ExpectedFound {
+                expected: WithLeakedVars::new(expected),
+                found: WithLeakedVars::new(found),
+            }),
             Mismatch::Fixed(_) => None,
         };
         let exp_found = match terr {
@@ -2036,7 +2040,9 @@ impl<'tcx> ObligationCause<'tcx> {
             // tailor to that.
             _ => match terr {
                 TypeError::CyclicTy(ty)
-                    if ty.is_closure() || ty.is_coroutine() || ty.is_coroutine_closure() =>
+                    if ty.into_leaked_value().is_closure()
+                        || ty.into_leaked_value().is_coroutine()
+                        || ty.into_leaked_value().is_coroutine_closure() =>
                 {
                     FailureCode::Error0644
                 }
@@ -2102,7 +2108,9 @@ impl<'tcx> ObligationCause<'tcx> {
             // tailor to that.
             _ => match terr {
                 TypeError::CyclicTy(ty)
-                    if ty.is_closure() || ty.is_coroutine() || ty.is_coroutine_closure() =>
+                    if ty.into_leaked_value().is_closure()
+                        || ty.into_leaked_value().is_coroutine()
+                        || ty.into_leaked_value().is_coroutine_closure() =>
                 {
                     ObligationCauseFailureCode::ClosureSelfref { span }
                 }

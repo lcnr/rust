@@ -12,6 +12,7 @@ use rustc_hir as hir;
 use rustc_hir::def::{CtorOf, DefKind, Namespace};
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::{self, InferOk};
+use rustc_macros::TypeVisitable;
 use rustc_middle::query::Providers;
 use rustc_middle::traits::ObligationCause;
 use rustc_middle::ty::{
@@ -22,6 +23,7 @@ use rustc_span::symbol::Ident;
 use rustc_span::Span;
 use rustc_trait_selection::traits::query::evaluate_obligation::InferCtxtExt;
 use rustc_trait_selection::traits::{self, NormalizeExt};
+use rustc_type_ir::WithLeakedVars;
 use tracing::{debug, instrument};
 
 use self::probe::{IsSuggestion, ProbeScope};
@@ -44,7 +46,7 @@ pub(crate) struct MethodCallee<'tcx> {
     pub sig: ty::FnSig<'tcx>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, TypeVisitable)]
 pub(crate) enum MethodError<'tcx> {
     // Did not find an applicable method, but we did find various near-misses that may work.
     NoMatch(NoMatchData<'tcx>),
@@ -54,13 +56,15 @@ pub(crate) enum MethodError<'tcx> {
 
     // Found an applicable method, but it is not visible. The third argument contains a list of
     // not-in-scope traits which may work.
-    PrivateMatch(DefKind, DefId, Vec<DefId>),
+    PrivateMatch(#[type_visitable(ignore)] DefKind, DefId, Vec<DefId>),
 
     // Found a `Self: Sized` bound where `Self` is a trait object.
     IllegalSizedBound {
+        #[type_visitable(ignore)]
         candidates: Vec<DefId>,
         needs_mut: bool,
         bound_span: Span,
+        #[type_visitable(ignore)]
         self_expr: &'tcx hir::Expr<'tcx>,
     },
 
@@ -70,11 +74,12 @@ pub(crate) enum MethodError<'tcx> {
 
 // Contains a list of static methods that may apply, a list of unsatisfied trait predicates which
 // could lead to matches if satisfied, and a list of not-in-scope traits which may work.
-#[derive(Debug)]
+#[derive(Debug, Clone, TypeVisitable)]
 pub(crate) struct NoMatchData<'tcx> {
     pub static_candidates: Vec<CandidateSource>,
-    pub unsatisfied_predicates:
+    pub unsatisfied_predicates: WithLeakedVars<
         Vec<(ty::Predicate<'tcx>, Option<ty::Predicate<'tcx>>, Option<ObligationCause<'tcx>>)>,
+    >,
     pub out_of_scope_traits: Vec<DefId>,
     pub similar_candidate: Option<ty::AssocItem>,
     pub mode: probe::Mode,
@@ -82,7 +87,7 @@ pub(crate) struct NoMatchData<'tcx> {
 
 // A pared down enum describing just the places from which a method
 // candidate can arise. Used for error reporting only.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, TypeVisitable)]
 pub(crate) enum CandidateSource {
     Impl(DefId),
     Trait(DefId /* trait id */),
@@ -217,7 +222,8 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                     ProbeScope::TraitsInScope,
                 ) {
                     Ok(ref new_pick) if pick.differs_from(new_pick) => {
-                        needs_mut = new_pick.self_ty.ref_mutability() != self_ty.ref_mutability();
+                        needs_mut = new_pick.self_ty.into_leaked_value().ref_mutability()
+                            != self_ty.ref_mutability();
                     }
                     _ => {}
                 }

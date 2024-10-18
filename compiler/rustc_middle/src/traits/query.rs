@@ -9,6 +9,7 @@ use rustc_macros::{HashStable, TypeFoldable, TypeVisitable};
 use rustc_span::Span;
 // FIXME: Remove this import and import via `traits::solve`.
 pub use rustc_type_ir::solve::NoSolution;
+use rustc_type_ir::visit::{TypeVisitable, TypeVisitor};
 
 use crate::error::DropCheckOverflow;
 use crate::infer::canonical::{Canonical, QueryResponse};
@@ -143,7 +144,7 @@ impl<'tcx> FromIterator<DropckConstraint<'tcx>> for DropckConstraint<'tcx> {
     }
 }
 
-#[derive(Debug, HashStable)]
+#[derive(Clone, Debug, TypeVisitable, HashStable)]
 pub struct CandidateStep<'tcx> {
     pub self_ty: Canonical<'tcx, QueryResponse<'tcx, Ty<'tcx>>>,
     pub autoderefs: usize,
@@ -156,7 +157,7 @@ pub struct CandidateStep<'tcx> {
     pub unsize: bool,
 }
 
-#[derive(Copy, Clone, Debug, HashStable)]
+#[derive(Copy, Clone, Debug, TypeVisitable, HashStable)]
 pub struct MethodAutoderefStepsResult<'tcx> {
     /// The valid autoderef steps that could be found.
     pub steps: &'tcx [CandidateStep<'tcx>],
@@ -167,10 +168,15 @@ pub struct MethodAutoderefStepsResult<'tcx> {
     pub reached_recursion_limit: bool,
 }
 
-#[derive(Debug, HashStable)]
+#[derive(Clone, Debug, HashStable, TypeVisitable)]
 pub struct MethodAutoderefBadTy<'tcx> {
     pub reached_raw_pointer: bool,
     pub ty: Canonical<'tcx, QueryResponse<'tcx, Ty<'tcx>>>,
+}
+impl<'tcx> TypeVisitable<TyCtxt<'tcx>> for &MethodAutoderefBadTy<'tcx> {
+    fn visit_with<V: TypeVisitor<TyCtxt<'tcx>>>(&self, visitor: &mut V) -> V::Result {
+        MethodAutoderefBadTy::visit_with(self, visitor)
+    }
 }
 
 /// Result of the `normalize_canonicalized_{{,inherent_}projection,weak}_ty` queries.

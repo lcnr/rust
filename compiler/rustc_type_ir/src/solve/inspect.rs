@@ -21,11 +21,11 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 use derive_where::derive_where;
+use rustc_ast_ir::try_visit;
 use rustc_type_ir_macros::{TypeFoldable_Generic, TypeVisitable_Generic};
 
-use crate::solve::{
-    CandidateSource, CanonicalInput, Certainty, Goal, GoalSource, QueryInput, QueryResult,
-};
+use crate::solve::{CandidateSource, CanonicalInput, Certainty, Goal, GoalSource, QueryResult};
+use crate::visit::{TypeVisitable, TypeVisitor};
 use crate::{Canonical, CanonicalVarValues, Interner};
 
 /// Some `data` together with information about how they relate to the input
@@ -52,30 +52,32 @@ pub type CanonicalState<I, T> = Canonical<I, State<I, T>>;
 /// for the `CanonicalVarValues` of the canonicalized goal.
 /// We use this to map any [CanonicalState] from the local `InferCtxt`
 /// of the solver query to the `InferCtxt` of the caller.
-#[derive_where(PartialEq, Eq, Hash; I: Interner)]
+#[derive_where(PartialEq, Eq, Hash, Clone, Debug; I: Interner)]
+#[derive(TypeVisitable_Generic)]
 pub struct GoalEvaluation<I: Interner> {
     pub uncanonicalized_goal: Goal<I, I::Predicate>,
     pub orig_values: Vec<I::GenericArg>,
     pub evaluation: CanonicalGoalEvaluation<I>,
 }
 
-#[derive_where(PartialEq, Eq, Hash, Debug; I: Interner)]
+#[derive_where(PartialEq, Eq, Hash, Clone, Debug; I: Interner)]
+#[derive(TypeVisitable_Generic)]
 pub struct CanonicalGoalEvaluation<I: Interner> {
     pub goal: CanonicalInput<I>,
     pub kind: CanonicalGoalEvaluationKind<I>,
     pub result: QueryResult<I>,
 }
 
-#[derive_where(PartialEq, Eq, Hash, Debug; I: Interner)]
+#[derive_where(PartialEq, Eq, Hash, Clone, Debug; I: Interner)]
+#[derive(TypeVisitable_Generic)]
 pub enum CanonicalGoalEvaluationKind<I: Interner> {
     Overflow,
     Evaluation { final_revision: CanonicalGoalEvaluationStep<I> },
 }
 
-#[derive_where(PartialEq, Eq, Hash, Debug; I: Interner)]
+#[derive_where(PartialEq, Eq, Hash, Clone, Debug; I: Interner)]
+#[derive(TypeVisitable_Generic)]
 pub struct CanonicalGoalEvaluationStep<I: Interner> {
-    pub instantiated_goal: QueryInput<I, I::Predicate>,
-
     /// The actual evaluation of the goal, always `ProbeKind::Root`.
     pub evaluation: Probe<I>,
 }
@@ -83,15 +85,27 @@ pub struct CanonicalGoalEvaluationStep<I: Interner> {
 /// A self-contained computation during trait solving. This either
 /// corresponds to a `EvalCtxt::probe(_X)` call or the root evaluation
 /// of a goal.
-#[derive_where(PartialEq, Eq, Hash, Debug; I: Interner)]
+#[derive_where(PartialEq, Eq, Hash, Clone, Debug; I: Interner)]
 pub struct Probe<I: Interner> {
     /// What happened inside of this probe in chronological order.
     pub steps: Vec<ProbeStep<I>>,
     pub kind: ProbeKind<I>,
     pub final_state: CanonicalState<I, ()>,
 }
+// HACK: `TypeVisitable_Generic` is a perfect-derive and requires all fields
+// to implement `TypeVisitable`. As `Probe` recursively depends on itself,
+// this would cause solver cycles. We manually implement `TypeVisitable` instead.
+impl<I: Interner> TypeVisitable<I> for Probe<I> {
+    fn visit_with<V: TypeVisitor<I>>(&self, visitor: &mut V) -> V::Result {
+        let Probe { steps, kind, final_state } = self;
+        try_visit!(steps.visit_with(visitor));
+        try_visit!(kind.visit_with(visitor));
+        final_state.visit_with(visitor)
+    }
+}
 
-#[derive_where(PartialEq, Eq, Hash, Debug; I: Interner)]
+#[derive_where(PartialEq, Eq, Hash, Clone, Debug; I: Interner)]
+#[derive(TypeVisitable_Generic)]
 pub enum ProbeStep<I: Interner> {
     /// We added a goal to the `EvalCtxt` which will get proven
     /// the next time `EvalCtxt::try_evaluate_added_goals` is called.

@@ -621,7 +621,11 @@ pub fn structurally_relate_consts<I: Interner, R: TypeRelation<I>>(
         }
         _ => false,
     };
-    if is_match { Ok(a) } else { Err(TypeError::ConstMismatch(ExpectedFound::new(true, a, b))) }
+    if is_match {
+        Ok(a)
+    } else {
+        Err(TypeError::ConstMismatch(ExpectedFound::new(true, a, b)))
+    }
 }
 
 impl<I: Interner, T: Relate<I>> Relate<I> for ty::Binder<I, T> {

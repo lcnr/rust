@@ -919,6 +919,15 @@ impl<'tcx> InferCtxt<'tcx> {
         ty::Const::new_var(self.tcx, vid)
     }
 
+    pub fn next_effect_var(&self) -> ty::Const<'tcx> {
+        let effect_vid = self.next_effect_var_id();
+        ty::Const::new_infer(self.tcx, ty::InferConst::EffectVar(effect_vid))
+    }
+
+    pub fn next_effect_var_id(&self) -> EffectVid {
+        self.inner.borrow_mut().effect_unification_table().new_key(EffectVarValue::Unknown).vid
+    }
+
     pub fn next_const_var_id(&self, origin: ConstVariableOrigin) -> ConstVid {
         self.inner
             .borrow_mut()
@@ -1033,8 +1042,7 @@ impl<'tcx> InferCtxt<'tcx> {
     }
 
     pub fn var_for_effect(&self, param: &ty::GenericParamDef) -> GenericArg<'tcx> {
-        let effect_vid =
-            self.inner.borrow_mut().effect_unification_table().new_key(EffectVarValue::Unknown).vid;
+        let effect_vid = self.next_effect_var_id();
         let ty = self
             .tcx
             .type_of(param.def_id)

@@ -14,6 +14,7 @@ use rustc_session::lint;
 use rustc_span::def_id::LocalDefId;
 use rustc_span::{Span, DUMMY_SP};
 use rustc_trait_selection::traits::{ObligationCause, ObligationCtxt};
+use rustc_type_ir::WithLeakedVars;
 use tracing::debug;
 
 use crate::{errors, FnCtxt, TypeckRootCtxt};
@@ -500,16 +501,16 @@ impl<'tcx> FnCtxt<'_, 'tcx> {
                         .expect("expected diverging var to be unconstrained");
                 }
 
-                ocx.select_where_possible()
+                WithLeakedVars::new(ocx.select_where_possible())
             })
         };
 
         // If we have no errors with `fallback = ()`, but *do* have errors with `fallback = !`,
         // then this code will be broken by the never type fallback change.qba
         let unit_errors = remaining_errors_if_fallback_to(self.tcx.types.unit);
-        if unit_errors.is_empty()
-            && let mut never_errors = remaining_errors_if_fallback_to(self.tcx.types.never)
-            && let [ref mut never_error, ..] = never_errors.as_mut_slice()
+        if unit_errors.leaked_value_ref().is_empty()
+            && let never_errors = remaining_errors_if_fallback_to(self.tcx.types.never)
+            && let [ref mut never_error, ..] = never_errors.into_leaked_value().as_mut_slice()
         {
             self.adjust_fulfillment_error_for_expr_obligation(never_error);
             self.tcx.emit_node_span_lint(

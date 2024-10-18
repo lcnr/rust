@@ -5,6 +5,7 @@ use rustc_index::Idx;
 use rustc_middle::span_bug;
 use rustc_middle::ty::error::TypeError;
 use tracing::{debug, instrument};
+use ty::WithLeakedVars;
 
 use super::*;
 use crate::infer::relate::RelateResult;
@@ -279,7 +280,10 @@ impl<'a, 'b, 'tcx> LeakCheck<'a, 'b, 'tcx> {
         other_region: ty::Region<'tcx>,
     ) -> TypeError<'tcx> {
         debug!("error: placeholder={:?}, other_region={:?}", placeholder, other_region);
-        TypeError::RegionsInsufficientlyPolymorphic(placeholder.bound, other_region)
+        TypeError::RegionsInsufficientlyPolymorphic(
+            placeholder.bound,
+            other_region,
+        )
     }
 }
 

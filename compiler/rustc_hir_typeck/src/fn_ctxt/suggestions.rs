@@ -31,6 +31,7 @@ use rustc_trait_selection::error_reporting::InferCtxtErrorExt;
 use rustc_trait_selection::infer::InferCtxtExt;
 use rustc_trait_selection::traits;
 use rustc_trait_selection::traits::query::evaluate_obligation::InferCtxtExt as _;
+use rustc_type_ir::WithLeakedVars;
 use tracing::{debug, instrument};
 
 use super::FnCtxt;
@@ -1812,7 +1813,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 if let Some(errors) =
                     self.type_implements_trait_shallow(clone_trait_did, expected_ty, self.param_env)
                 {
-                    match &errors[..] {
+                    match &errors.leaked_value_ref()[..] {
                         [] => {}
                         [error] => {
                             diag.help(format!(
@@ -1834,7 +1835,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                             ));
                         }
                     }
-                    for error in errors {
+                    for error in errors.into_leaked_value() {
                         if let traits::FulfillmentErrorCode::Select(
                             traits::SelectionError::Unimplemented,
                         ) = error.code
@@ -1849,7 +1850,9 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                         }
                     }
                 }
-                self.suggest_derive(diag, &[(trait_ref.upcast(self.tcx), None, None)]);
+                let predicates =
+                    WithLeakedVars::new(vec![(trait_ref.upcast(self.tcx), None, None)]);
+                self.suggest_derive(diag, &predicates);
             }
         }
     }

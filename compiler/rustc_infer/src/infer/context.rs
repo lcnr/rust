@@ -3,12 +3,12 @@ use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_middle::traits::solve::{Goal, NoSolution, SolverMode};
 use rustc_middle::traits::ObligationCause;
 use rustc_middle::ty::fold::TypeFoldable;
-use rustc_middle::ty::{self, Ty, TyCtxt};
+use rustc_middle::ty::{self, Ty, TyCtxt, TypeVisitable};
 use rustc_span::DUMMY_SP;
 use rustc_type_ir::relate::Relate;
 use rustc_type_ir::InferCtxtLike;
 
-use super::{BoundRegionConversionTime, InferCtxt, SubregionOrigin};
+use super::{BoundRegionConversionTime, InferCtxt, RegionVariableOrigin, SubregionOrigin};
 
 impl<'tcx> InferCtxtLike for InferCtxt<'tcx> {
     type Interner = TyCtxt<'tcx>;
@@ -100,12 +100,28 @@ impl<'tcx> InferCtxtLike for InferCtxt<'tcx> {
         self.defining_opaque_types()
     }
 
+    fn next_region_infer(&self) -> ty::Region<'tcx> {
+        self.next_region_var(RegionVariableOrigin::MiscVariable(DUMMY_SP))
+    }
+
     fn next_ty_infer(&self) -> Ty<'tcx> {
         self.next_ty_var(DUMMY_SP)
     }
 
+    fn next_int_infer(&self) -> Ty<'tcx> {
+        self.next_int_var()
+    }
+
+    fn next_float_infer(&self) -> Ty<'tcx> {
+        self.next_float_var()
+    }
+
     fn next_const_infer(&self) -> ty::Const<'tcx> {
         self.next_const_var(DUMMY_SP)
+    }
+
+    fn next_effect_infer(&self) -> ty::Const<'tcx> {
+        self.next_effect_var()
     }
 
     fn fresh_args_for_item(&self, def_id: DefId) -> ty::GenericArgsRef<'tcx> {
@@ -162,7 +178,7 @@ impl<'tcx> InferCtxtLike for InferCtxt<'tcx> {
         self.resolve_vars_if_possible(value)
     }
 
-    fn probe<T>(&self, probe: impl FnOnce() -> T) -> T {
+    fn probe<T: TypeVisitable<TyCtxt<'tcx>>>(&self, probe: impl FnOnce() -> T) -> T {
         self.probe(|_| probe())
     }
 

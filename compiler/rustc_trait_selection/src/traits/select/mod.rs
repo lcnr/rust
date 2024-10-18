@@ -18,6 +18,7 @@ use rustc_infer::infer::relate::TypeRelation;
 use rustc_infer::infer::BoundRegionConversionTime::{self, HigherRankedType};
 use rustc_infer::infer::DefineOpaqueTypes;
 use rustc_infer::traits::TraitObligation;
+use rustc_macros::TypeVisitable;
 use rustc_middle::bug;
 use rustc_middle::dep_graph::{dep_kinds, DepNodeIndex};
 use rustc_middle::mir::interpret::ErrorHandled;
@@ -3127,6 +3128,7 @@ impl<'o, 'tcx> fmt::Debug for TraitObligationStack<'o, 'tcx> {
     }
 }
 
+#[derive(Debug, Clone, TypeVisitable)]
 pub(crate) enum ProjectionMatchesProjection {
     Yes,
     Ambiguous,

@@ -696,10 +696,11 @@ impl<'a, 'tcx> ObligationProcessor for FulfillProcessor<'a, 'tcx> {
                                 ProcessResult::Unchanged
                             } else {
                                 // Two different constants using generic parameters ~> error.
-                                let expected_found = ExpectedFound::new(true, c1, c2);
                                 ProcessResult::Error(FulfillmentErrorCode::ConstEquate(
-                                    expected_found,
-                                    TypeError::ConstMismatch(expected_found),
+                                    ExpectedFound::new(true, c1, c2),
+                                    TypeError::ConstMismatch(ExpectedFound::new(
+                                        true, c1, c2,
+                                    )),
                                 ))
                             }
                         }

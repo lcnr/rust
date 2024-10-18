@@ -664,7 +664,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                     &obligation.cause,
                     None,
                     None,
-                    TypeError::Sorts(ty::error::ExpectedFound::new(true, expected_ty, ct_ty)),
+                    TypeError::Sorts(ExpectedFound::new(true, expected_ty, ct_ty)),
                     false,
                     false,
                 );
