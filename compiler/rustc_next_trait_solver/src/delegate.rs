@@ -92,7 +92,6 @@ pub trait SolverDelegate: Deref<Target = <Self as SolverDelegate>::Infcx> + Size
 
     fn fetch_eligible_assoc_item(
         &self,
-        param_env: <Self::Interner as Interner>::ParamEnv,
         goal_trait_ref: ty::TraitRef<Self::Interner>,
         trait_assoc_def_id: <Self::Interner as Interner>::DefId,
         impl_def_id: <Self::Interner as Interner>::DefId,

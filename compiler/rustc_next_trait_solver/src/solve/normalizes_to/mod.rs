@@ -244,7 +244,6 @@ where
             // return ambiguity this would otherwise be incomplete, resulting in
             // unsoundness during coherence (#105782).
             let Some(target_item_def_id) = ecx.fetch_eligible_assoc_item(
-                goal.param_env,
                 goal_trait_ref,
                 goal.predicate.def_id(),
                 impl_def_id,

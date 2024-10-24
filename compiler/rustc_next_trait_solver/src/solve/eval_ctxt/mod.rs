@@ -938,17 +938,11 @@ where
 
     pub(super) fn fetch_eligible_assoc_item(
         &self,
-        param_env: I::ParamEnv,
         goal_trait_ref: ty::TraitRef<I>,
         trait_assoc_def_id: I::DefId,
         impl_def_id: I::DefId,
     ) -> Result<Option<I::DefId>, NoSolution> {
-        self.delegate.fetch_eligible_assoc_item(
-            param_env,
-            goal_trait_ref,
-            trait_assoc_def_id,
-            impl_def_id,
-        )
+        self.delegate.fetch_eligible_assoc_item(goal_trait_ref, trait_assoc_def_id, impl_def_id)
     }
 
     pub(super) fn insert_hidden_type(
