@@ -12,37 +12,23 @@ use rustc_span::hygiene::LocalExpnId;
 use rustc_span::symbol::{Symbol, kw, sym};
 use tracing::debug;
 
-use crate::{ImplTraitContext, InvocationParent, LazyAnonConstDefInfo, Resolver};
+use crate::{ImplTraitContext, InvocationParent, ParentDef, Resolver};
 
 pub(crate) fn collect_definitions(
     resolver: &mut Resolver<'_, '_>,
     fragment: &AstFragment,
     expansion: LocalExpnId,
 ) {
-    let InvocationParent { parent_def, lazy_anon_const_def_info, impl_trait_context, in_attr } =
+    let InvocationParent { parent_def, impl_trait_context, in_attr } =
         resolver.invocation_parents[&expansion];
-    let mut visitor = DefCollector {
-        resolver,
-        parent_def,
-        lazy_anon_const_def_info,
-        expansion,
-        impl_trait_context,
-        in_attr,
-    };
+    let mut visitor = DefCollector { resolver, parent_def, expansion, impl_trait_context, in_attr };
     fragment.visit_with(&mut visitor);
 }
 
 /// Creates `DefId`s for nodes in the AST.
 struct DefCollector<'a, 'ra, 'tcx> {
     resolver: &'a mut Resolver<'ra, 'tcx>,
-    parent_def: LocalDefId,
-    /// If we have an anon const that consists of a macro invocation, e.g. `Foo<{ m!() }>`,
-    /// we need to wait until we know what the macro expands to before we create the def for
-    /// the anon const. That's because we lower some anon consts into `hir::ConstArgKind::Path`,
-    /// which don't have defs.
-    ///
-    /// See `Self::handle_lazy_anon_const_def` for more details.
-    lazy_anon_const_def_info: Option<LazyAnonConstDefInfo>,
+    parent_def: ParentDef,
     impl_trait_context: ImplTraitContext,
     in_attr: bool,
     expansion: LocalExpnId,
@@ -56,18 +42,22 @@ impl<'a, 'ra, 'tcx> DefCollector<'a, 'ra, 'tcx> {
         def_kind: DefKind,
         span: Span,
     ) -> LocalDefId {
-        let parent_def = self.parent_def;
+        let parent_def_id = match self.parent_def {
+            ParentDef::Eager(parent_def_id) => parent_def_id,
+            ParentDef::LazyAnonConst { parent_def_id, id, span } => {
+                self.create_or_reuse_anon_const_def(parent_def_id, id, span)
+            }
+        };
         // When recursion into anon-consts, we must only create nested definitions
         // after creating the `DefId` for the anon-const. See `handle_lazy_anon_const_def`
         // for more details.
-        debug_assert_eq!(self.lazy_anon_const_def_info, None);
         debug!(
-            "create_def(node_id={:?}, def_kind={:?}, parent_def={:?})",
-            node_id, def_kind, parent_def
+            "create_def(node_id={:?}, def_kind={:?}, parent_def_id={:?})",
+            node_id, def_kind, parent_def_id
         );
         self.resolver
             .create_def(
-                parent_def,
+                parent_def_id,
                 node_id,
                 name,
                 def_kind,
@@ -84,79 +74,27 @@ impl<'a, 'ra, 'tcx> DefCollector<'a, 'ra, 'tcx> {
     /// exact same information somewhere else.
     fn create_or_reuse_anon_const_def(
         &mut self,
+        parent_def_id: LocalDefId,
         node_id: NodeId,
-        name: Symbol,
-        def_kind: DefKind,
         span: Span,
     ) -> LocalDefId {
-        debug_assert_eq!(def_kind, DefKind::AnonConst);
         if let Some(def_id) = self.resolver.opt_local_def_id(node_id) {
             debug_assert_eq!(
                 self.resolver.tcx.parent(def_id.to_def_id()),
-                self.parent_def.to_def_id(),
+                parent_def_id.to_def_id(),
                 "reusing incorrect anon const defintion: {node_id:?} {span:?}"
             );
+            debug_assert_eq!(self.resolver.tcx.def_kind(def_id), DefKind::AnonConst);
             def_id
         } else {
-            self.create_def(node_id, name, def_kind, span)
+            self.create_def(node_id, kw::Empty, DefKind::AnonConst, span)
         }
     }
 
-    fn with_parent<F: FnOnce(&mut Self)>(&mut self, parent_def: LocalDefId, f: F) {
+    fn with_parent<F: FnOnce(&mut Self)>(&mut self, parent_def: ParentDef, f: F) {
         let orig_parent_def = mem::replace(&mut self.parent_def, parent_def);
         f(self);
         self.parent_def = orig_parent_def;
-    }
-
-    /// Trivial const arguments get directly lowered to `hir::ConstArgKind::Path` instead
-    /// of an anon-const. Because of this, we do not create a `DefId` for the anonymous
-    /// constant. To support macros as const arguments and especially to support macros
-    /// expanding to nothing, e.g. `foo<const N: usize>() -> [u8; { empty! {} N }]`, we
-    /// cannot eagerly know whether an AST-constant needs a `DefId`.
-    ///
-    /// See `tests/ui/const-generics/early/const_arg_trivial_macro_expansion-3-pass.rs`
-    /// for examples where this is relevant.
-    ///
-    /// We therefore only create `DefId` for the anon const lazily, either when we need
-    /// the `DefId` for a nested definition, or when we lower the AST-constant to a HIR
-    /// anon-const. We use [`DefCollector::create_or_reuse_anon_const_def`] to simplify
-    /// the tracking of whether a `DefId` has already been created.
-    ///
-    /// When recursing into anon-consts we set `lazy_anon_const_def_info` to `Some` and
-    /// use this function in all places could potentially create definitions. It then
-    /// lazily creates the `DefId` of the anon-const if it may be needed and the anon-const
-    /// is definitely non-trivial. The `lazy_anon_const_def_info` is also stored in the
-    /// [`InvocationParent`] when encountering any macros inside of the anon-const.
-    ///
-    /// There are two requirements here:
-    /// - the anon-const is definitely a trivial const-arg: we must not create a `DefId`.
-    /// - we encounter a nested definition inside of the anon-const: we must create a `DefId`
-    ///   for the anon-const and provide it as a parent to the nested definition.
-    ///
-    /// The first requirement is handled by only creating the `DefId` for the anon-const
-    /// when encountering something that's definitely not a trivial const-arg. We make sure
-    /// the second requirement is satisfied by asserting that the `lazy_anon_const_def_info`
-    /// is `None` whenever we create a new definition.
-    fn handle_lazy_anon_const_def(
-        &mut self,
-        is_potential_trivial_const_arg: impl FnOnce() -> bool,
-        f: impl FnOnce(&mut Self),
-    ) {
-        if let Some(def_info) = self.lazy_anon_const_def_info
-            && !is_potential_trivial_const_arg()
-        {
-            self.lazy_anon_const_def_info = None;
-            let parent = self.create_or_reuse_anon_const_def(
-                def_info.id,
-                kw::Empty,
-                DefKind::AnonConst,
-                def_info.span,
-            );
-            self.with_parent(parent, f);
-            self.lazy_anon_const_def_info = Some(def_info);
-        } else {
-            f(self)
-        }
     }
 
     fn with_impl_trait<F: FnOnce(&mut Self)>(
@@ -184,7 +122,7 @@ impl<'a, 'ra, 'tcx> DefCollector<'a, 'ra, 'tcx> {
         } else {
             let name = field.ident.map_or_else(|| sym::integer(index(self)), |ident| ident.name);
             let def = self.create_def(field.id, name, DefKind::Field, field.span);
-            self.with_parent(def, |this| visit::walk_field_def(this, field));
+            self.with_parent(ParentDef::Eager(def), |this| visit::walk_field_def(this, field));
         }
     }
 
@@ -192,7 +130,6 @@ impl<'a, 'ra, 'tcx> DefCollector<'a, 'ra, 'tcx> {
         let id = id.placeholder_to_expn_id();
         let old_parent = self.resolver.invocation_parents.insert(id, InvocationParent {
             parent_def: self.parent_def,
-            lazy_anon_const_def_info: self.lazy_anon_const_def_info,
             impl_trait_context: self.impl_trait_context,
             in_attr: self.in_attr,
         });
@@ -243,7 +180,7 @@ impl<'a, 'ra, 'tcx> visit::Visitor<'a> for DefCollector<'a, 'ra, 'tcx> {
             self.resolver.macro_map.insert(def_id.to_def_id(), macro_data);
         }
 
-        self.with_parent(def_id, |this| {
+        self.with_parent(ParentDef::Eager(def_id), |this| {
             this.with_impl_trait(ImplTraitContext::Existential, |this| {
                 match i.kind {
                     ItemKind::Struct(ref struct_def, _) | ItemKind::Union(ref struct_def, _) => {
@@ -283,7 +220,7 @@ impl<'a, 'ra, 'tcx> visit::Visitor<'a> for DefCollector<'a, 'ra, 'tcx> {
                 let (return_id, return_span) = coroutine_kind.return_id();
                 let return_def =
                     self.create_def(return_id, kw::Empty, DefKind::OpaqueTy, return_span);
-                self.with_parent(return_def, |this| this.visit_fn_ret_ty(output));
+                self.with_parent(ParentDef::Eager(return_def), |this| this.visit_fn_ret_ty(output));
 
                 // If this async fn has no body (i.e. it's an async fn signature in a trait)
                 // then the closure_def will never be used, and we should avoid generating a
@@ -295,7 +232,7 @@ impl<'a, 'ra, 'tcx> visit::Visitor<'a> for DefCollector<'a, 'ra, 'tcx> {
                         DefKind::Closure,
                         span,
                     );
-                    self.with_parent(closure_def, |this| this.visit_block(body));
+                    self.with_parent(ParentDef::Eager(closure_def), |this| this.visit_block(body));
                 }
             }
             FnKind::Closure(binder, Some(coroutine_kind), decl, body) => {
@@ -306,7 +243,7 @@ impl<'a, 'ra, 'tcx> visit::Visitor<'a> for DefCollector<'a, 'ra, 'tcx> {
                 // we must create two defs.
                 let coroutine_def =
                     self.create_def(coroutine_kind.closure_id(), kw::Empty, DefKind::Closure, span);
-                self.with_parent(coroutine_def, |this| this.visit_expr(body));
+                self.with_parent(ParentDef::Eager(coroutine_def), |this| this.visit_expr(body));
             }
             _ => visit::walk_fn(self, fn_kind),
         }
@@ -334,7 +271,7 @@ impl<'a, 'ra, 'tcx> visit::Visitor<'a> for DefCollector<'a, 'ra, 'tcx> {
 
         let def = self.create_def(fi.id, fi.ident.name, def_kind, fi.span);
 
-        self.with_parent(def, |this| visit::walk_item(this, fi));
+        self.with_parent(ParentDef::Eager(def), |this| visit::walk_item(this, fi));
     }
 
     fn visit_variant(&mut self, v: &'a Variant) {
@@ -342,7 +279,7 @@ impl<'a, 'ra, 'tcx> visit::Visitor<'a> for DefCollector<'a, 'ra, 'tcx> {
             return self.visit_macro_invoc(v.id);
         }
         let def = self.create_def(v.id, v.ident.name, DefKind::Variant, v.span);
-        self.with_parent(def, |this| {
+        self.with_parent(ParentDef::Eager(def), |this| {
             if let Some((ctor_kind, ctor_node_id)) = CtorKind::from_ast(&v.data) {
                 this.create_def(
                     ctor_node_id,
@@ -398,7 +335,7 @@ impl<'a, 'ra, 'tcx> visit::Visitor<'a> for DefCollector<'a, 'ra, 'tcx> {
         };
 
         let def = self.create_def(i.id, i.ident.name, def_kind, i.span);
-        self.with_parent(def, |this| visit::walk_assoc_item(this, i, ctxt));
+        self.with_parent(ParentDef::Eager(def), |this| visit::walk_assoc_item(this, i, ctxt));
     }
 
     fn visit_pat(&mut self, pat: &'a Pat) {
@@ -427,7 +364,7 @@ impl<'a, 'ra, 'tcx> visit::Visitor<'a> for DefCollector<'a, 'ra, 'tcx> {
                     // so the `impl_trait` node is not a parent to `bounds`.
                     ImplTraitContext::Universal => visit::walk_ty(self, ty),
                     ImplTraitContext::Existential => {
-                        self.with_parent(id, |this| visit::walk_ty(this, ty))
+                        self.with_parent(ParentDef::Eager(id), |this| visit::walk_ty(this, ty))
                     }
                 };
             }
@@ -437,57 +374,49 @@ impl<'a, 'ra, 'tcx> visit::Visitor<'a> for DefCollector<'a, 'ra, 'tcx> {
 
     fn visit_anon_const(&mut self, constant: &'a AnonConst) {
         // Handling anon-consts is quite subtle, see `Self::handle_lazy_anon_const_def`.
-        self.lazy_anon_const_def_info =
-            Some(LazyAnonConstDefInfo { id: constant.id, span: constant.value.span });
-        visit::walk_anon_const(self, constant);
-        self.lazy_anon_const_def_info = None;
+        self.with_parent(
+            ParentDef::LazyAnonConst {
+                // TODO: wrong
+                parent_def_id: self.parent_def.unwrap_eager(),
+                id: constant.id,
+                span: constant.value.span,
+            },
+            |this| visit::walk_anon_const(this, constant),
+        );
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        self.handle_lazy_anon_const_def(
-            || match &expr.kind {
-                ExprKind::Block(_, None) => true,
-                _ => expr.is_potential_trivial_const_arg(),
-            },
-            |this| {
-                let parent_def = match expr.kind {
-                    ExprKind::MacCall(..) => return this.visit_macro_invoc(expr.id),
-                    ExprKind::Closure(..) | ExprKind::Gen(..) => {
-                        this.create_def(expr.id, kw::Empty, DefKind::Closure, expr.span)
-                    }
-                    ExprKind::ConstBlock(ref constant) => {
-                        for attr in &expr.attrs {
-                            visit::walk_attribute(this, attr);
-                        }
-                        let def = this.create_def(
-                            constant.id,
-                            kw::Empty,
-                            DefKind::InlineConst,
-                            constant.value.span,
-                        );
-                        this.with_parent(def, |this| visit::walk_anon_const(this, constant));
-                        return;
-                    }
-                    _ => this.parent_def,
-                };
+        let parent_def = match expr.kind {
+            ExprKind::MacCall(..) => return self.visit_macro_invoc(expr.id),
+            ExprKind::Closure(..) | ExprKind::Gen(..) => {
+                ParentDef::Eager(self.create_def(expr.id, kw::Empty, DefKind::Closure, expr.span))
+            }
+            ExprKind::ConstBlock(ref constant) => {
+                for attr in &expr.attrs {
+                    visit::walk_attribute(self, attr);
+                }
+                let def = self.create_def(
+                    constant.id,
+                    kw::Empty,
+                    DefKind::InlineConst,
+                    constant.value.span,
+                );
+                self.with_parent(ParentDef::Eager(def), |this| {
+                    visit::walk_anon_const(this, constant)
+                });
+                return;
+            }
+            _ => self.parent_def,
+        };
 
-                this.with_parent(parent_def, |this| visit::walk_expr(this, expr))
-            },
-        )
+        self.with_parent(parent_def, |this| visit::walk_expr(this, expr))
     }
 
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        self.handle_lazy_anon_const_def(
-            || match &stmt.kind {
-                StmtKind::Expr(expr) => expr.is_potential_trivial_const_arg(),
-                StmtKind::MacCall(_) => true,
-                _ => false,
-            },
-            |this| match stmt.kind {
-                StmtKind::MacCall(..) => this.visit_macro_invoc(stmt.id),
-                _ => visit::walk_stmt(this, stmt),
-            },
-        )
+        match stmt.kind {
+            StmtKind::MacCall(..) => self.visit_macro_invoc(stmt.id),
+            _ => visit::walk_stmt(self, stmt),
+        }
     }
 
     fn visit_arm(&mut self, arm: &'a Arm) {

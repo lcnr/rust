@@ -991,7 +991,7 @@ pub struct DeriveResolution {
 
 pub trait ResolverExpand {
     fn next_node_id(&mut self) -> NodeId;
-    fn invocation_parent(&self, id: LocalExpnId) -> LocalDefId;
+    fn invocation_parent(&self, id: LocalExpnId) -> ParentDef;
 
     fn resolve_dollar_crates(&mut self);
     fn visit_ast_fragment_with_placeholders(

@@ -172,28 +172,40 @@ impl<'ra> ParentScope<'ra> {
 }
 
 #[derive(Copy, Debug, Clone)]
+enum ParentDef {
+    Eager(LocalDefId),
+    LazyAnonConst { parent_def_id: LocalDefId, id: NodeId, span: Span },
+}
+
+impl ParentDef {
+    fn unwrap_eager(self) -> LocalDefId {
+        match self {
+            ParentDef::Eager(local_def_id) => local_def_id,
+            ParentDef::LazyAnonConst { .. } => unreachable!(),
+        }
+    }
+
+    fn is_module(self, tcx: TyCtxt<'_>) -> bool {
+        match self {
+            ParentDef::Eager(def_id) => tcx.def_kind(def_id) == DefKind::Mod,
+            ParentDef::LazyAnonConst { .. } => false,
+        }
+    }
+}
+
+#[derive(Copy, Debug, Clone)]
 struct InvocationParent {
-    parent_def: LocalDefId,
-    lazy_anon_const_def_info: Option<LazyAnonConstDefInfo>,
+    parent_def: ParentDef,
     impl_trait_context: ImplTraitContext,
     in_attr: bool,
 }
 
 impl InvocationParent {
     const ROOT: Self = Self {
-        parent_def: CRATE_DEF_ID,
-        lazy_anon_const_def_info: None,
+        parent_def: ParentDef::Eager(CRATE_DEF_ID),
         impl_trait_context: ImplTraitContext::Existential,
         in_attr: false,
     };
-}
-
-/// The information necessary to lazily create the `DefId` for a non-trivial
-/// anonymous constant. See `DefCollector::handle_lazy_anon_const_def` for more details.
-#[derive(Copy, Debug, Clone, PartialEq, Eq)]
-struct LazyAnonConstDefInfo {
-    id: NodeId,
-    span: Span,
 }
 
 #[derive(Copy, Debug, Clone)]

@@ -182,7 +182,7 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
         self.next_node_id()
     }
 
-    fn invocation_parent(&self, id: LocalExpnId) -> LocalDefId {
+    fn invocation_parent(&self, id: LocalExpnId) -> ParentDef {
         self.invocation_parents[&id].parent_def
     }
 
@@ -303,12 +303,12 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
             .invocation_parents
             .get(&invoc_id)
             .or_else(|| self.invocation_parents.get(&eager_expansion_root))
-            .filter(|&&InvocationParent { parent_def: mod_def_id, in_attr, .. }| {
+            .filter(|&&InvocationParent { parent_def, in_attr, .. }| {
                 in_attr
                     && invoc.fragment_kind == AstFragmentKind::Expr
-                    && self.tcx.def_kind(mod_def_id) == DefKind::Mod
+                    && parent_def.is_module(self.tcx)
             })
-            .map(|&InvocationParent { parent_def: mod_def_id, .. }| mod_def_id);
+            .map(|&InvocationParent { parent_def, .. }| parent_def.unwrap_eager());
         let (ext, res) = self.smart_resolve_macro_path(
             path,
             kind,
@@ -957,7 +957,7 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
                             .invocation_parents
                             .get(&parent_scope.expansion)
                             .map_or(ast::CRATE_NODE_ID, |parent| {
-                                self.def_id_to_node_id[parent.parent_def]
+                                self.def_id_to_node_id[parent.parent_def.unwrap_eager()]
                             });
                         self.lint_buffer.buffer_lint(
                             LEGACY_DERIVE_HELPERS,
