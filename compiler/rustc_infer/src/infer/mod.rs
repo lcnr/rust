@@ -246,6 +246,10 @@ pub struct InferCtxt<'tcx> {
     /// The mode of this inference context, see the struct documentation
     /// for more details.
     typing_mode: TypingMode<'tcx>,
+    /// Whenever we access `self.typing_mode()`, we increment this counter.
+    /// If the counter has not been incremented while evaluating a goal, we can
+    /// use this result for all non-coherence typing modes in the global cache.
+    non_coherence_typing_mode_counter: Cell<usize>,
 
     /// Whether this inference context should care about region obligations in
     /// the root universe. Most notably, this is used during hir typeck as region
@@ -579,6 +583,7 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
         InferCtxt {
             tcx,
             typing_mode,
+            non_coherence_typing_mode_counter: Cell::new(0),
             considering_regions,
             skip_leak_check,
             inner: RefCell::new(InferCtxtInner::new()),
@@ -614,6 +619,9 @@ impl<'tcx> InferOk<'tcx, ()> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NonCoherenceTypingModeCounter(usize);
+
 impl<'tcx> InferCtxt<'tcx> {
     pub fn dcx(&self) -> DiagCtxtHandle<'_> {
         self.tcx.dcx().taintable_handle(&self.tainted_by_errors)
@@ -624,7 +632,19 @@ impl<'tcx> InferCtxt<'tcx> {
     }
 
     #[inline(always)]
+    pub fn get_non_coherence_typing_mode_counter(&self) -> NonCoherenceTypingModeCounter {
+        NonCoherenceTypingModeCounter(self.non_coherence_typing_mode_counter.get())
+    }
+    #[inline(always)]
     pub fn typing_mode(&self) -> TypingMode<'tcx> {
+        let curr = self.non_coherence_typing_mode_counter.get();
+        self.non_coherence_typing_mode_counter.set(curr + 1);
+        self.typing_mode
+    }
+    /// Access `typing_mode` without incrementing `non_coherence_typing_mode_counter`.
+    /// This must not impact the observable behavior.
+    #[inline(always)]
+    pub fn typing_mode_untracked(&self) -> TypingMode<'tcx> {
         self.typing_mode
     }
     #[inline(always)]

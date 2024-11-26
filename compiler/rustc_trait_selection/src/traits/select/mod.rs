@@ -15,9 +15,9 @@ use rustc_hir as hir;
 use rustc_hir::LangItem;
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::BoundRegionConversionTime::{self, HigherRankedType};
-use rustc_infer::infer::DefineOpaqueTypes;
 use rustc_infer::infer::at::ToTrace;
 use rustc_infer::infer::relate::TypeRelation;
+use rustc_infer::infer::{DefineOpaqueTypes, NonCoherenceTypingModeCounter};
 use rustc_infer::traits::{PredicateObligations, TraitObligation};
 use rustc_middle::bug;
 use rustc_middle::dep_graph::{DepNodeIndex, dep_kinds};
@@ -335,12 +335,14 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         debug!(?cache_fresh_trait_pred);
         debug_assert!(!stack.obligation.predicate.has_escaping_bound_vars());
 
-        if let Some(c) =
+        let non_coherence_typing_mode_counter = if let Some(c) =
             self.check_candidate_cache(stack.obligation.param_env, cache_fresh_trait_pred)
         {
             debug!("CACHE HIT");
             return c;
-        }
+        } else {
+            self.infcx.get_non_coherence_typing_mode_counter()
+        };
 
         // If no match, compute result and insert into cache.
         //
@@ -356,6 +358,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             stack.obligation.param_env,
             cache_fresh_trait_pred,
             dep_node,
+            non_coherence_typing_mode_counter,
             candidate.clone(),
         );
         candidate
@@ -1496,7 +1499,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             return false;
         }
 
-        match self.infcx.typing_mode() {
+        match self.infcx.typing_mode_untracked() {
             // Avoid using the global cache during coherence and just rely
             // on the local cache. It is really just a simplification to
             // avoid us having to fear that coherence results "pollute"
@@ -1577,6 +1580,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         param_env: ty::ParamEnv<'tcx>,
         cache_fresh_trait_pred: ty::PolyTraitPredicate<'tcx>,
         dep_node: DepNodeIndex,
+        non_coherence_typing_mode_counter: NonCoherenceTypingModeCounter,
         candidate: SelectionResult<'tcx, SelectionCandidate<'tcx>>,
     ) {
         let infcx = self.infcx;
@@ -1594,6 +1598,9 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             } else {
                 debug!(?pred, ?candidate, "insert_candidate_cache global");
                 debug_assert!(!candidate.has_infer());
+
+                let used_non_coherence_typing_mode = non_coherence_typing_mode_counter
+                    != infcx.get_non_coherence_typing_mode_counter();
 
                 // This may overwrite the cache with the same value.
                 tcx.selection_cache.insert(

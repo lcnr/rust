@@ -11,10 +11,19 @@ use self::EvaluationResult::*;
 use super::{SelectionError, SelectionResult};
 use crate::ty;
 
-pub type SelectionCache<'tcx, ENV> =
-    Cache<(ENV, ty::TraitPredicate<'tcx>), SelectionResult<'tcx, SelectionCandidate<'tcx>>>;
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct CacheEntry<R> {
+    pub result: R,
+    pub used_non_coherence_typing_mode: bool,
+}
 
-pub type EvaluationCache<'tcx, ENV> = Cache<(ENV, ty::PolyTraitPredicate<'tcx>), EvaluationResult>;
+pub type SelectionCache<'tcx, ENV> = Cache<
+    (ENV, ty::TraitPredicate<'tcx>),
+    CacheEntry<SelectionResult<'tcx, SelectionCandidate<'tcx>>>,
+>;
+
+pub type EvaluationCache<'tcx, ENV> =
+    Cache<(ENV, ty::PolyTraitPredicate<'tcx>), CacheEntry<EvaluationResult>>;
 
 /// The selection process begins by considering all impls, where
 /// clauses, and so forth that might resolve an obligation. Sometimes

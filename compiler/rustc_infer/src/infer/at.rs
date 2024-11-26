@@ -70,6 +70,7 @@ impl<'tcx> InferCtxt<'tcx> {
         Self {
             tcx: self.tcx,
             typing_mode: self.typing_mode,
+            non_coherence_typing_mode_counter: Cell::new(0),
             considering_regions: self.considering_regions,
             skip_leak_check: self.skip_leak_check,
             inner: self.inner.clone(),
@@ -94,6 +95,7 @@ impl<'tcx> InferCtxt<'tcx> {
         let forked = Self {
             tcx: self.tcx,
             typing_mode,
+            non_coherence_typing_mode_counter: Cell::new(0),
             considering_regions: self.considering_regions,
             skip_leak_check: self.skip_leak_check,
             inner: self.inner.clone(),
