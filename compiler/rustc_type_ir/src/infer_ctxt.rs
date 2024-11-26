@@ -100,6 +100,9 @@ pub trait InferCtxtLike: Sized {
     }
 
     fn typing_mode(&self) -> TypingMode<Self::Interner>;
+    fn typing_mode_is_coherence(&self) -> bool {
+        matches!(self.typing_mode(), TypingMode::Coherence)
+    }
 
     fn universe(&self) -> ty::UniverseIndex;
     fn create_next_universe(&self) -> ty::UniverseIndex;

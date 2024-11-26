@@ -627,6 +627,10 @@ impl<'tcx> InferCtxt<'tcx> {
     pub fn typing_mode(&self) -> TypingMode<'tcx> {
         self.typing_mode
     }
+    #[inline(always)]
+    pub fn typing_mode_is_coherence(&self) -> bool {
+        matches!(self.typing_mode, TypingMode::Coherence)
+    }
 
     pub fn freshen<T: TypeFoldable<TyCtxt<'tcx>>>(&self, t: T) -> T {
         t.fold_with(&mut self.freshener())

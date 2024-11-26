@@ -12,7 +12,7 @@ use rustc_infer::traits::{
 use rustc_middle::bug;
 use rustc_middle::ty::abstract_const::NotConstEvaluatable;
 use rustc_middle::ty::error::{ExpectedFound, TypeError};
-use rustc_middle::ty::{self, Binder, Const, GenericArgsRef, TypeVisitableExt, TypingMode};
+use rustc_middle::ty::{self, Binder, Const, GenericArgsRef, TypeVisitableExt};
 use thin_vec::ThinVec;
 use tracing::{debug, debug_span, instrument};
 
@@ -771,8 +771,7 @@ impl<'a, 'tcx> FulfillProcessor<'a, 'tcx> {
         stalled_on: &mut Vec<TyOrConstInferVar>,
     ) -> ProcessResult<PendingPredicateObligation<'tcx>, FulfillmentErrorCode<'tcx>> {
         let infcx = self.selcx.infcx;
-        if obligation.predicate.is_global() && !matches!(infcx.typing_mode(), TypingMode::Coherence)
-        {
+        if obligation.predicate.is_global() && !infcx.typing_mode_is_coherence() {
             // no type variables present, can use evaluation for better caching.
             // FIXME: consider caching errors too.
             if infcx.predicate_must_hold_considering_regions(obligation) {
@@ -826,8 +825,7 @@ impl<'a, 'tcx> FulfillProcessor<'a, 'tcx> {
     ) -> ProcessResult<PendingPredicateObligation<'tcx>, FulfillmentErrorCode<'tcx>> {
         let tcx = self.selcx.tcx();
         let infcx = self.selcx.infcx;
-        if obligation.predicate.is_global() && !matches!(infcx.typing_mode(), TypingMode::Coherence)
-        {
+        if obligation.predicate.is_global() && !infcx.typing_mode_is_coherence() {
             // no type variables present, can use evaluation for better caching.
             // FIXME: consider caching errors too.
             if infcx.predicate_must_hold_considering_regions(obligation) {

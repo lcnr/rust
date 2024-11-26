@@ -903,7 +903,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         //
         // FIXME(@lcnr): This should probably only trigger during analysis,
         // disabling candidates during codegen is also questionable.
-        if let TypingMode::Coherence = self.infcx.typing_mode() {
+        if self.infcx.typing_mode_is_coherence() {
             return None;
         }
 

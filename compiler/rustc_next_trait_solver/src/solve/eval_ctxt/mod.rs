@@ -218,6 +218,10 @@ where
         self.delegate.typing_mode()
     }
 
+    pub(super) fn typing_mode_is_coherence(&self) -> bool {
+        self.delegate.typing_mode_is_coherence()
+    }
+
     pub(super) fn set_is_normalizes_to_goal(&mut self) {
         self.is_normalizes_to_goal = true;
     }

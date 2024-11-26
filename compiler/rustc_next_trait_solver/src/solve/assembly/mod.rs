@@ -8,7 +8,7 @@ use rustc_type_ir::inherent::*;
 use rustc_type_ir::lang_items::TraitSolverLangItem;
 use rustc_type_ir::solve::inspect;
 use rustc_type_ir::visit::TypeVisitableExt as _;
-use rustc_type_ir::{self as ty, Interner, TypingMode, Upcast as _, elaborate};
+use rustc_type_ir::{self as ty, Interner, Upcast as _, elaborate};
 use tracing::{debug, instrument};
 
 use crate::delegate::SolverDelegate;
@@ -321,7 +321,7 @@ where
 
         let mut candidates = vec![];
 
-        if let TypingMode::Coherence = self.typing_mode() {
+        if self.typing_mode_is_coherence() {
             if let Ok(candidate) = self.consider_coherence_unknowable_candidate(goal) {
                 return vec![candidate];
             }
@@ -337,11 +337,8 @@ where
 
         self.assemble_param_env_candidates(goal, &mut candidates);
 
-        match self.typing_mode() {
-            TypingMode::Coherence => {}
-            TypingMode::Analysis { .. } | TypingMode::PostAnalysis => {
-                self.discard_impls_shadowed_by_env(goal, &mut candidates);
-            }
+        if !self.typing_mode_is_coherence() {
+            self.discard_impls_shadowed_by_env(goal, &mut candidates);
         }
 
         candidates

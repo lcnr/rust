@@ -23,6 +23,9 @@ impl<'tcx> rustc_type_ir::InferCtxtLike for InferCtxt<'tcx> {
     fn typing_mode(&self) -> ty::TypingMode<'tcx> {
         self.typing_mode()
     }
+    fn typing_mode_is_coherence(&self) -> bool {
+        self.typing_mode_is_coherence()
+    }
 
     fn universe(&self) -> ty::UniverseIndex {
         self.universe()
