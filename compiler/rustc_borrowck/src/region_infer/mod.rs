@@ -973,7 +973,7 @@ impl<'tcx> RegionInferenceContext<'tcx> {
         propagated_outlives_requirements: &mut Vec<ClosureOutlivesRequirement<'tcx>>,
     ) -> bool {
         let tcx = infcx.tcx;
-        let TypeTest { generic_kind, lower_bound, span: blame_span, ref verify_bound } = *type_test;
+        let TypeTest { generic_kind, lower_bound, span: blame_span, verify_bound: _ } = *type_test;
 
         let generic_ty = generic_kind.to_ty(tcx);
         let Some(subject) = self.try_promote_type_test_subject(infcx, generic_ty) else {
@@ -1008,50 +1008,31 @@ impl<'tcx> RegionInferenceContext<'tcx> {
             return true;
         }
 
-        // For each region outlived by lower_bound find a non-local,
-        // universal region (it may be the same region) and add it to
-        // `ClosureOutlivesRequirement`.
+        // Add all non-local universal regions which are outlived by
+        // `lower_bound` to the `ClosureOutlivesRequirement`.
+        //
+        // This is slightly too conservative. To show T: '1, given `'2: '1`
+        // and `'3: '1` we only need to prove that T: '2 *or* T: '3, but to
+        // avoid potential non-determinism we approximate this by requiring
+        // T: '1 and T: '2.
+        let mut found_candidate = false;
         for ur in self.scc_values.universal_regions_outlived_by(r_scc) {
-            debug!("universal_region_outlived_by ur={:?}", ur);
-            // Check whether we can already prove that the "subject" outlives `ur`.
-            // If so, we don't have to propagate this requirement to our caller.
-            //
-            // To continue the example from the function, if we are trying to promote
-            // a requirement that `T: 'X`, and we know that `'X = '1 + '2` (i.e., the union
-            // `'1` and `'2`), then in this loop `ur` will be `'1` (and `'2`). So here
-            // we check whether `T: '1` is something we *can* prove. If so, no need
-            // to propagate that requirement.
-            //
-            // This is needed because -- particularly in the case
-            // where `ur` is a local bound -- we are sometimes in a
-            // position to prove things that our caller cannot. See
-            // #53570 for an example.
-            if self.eval_verify_bound(infcx, generic_ty, ur, &verify_bound) {
-                continue;
-            }
-
-            let non_local_ub = self.universal_region_relations.non_local_upper_bounds(ur);
-            debug!(?non_local_ub);
-
-            // This is slightly too conservative. To show T: '1, given `'2: '1`
-            // and `'3: '1` we only need to prove that T: '2 *or* T: '3, but to
-            // avoid potential non-determinism we approximate this by requiring
-            // T: '1 and T: '2.
-            for upper_bound in non_local_ub {
-                debug_assert!(self.universal_regions().is_universal_region(upper_bound));
-                debug_assert!(!self.universal_regions().is_local_free_region(upper_bound));
-
+            if !self.universal_regions().is_local_free_region(ur) {
+                debug_assert!(!self.universal_regions().is_local_free_region(ur));
                 let requirement = ClosureOutlivesRequirement {
                     subject,
-                    outlived_free_region: upper_bound,
+                    outlived_free_region: ur,
                     blame_span,
                     category: ConstraintCategory::Boring,
                 };
-                debug!(?requirement, "adding closure requirement");
+                debug!(?requirement, ?ur, "adding closure requirement");
                 propagated_outlives_requirements.push(requirement);
+                found_candidate = true;
+            } else {
+                debug!(?ur, "skippiung local universal");
             }
         }
-        true
+        found_candidate
     }
 
     /// When we promote a type test `T: 'r`, we have to replace all region

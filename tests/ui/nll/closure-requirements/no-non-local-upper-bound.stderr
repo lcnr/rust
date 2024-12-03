@@ -1,0 +1,42 @@
+error[E0311]: the parameter type `T` may not live long enough
+  --> $DIR/no-non-local-upper-bound.rs:9:23
+   |
+LL |     Box::new(move |_| x)
+   |              -------- ^ ...so that the type `T` will meet its required lifetime bounds
+   |              |
+   |              the parameter type `T` must be valid for the anonymous lifetime as defined here...
+   |
+   = help: consider adding an explicit lifetime bound `T: '_`...
+
+error[E0310]: the parameter type `T` may not live long enough
+  --> $DIR/no-non-local-upper-bound.rs:9:5
+   |
+LL |     Box::new(move |_| x)
+   |     ^^^^^^^^^^^^^^^^^^^^
+   |     |
+   |     the parameter type `T` must be valid for the static lifetime...
+   |     ...so that the type `T` will meet its required lifetime bounds
+   |
+help: consider adding an explicit lifetime bound
+   |
+LL | fn foo<T: 'static>(x: Box<T>) -> Box<dyn for<'a> FnOnce(&'a ()) -> Box<dyn IsStatic + 'a>> {
+   |         +++++++++
+
+error[E0310]: the parameter type `T` may not live long enough
+  --> $DIR/no-non-local-upper-bound.rs:9:23
+   |
+LL |     Box::new(move |_| x)
+   |                       ^
+   |                       |
+   |                       the parameter type `T` must be valid for the static lifetime...
+   |                       ...so that the type `T` will meet its required lifetime bounds
+   |
+help: consider adding an explicit lifetime bound
+   |
+LL | fn foo<T: 'static>(x: Box<T>) -> Box<dyn for<'a> FnOnce(&'a ()) -> Box<dyn IsStatic + 'a>> {
+   |         +++++++++
+
+error: aborting due to 3 previous errors
+
+Some errors have detailed explanations: E0310, E0311.
+For more information about an error, try `rustc --explain E0310`.
