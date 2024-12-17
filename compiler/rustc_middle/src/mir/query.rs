@@ -319,7 +319,7 @@ impl<'tcx> ClosureOutlivesSubjectTy<'tcx> {
             ty::ReVar(vid) => {
                 let br = ty::BoundRegion {
                     var: ty::BoundVar::new(vid.index()),
-                    kind: ty::BoundRegionKind::Anon,
+                    kind: ty::BoundRegionKind::Anon(vid.as_u32()),
                 };
                 ty::Region::new_bound(tcx, depth, br)
             }

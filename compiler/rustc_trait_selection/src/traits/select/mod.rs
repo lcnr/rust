@@ -3237,7 +3237,7 @@ fn bind_coroutine_hidden_types_above<'tcx>(
     let bound_vars = tcx.mk_bound_variable_kinds_from_iter(
         bound_vars.iter().chain(
             (num_bound_variables..counter)
-                .map(|_| ty::BoundVariableKind::Region(ty::BoundRegionKind::Anon)),
+                .map(|i| ty::BoundVariableKind::Region(ty::BoundRegionKind::Anon(i as u32))),
         ),
     );
     ty::Binder::bind_with_vars(hidden_types, bound_vars)

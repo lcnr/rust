@@ -1071,7 +1071,7 @@ impl<'tcx> CommonLifetimes<'tcx> {
                     .map(|v| {
                         mk(ty::ReBound(ty::DebruijnIndex::from(i), ty::BoundRegion {
                             var: ty::BoundVar::from(v),
-                            kind: ty::BoundRegionKind::Anon,
+                            kind: ty::BoundRegionKind::Anon(v),
                         }))
                     })
                     .collect()

@@ -757,11 +757,9 @@ impl<'tcx> TyCtxt<'tcx> {
                 let ty = fold_regions(self, decl.ty, |re, debruijn| {
                     assert_eq!(re, self.lifetimes.re_erased);
                     let var = ty::BoundVar::from_usize(vars.len());
-                    vars.push(ty::BoundVariableKind::Region(ty::BoundRegionKind::Anon));
-                    ty::Region::new_bound(self, debruijn, ty::BoundRegion {
-                        var,
-                        kind: ty::BoundRegionKind::Anon,
-                    })
+                    let kind = ty::BoundRegionKind::Anon(var.as_u32());
+                    vars.push(ty::BoundVariableKind::Region(kind));
+                    ty::Region::new_bound(self, debruijn, ty::BoundRegion { var, kind })
                 });
                 ty::EarlyBinder::bind(ty::Binder::bind_with_vars(
                     ty,

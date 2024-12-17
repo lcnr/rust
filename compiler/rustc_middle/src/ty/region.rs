@@ -56,7 +56,7 @@ impl<'tcx> Region<'tcx> {
         bound_region: ty::BoundRegion,
     ) -> Region<'tcx> {
         // Use a pre-interned one when possible.
-        if let ty::BoundRegion { var, kind: ty::BoundRegionKind::Anon } = bound_region
+        if let ty::BoundRegion { var, kind: ty::BoundRegionKind::Anon(_) } = bound_region
             && let Some(inner) = tcx.lifetimes.re_late_bounds.get(debruijn.as_usize())
             && let Some(re) = inner.get(var.as_usize()).copied()
         {
@@ -147,7 +147,7 @@ impl<'tcx> rustc_type_ir::inherent::Region<TyCtxt<'tcx>> for Region<'tcx> {
     }
 
     fn new_anon_bound(tcx: TyCtxt<'tcx>, debruijn: ty::DebruijnIndex, var: ty::BoundVar) -> Self {
-        Region::new_bound(tcx, debruijn, ty::BoundRegion { var, kind: ty::BoundRegionKind::Anon })
+        Region::new_bound(tcx, debruijn, ty::BoundRegion::new_anon(var))
     }
 
     fn new_static(tcx: TyCtxt<'tcx>) -> Self {
@@ -366,7 +366,7 @@ pub struct LateParamRegion {
 #[derive(HashStable)]
 pub enum BoundRegionKind {
     /// An anonymous region parameter for a given fn (&T)
-    Anon,
+    Anon(u32),
 
     /// Named region parameters for functions (a in &'a T)
     ///
@@ -386,6 +386,12 @@ pub struct BoundRegion {
     pub kind: BoundRegionKind,
 }
 
+impl BoundRegion {
+    pub fn new_anon(var: BoundVar) -> BoundRegion {
+        BoundRegion { var, kind: BoundRegionKind::Anon(var.as_u32()) }
+    }
+}
+
 impl<'tcx> rustc_type_ir::inherent::BoundVarLike<TyCtxt<'tcx>> for BoundRegion {
     fn var(self) -> BoundVar {
         self.var
@@ -399,7 +405,7 @@ impl<'tcx> rustc_type_ir::inherent::BoundVarLike<TyCtxt<'tcx>> for BoundRegion {
 impl core::fmt::Debug for BoundRegion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.kind {
-            BoundRegionKind::Anon => write!(f, "{:?}", self.var),
+            BoundRegionKind::Anon(_) => write!(f, "{:?}", self.var),
             BoundRegionKind::ClosureEnv => write!(f, "{:?}.Env", self.var),
             BoundRegionKind::Named(def, symbol) => {
                 write!(f, "{:?}.Named({:?}, {:?})", self.var, def, symbol)

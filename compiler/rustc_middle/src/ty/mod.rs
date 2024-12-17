@@ -892,7 +892,7 @@ impl rustc_type_ir::inherent::PlaceholderLike for PlaceholderRegion {
     }
 
     fn new(ui: UniverseIndex, var: BoundVar) -> Self {
-        Placeholder { universe: ui, bound: BoundRegion { var, kind: BoundRegionKind::Anon } }
+        Placeholder { universe: ui, bound: BoundRegion::new_anon(var) }
     }
 }
 

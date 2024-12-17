@@ -339,7 +339,8 @@ impl RustcInternal for BoundVariableKind {
                 ),
             }),
             BoundVariableKind::Region(kind) => rustc_ty::BoundVariableKind::Region(match kind {
-                BoundRegionKind::BrAnon => rustc_ty::BoundRegionKind::Anon,
+                // FIXME: Need to track the index of `BoundRegionKind::BrAnon`.
+                BoundRegionKind::BrAnon => unimplemented!(),
                 BoundRegionKind::BrNamed(def, symbol) => rustc_ty::BoundRegionKind::Named(
                     def.0.internal(tables, tcx),
                     Symbol::intern(symbol),

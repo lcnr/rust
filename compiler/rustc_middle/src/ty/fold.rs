@@ -317,10 +317,12 @@ impl<'tcx> TyCtxt<'tcx> {
         impl<'tcx> BoundVarReplacerDelegate<'tcx> for Anonymize<'_, 'tcx> {
             fn replace_region(&mut self, br: ty::BoundRegion) -> ty::Region<'tcx> {
                 let entry = self.map.entry(br.var);
-                let index = entry.index();
-                let var = ty::BoundVar::from_usize(index);
+                let index = entry.index() as u32;
+                let var = ty::BoundVar::from_u32(index);
                 let kind = entry
-                    .or_insert_with(|| ty::BoundVariableKind::Region(ty::BoundRegionKind::Anon))
+                    .or_insert_with(|| {
+                        ty::BoundVariableKind::Region(ty::BoundRegionKind::Anon(index))
+                    })
                     .expect_region();
                 let br = ty::BoundRegion { var, kind };
                 ty::Region::new_bound(self.tcx, ty::INNERMOST, br)

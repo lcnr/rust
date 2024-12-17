@@ -753,7 +753,7 @@ impl<'cx, 'tcx> Canonicalizer<'cx, 'tcx> {
         r: ty::Region<'tcx>,
     ) -> ty::Region<'tcx> {
         let var = self.canonical_var(info, r.into());
-        let br = ty::BoundRegion { var, kind: ty::BoundRegionKind::Anon };
+        let br = ty::BoundRegion::new_anon(var);
         ty::Region::new_bound(self.cx(), self.binder_index, br)
     }
 
