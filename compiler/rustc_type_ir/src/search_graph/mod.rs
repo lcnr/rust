@@ -11,7 +11,7 @@
 /// more details. Caching is split between a global cache and the per-cycle `provisional_cache`.
 /// The global cache has to be completely unobservable, while the per-cycle cache may impact
 /// behavior as long as the resulting behavior is still correct.
-use std::cmp::Ordering;
+use std::{cmp::Ordering};
 use std::collections::BTreeMap;
 use std::collections::hash_map::Entry;
 use std::fmt::Debug;
@@ -170,41 +170,6 @@ impl UsageKind {
     }
 }
 
-/// For each goal we track whether the paths from this goal
-/// to its cycle heads are coinductive.
-///
-/// This is a necessary condition to rebase provisional cache
-/// entries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AllPathsToHeadCoinductive {
-    Yes,
-    No,
-}
-impl From<PathKind> for AllPathsToHeadCoinductive {
-    fn from(path: PathKind) -> AllPathsToHeadCoinductive {
-        match path {
-            PathKind::Coinductive => AllPathsToHeadCoinductive::Yes,
-            _ => AllPathsToHeadCoinductive::No,
-        }
-    }
-}
-impl AllPathsToHeadCoinductive {
-    #[must_use]
-    fn merge(self, other: impl Into<Self>) -> Self {
-        match (self, other.into()) {
-            (AllPathsToHeadCoinductive::Yes, AllPathsToHeadCoinductive::Yes) => {
-                AllPathsToHeadCoinductive::Yes
-            }
-            (AllPathsToHeadCoinductive::No, _) | (_, AllPathsToHeadCoinductive::No) => {
-                AllPathsToHeadCoinductive::No
-            }
-        }
-    }
-    fn and_merge(&mut self, other: impl Into<Self>) {
-        *self = self.merge(other);
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 struct AvailableDepth(usize);
 impl AvailableDepth {
@@ -240,82 +205,12 @@ impl AvailableDepth {
     }
 }
 
-/// All cycle heads a given goal depends on, ordered by their stack depth.
-///
-/// We also track all paths from this goal to that head. This is necessary
-/// when rebasing provisional cache results.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-struct CycleHeads {
-    heads: BTreeMap<StackDepth, AllPathsToHeadCoinductive>,
-}
-
-impl CycleHeads {
-    fn is_empty(&self) -> bool {
-        self.heads.is_empty()
-    }
-
-    fn highest_cycle_head(&self) -> StackDepth {
-        self.opt_highest_cycle_head().unwrap()
-    }
-
-    fn opt_highest_cycle_head(&self) -> Option<StackDepth> {
-        self.heads.last_key_value().map(|(k, _)| *k)
-    }
-
-    fn opt_lowest_cycle_head(&self) -> Option<StackDepth> {
-        self.heads.first_key_value().map(|(k, _)| *k)
-    }
-
-    fn remove_highest_cycle_head(&mut self) {
-        let last = self.heads.pop_last();
-        debug_assert_ne!(last, None);
-    }
-
-    fn insert(
-        &mut self,
-        head: StackDepth,
-        path_from_entry: impl Into<AllPathsToHeadCoinductive> + Copy,
-    ) {
-        self.heads.entry(head).or_insert(path_from_entry.into()).and_merge(path_from_entry);
-    }
-
-    fn merge(&mut self, heads: &CycleHeads) {
-        for (&head, &path_from_entry) in heads.heads.iter() {
-            self.insert(head, path_from_entry);
-            debug_assert!(matches!(self.heads[&head], AllPathsToHeadCoinductive::Yes));
-        }
-    }
-
-    fn iter(&self) -> impl Iterator<Item = (StackDepth, AllPathsToHeadCoinductive)> + '_ {
-        self.heads.iter().map(|(k, v)| (*k, *v))
-    }
-
-    /// Update the cycle heads of a goal at depth `this` given the cycle heads
-    /// of a nested goal. This merges the heads after filtering the parent goal
-    /// itself.
-    fn extend_from_child(&mut self, this: StackDepth, step_kind: PathKind, child: &CycleHeads) {
-        for (&head, &path_from_entry) in child.heads.iter() {
-            match head.cmp(&this) {
-                Ordering::Less => {}
-                Ordering::Equal => continue,
-                Ordering::Greater => unreachable!(),
-            }
-
-            let path_from_entry = match step_kind {
-                PathKind::Coinductive => AllPathsToHeadCoinductive::Yes,
-                PathKind::Unknown | PathKind::Inductive => path_from_entry,
-            };
-
-            self.insert(head, path_from_entry);
-        }
-    }
-}
 
 bitflags::bitflags! {
     /// Tracks how nested goals have been accessed. This is necessary to disable
     /// global cache entries if computing them would otherwise result in a cycle or
     /// access a provisional cache entry.
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct PathsToNested: u8 {
         /// The initial value when adding a goal to its own nested goals.
         const EMPTY                      = 1 << 0;
@@ -362,6 +257,86 @@ impl PathsToNested {
         }
 
         self
+    }
+
+    fn extend_with_paths(self, paths: PathsToNested) -> PathsToNested {
+        let mut extended_paths = PathsToNested::empty();
+        if paths.contains(PathsToNested::INDUCTIVE) {
+            extended_paths |= self.extend_with(PathKind::Inductive);
+        }
+        if paths.contains(PathsToNested::UNKNOWN) {
+            extended_paths |= self.extend_with(PathKind::Unknown);
+        }
+        if paths.contains(PathsToNested::COINDUCTIVE) {
+            extended_paths |= self.extend_with(PathKind::Coinductive);
+        }
+        extended_paths
+    }
+}
+
+
+/// All cycle heads a given goal depends on, ordered by their stack depth.
+///
+/// We also track all paths from this goal to that head. This is necessary
+/// when rebasing provisional cache results.
+#[derive(Clone, Debug, Default)]
+struct CycleHeads {
+    heads: BTreeMap<StackDepth, PathsToNested>,
+}
+
+impl CycleHeads {
+    fn is_empty(&self) -> bool {
+        self.heads.is_empty()
+    }
+
+    fn highest_cycle_head(&self) -> StackDepth {
+        self.opt_highest_cycle_head().unwrap()
+    }
+
+    fn opt_highest_cycle_head(&self) -> Option<StackDepth> {
+        self.heads.last_key_value().map(|(k, _)| *k)
+    }
+
+    fn opt_lowest_cycle_head(&self) -> Option<StackDepth> {
+        self.heads.first_key_value().map(|(k, _)| *k)
+    }
+
+    fn remove_highest_cycle_head(&mut self) -> PathsToNested {
+        self.heads.pop_last().unwrap().1
+    }
+
+    fn insert(
+        &mut self,
+        head: StackDepth,
+        path_from_entry: impl Into<PathsToNested> + Copy,
+    ) {
+        *self.heads.entry(head).or_insert(path_from_entry.into()) |= path_from_entry.into();
+    }
+
+    fn merge(&mut self, heads: &CycleHeads) {
+        for (&head, &path_from_entry) in heads.heads.iter() {
+            self.insert(head, path_from_entry);
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (StackDepth, PathsToNested)> + '_ {
+        self.heads.iter().map(|(k, v)| (*k, *v))
+    }
+
+    /// Update the cycle heads of a goal at depth `this` given the cycle heads
+    /// of a nested goal. This merges the heads after filtering the parent goal
+    /// itself.
+    fn extend_from_child(&mut self, this: StackDepth, step_kind: PathKind, child: &CycleHeads) {
+        for (&head, &path_from_entry) in child.heads.iter() {
+            match head.cmp(&this) {
+                Ordering::Less => {}
+                Ordering::Equal => continue,
+                Ordering::Greater => unreachable!(),
+            }
+
+            let path_from_entry = path_from_entry.extend_with(step_kind);
+            self.insert(head, path_from_entry);
+        }
     }
 }
 
@@ -779,29 +754,22 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                     path_from_head,
                     result,
                 } = entry;
-                if heads.highest_cycle_head() != head {
+                
+                let expected_path_to_entry = if heads.highest_cycle_head() != head {
                     return true;
-                }
-
-                // We only try to rebase if all paths from the cache entry
-                // to its heads are coinductive. In this case these cycle
-                // kinds won't change, no matter the goals between these
-                // heads and the provisional cache entry.
-                if heads.iter().any(|(_, p)| matches!(p, AllPathsToHeadCoinductive::No)) {
-                    return false;
-                }
+                } else {
+                    heads.remove_highest_cycle_head()
+                };
 
                 // The same for nested goals of the cycle head.
-                if stack_entry.heads.iter().any(|(_, p)| matches!(p, AllPathsToHeadCoinductive::No))
-                {
-                    return false;
+                for (h, path) in stack_entry.heads.iter() {
+                    let new_path = path.extend_with_paths(expected_path_to_entry);
+                    if new_path != path {
+                        tracing::warn!(?new_path, ?path, ?input, "not rebasing entry");
+                        return false;
+                    }
+                    heads.insert(h, new_path);
                 }
-
-                // Merge the cycle heads of the provisional cache entry and the
-                // popped head. If the popped cycle head was a root, discard all
-                // provisional cache entries which depend on it.
-                heads.remove_highest_cycle_head();
-                heads.merge(&stack_entry.heads);
                 let Some(head) = heads.opt_highest_cycle_head() else {
                     return false;
                 };
