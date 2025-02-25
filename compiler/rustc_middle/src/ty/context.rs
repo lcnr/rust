@@ -15,6 +15,7 @@ use std::ops::{Bound, Deref};
 use std::sync::{Arc, OnceLock};
 use std::{fmt, iter, mem};
 
+use non_structural_derive::non_structural_derive;
 use rustc_abi::{ExternAbi, FieldIdx, Layout, LayoutData, TargetDataLayout, VariantIdx};
 use rustc_ast as ast;
 use rustc_data_structures::defer;
@@ -25,9 +26,7 @@ use rustc_data_structures::profiling::SelfProfilerRef;
 use rustc_data_structures::sharded::{IntoPointer, ShardedHashMap};
 use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use rustc_data_structures::steal::Steal;
-use rustc_data_structures::sync::{
-    self, DynSend, DynSync, FreezeReadGuard, Lock, RwLock, WorkerLocal,
-};
+use rustc_data_structures::sync::{DynSend, DynSync, FreezeReadGuard, Lock, RwLock, WorkerLocal};
 use rustc_data_structures::unord::UnordSet;
 use rustc_errors::{
     Applicability, Diag, DiagCtxtHandle, ErrorGuaranteed, LintDiagnostic, MultiSpan,
@@ -1332,18 +1331,13 @@ impl<'tcx> TyCtxtFeed<'tcx, LocalDefId> {
 #[derive(Copy, Clone)]
 #[rustc_diagnostic_item = "TyCtxt"]
 #[rustc_pass_by_value]
+// Explicitly implement `DynSync` and `DynSend` for `TyCtxt` to short circuit trait resolution.
+// This greatly speeds-up compilation of this crate and its dependents.
+//
+// This also avoids overflow errors with the next-generation trait solver.
+#[non_structural_derive(DynSend, DynSync)]
 pub struct TyCtxt<'tcx> {
     gcx: &'tcx GlobalCtxt<'tcx>,
-}
-
-// Explicitly implement `DynSync` and `DynSend` for `TyCtxt` to short circuit trait resolution. Its
-// field are asserted to implement these traits below, so this is trivially safe, and it greatly
-// speeds-up compilation of this crate and its dependents.
-unsafe impl DynSend for TyCtxt<'_> {}
-unsafe impl DynSync for TyCtxt<'_> {}
-fn _assert_tcx_fields() {
-    sync::assert_dyn_sync::<&'_ GlobalCtxt<'_>>();
-    sync::assert_dyn_send::<&'_ GlobalCtxt<'_>>();
 }
 
 impl<'tcx> Deref for TyCtxt<'tcx> {
