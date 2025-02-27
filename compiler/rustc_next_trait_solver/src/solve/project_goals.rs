@@ -24,7 +24,8 @@ where
                 ty::AliasRelationDirection::Equate,
             ),
         );
-        self.add_goal(GoalSource::Misc, goal);
+        // Normalization is always unproductive.
+        self.add_goal(GoalSource::MiscKnownInductive, goal);
         self.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
     }
 }

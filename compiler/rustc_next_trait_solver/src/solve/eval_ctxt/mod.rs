@@ -271,12 +271,32 @@ where
     /// and will need to clearly document it in the rustc-dev-guide before
     /// stabilization.
     pub(super) fn step_kind_for_source(&self, source: GoalSource) -> PathKind {
-        match (self.current_goal_kind, source) {
-            (_, GoalSource::NormalizeGoal(step_kind)) => step_kind,
-            (CurrentGoalKind::CoinductiveTrait, GoalSource::ImplWhereBound) => {
-                PathKind::Coinductive
+        match source {
+            // We treat these goals as unknown for now. It is likely that most miscellaneous
+            // nested goals will be converted to `GoalSource::MiscKnownInductive` over time.
+            GoalSource::Misc => PathKind::Unknown,
+            GoalSource::NormalizeGoal(path_kind) => path_kind,
+            GoalSource::ImplWhereBound => {
+                // We currently only consider a cycle coinductive if it steps
+                // into a where-clause of a coinductive trait.
+                //
+                // We probably want to make all traits coinductive in the future,
+                // so we treat cycles involving their where-clauses as ambiguous.
+                if let CurrentGoalKind::CoinductiveTrait = self.current_goal_kind {
+                    PathKind::Coinductive
+                } else {
+                    PathKind::Unknown
+                }
             }
-            _ => PathKind::Inductive,
+            // A step which is clearly unproductive. Cycles exclusively involving such steps
+            // result in `Err(NoSolution)`.
+            GoalSource::MiscKnownInductive | GoalSource::InstantiateHigherRanked => {
+                PathKind::Inductive
+            }
+            // These goal sources are likely unproductive and can be changed to
+            // `PathKind::Inductive`. Keeping them as unknown until we're confident
+            // about this and have an example where it is necessary.
+            GoalSource::AliasBoundConstCondition | GoalSource::AliasWellFormed => PathKind::Unknown,
         }
     }
 
@@ -606,7 +626,7 @@ where
 
             let (NestedNormalizationGoals(nested_goals), _, certainty) = self.evaluate_goal_raw(
                 GoalEvaluationKind::Nested,
-                GoalSource::Misc,
+                GoalSource::normalizes_to(),
                 unconstrained_goal,
             )?;
             // Add the nested goals from normalization to our own nested goals.
@@ -683,7 +703,7 @@ where
     pub(super) fn add_normalizes_to_goal(&mut self, mut goal: Goal<I, ty::NormalizesTo<I>>) {
         goal.predicate = goal.predicate.fold_with(&mut ReplaceAliasWithInfer::new(
             self,
-            GoalSource::Misc,
+            GoalSource::normalizes_to(),
             goal.param_env,
         ));
         self.inspect.add_normalizes_to_goal(self.delegate, self.max_input_universe, goal);
@@ -939,7 +959,16 @@ where
         rhs: T,
     ) -> Result<(), NoSolution> {
         let goals = self.delegate.relate(param_env, lhs, variance, rhs, self.origin_span)?;
-        self.add_goals(GoalSource::Misc, goals);
+        if cfg!(debug_assertions) {
+            for g in goals.iter() {
+                match g.predicate.kind().skip_binder() {
+                    ty::PredicateKind::Subtype { .. } | ty::PredicateKind::AliasRelate(..) => {}
+                    p => unreachable!("unexpected nested goal in `relate`: {p:?}"),
+                }
+            }
+        }
+        // Relating types is always unproductive.
+        self.add_goals(GoalSource::MiscKnownInductive, goals);
         Ok(())
     }
 

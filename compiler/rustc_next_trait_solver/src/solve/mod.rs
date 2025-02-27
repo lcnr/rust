@@ -313,7 +313,8 @@ where
                     ty::AliasRelationDirection::Equate,
                 ),
             );
-            self.add_goal(GoalSource::Misc, alias_relate_goal);
+            // Normalization is always unproductive.
+            self.add_goal(GoalSource::MiscKnownInductive, alias_relate_goal);
             self.try_evaluate_added_goals()?;
             Ok(self.resolve_vars_if_possible(normalized_term))
         } else {
