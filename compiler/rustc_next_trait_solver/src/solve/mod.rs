@@ -70,6 +70,19 @@ fn has_no_inference_or_external_constraints<I: Interner>(
         && normalization_nested_goals.is_empty()
 }
 
+fn has_no_inference_or_external_constraints_modulo_regions<I: Interner>(
+    response: ty::Canonical<I, Response<I>>,
+) -> bool {
+    let ExternalConstraintsData {
+        region_constraints: _,
+        ref opaque_types,
+        ref normalization_nested_goals,
+    } = *response.value.external_constraints;
+    response.value.var_values.is_identity_modulo_regions()
+        && opaque_types.is_empty()
+        && normalization_nested_goals.is_empty()
+}
+
 impl<'a, D, I> EvalCtxt<'a, D>
 where
     D: SolverDelegate<Interner = I>,
@@ -228,17 +241,20 @@ where
         // FIXME(-Znext-solver): We should instead try to find a `Certainty::Yes` response with
         // a subset of the constraints that all the other responses have.
         let one = responses[0];
-        if responses[1..].iter().all(|&resp| resp == one) {
-            return Some(one);
+        if responses.len() == 1 {
+            Some(one)
+        } else if one.value.certainty == Certainty::Yes
+            && responses[1..].iter().all(|&resp| resp == one)
+        {
+            Some(one)
+        } else if responses.iter().all(|&r| {
+            r.value.certainty == Certainty::Yes
+                && has_no_inference_or_external_constraints_modulo_regions(r)
+        }) {
+            responses.iter().find(|&&r| has_no_inference_or_external_constraints(r)).copied()
+        } else {
+            None
         }
-
-        responses
-            .iter()
-            .find(|response| {
-                response.value.certainty == Certainty::Yes
-                    && has_no_inference_or_external_constraints(**response)
-            })
-            .copied()
     }
 
     fn bail_with_ambiguity(&mut self, responses: &[CanonicalResponse<I>]) -> CanonicalResponse<I> {
