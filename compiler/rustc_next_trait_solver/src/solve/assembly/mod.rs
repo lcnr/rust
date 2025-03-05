@@ -292,6 +292,7 @@ where
     pub(super) fn assemble_and_evaluate_candidates<G: GoalKind<D>>(
         &mut self,
         goal: Goal<I, G>,
+        proven_via: Option<TraitGoalProvenVia>,
     ) -> Vec<Candidate<I>> {
         let Ok(normalized_self_ty) =
             self.structurally_normalize_ty(goal.param_env, goal.predicate.self_ty())
@@ -318,15 +319,18 @@ where
             }
         }
 
-        self.assemble_impl_candidates(goal, &mut candidates);
-
-        self.assemble_builtin_impl_candidates(goal, &mut candidates);
-
-        self.assemble_alias_bound_candidates(goal, &mut candidates);
-
-        self.assemble_object_bound_candidates(goal, &mut candidates);
-
         self.assemble_param_env_candidates(goal, &mut candidates);
+        self.assemble_alias_bound_candidates(goal, &mut candidates);
+        if candidates.is_empty()
+            && !matches!(
+                proven_via,
+                Some(TraitGoalProvenVia::ParamEnv | TraitGoalProvenVia::AliasBound)
+            )
+        {
+            self.assemble_impl_candidates(goal, &mut candidates);
+            self.assemble_builtin_impl_candidates(goal, &mut candidates);
+            self.assemble_object_bound_candidates(goal, &mut candidates);
+        }
 
         candidates
     }
@@ -780,17 +784,10 @@ where
     #[instrument(level = "debug", skip(self, inject_normalize_to_rigid_candidate), ret)]
     pub(super) fn merge_candidates(
         &mut self,
-        proven_via: Option<TraitGoalProvenVia>,
+        proven_via: TraitGoalProvenVia,
         candidates: Vec<Candidate<I>>,
         inject_normalize_to_rigid_candidate: impl FnOnce(&mut EvalCtxt<'_, D>) -> QueryResult<I>,
     ) -> QueryResult<I> {
-        let Some(proven_via) = proven_via else {
-            // We don't care about overflow. If proving the trait goal overflowed, then
-            // it's enough to report an overflow error for that, we don't also have to
-            // overflow during normalization.
-            return Ok(self.make_ambiguous_response_no_constraints(MaybeCause::Ambiguity));
-        };
-
         match proven_via {
             // Even when a trait bound has been proven using a where-bound, we
             // still need to consider alias-bounds for normalization, see

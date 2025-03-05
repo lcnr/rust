@@ -32,23 +32,30 @@ where
         let cx = self.cx();
         match goal.predicate.alias.kind(cx) {
             ty::AliasTermKind::ProjectionTy | ty::AliasTermKind::ProjectionConst => {
-                let candidates = self.assemble_and_evaluate_candidates(goal);
                 let trait_ref = goal.predicate.alias.trait_ref(cx);
                 let (_, proven_via) =
                     self.probe(|_| ProbeKind::ShadowedEnvProbing).enter(|ecx| {
                         let trait_goal: Goal<I, ty::TraitPredicate<I>> = goal.with(cx, trait_ref);
                         ecx.compute_trait_goal(trait_goal)
                     })?;
-                self.merge_candidates(proven_via, candidates, |ecx| {
-                    ecx.probe(|&result| ProbeKind::RigidAlias { result }).enter(|this| {
-                        this.structurally_instantiate_normalizes_to_term(
-                            goal,
-                            goal.predicate.alias,
-                        );
-                        this.add_goal(GoalSource::AliasWellFormed, goal.with(cx, trait_ref));
-                        this.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
+                if let Some(proven_via) = proven_via {
+                    let candidates = self.assemble_and_evaluate_candidates(goal, Some(proven_via));
+                    self.merge_candidates(proven_via, candidates, |ecx| {
+                        ecx.probe(|&result| ProbeKind::RigidAlias { result }).enter(|this| {
+                            this.structurally_instantiate_normalizes_to_term(
+                                goal,
+                                goal.predicate.alias,
+                            );
+                            this.add_goal(GoalSource::AliasWellFormed, goal.with(cx, trait_ref));
+                            this.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
+                        })
                     })
-                })
+                } else {
+                    // We don't care about overflow. If proving the trait goal overflowed, then
+                    // it's enough to report an overflow error for that, we don't also have to
+                    // overflow during normalization.
+                    Ok(self.make_ambiguous_response_no_constraints(MaybeCause::Ambiguity))
+                }
             }
             ty::AliasTermKind::InherentTy => self.normalize_inherent_associated_type(goal),
             ty::AliasTermKind::OpaqueTy => self.normalize_opaque_type(goal),

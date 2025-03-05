@@ -1377,7 +1377,7 @@ where
         &mut self,
         goal: Goal<I, TraitPredicate<I>>,
     ) -> Result<(CanonicalResponse<I>, Option<TraitGoalProvenVia>), NoSolution> {
-        let candidates = self.assemble_and_evaluate_candidates(goal);
+        let candidates = self.assemble_and_evaluate_candidates(goal, None);
         self.merge_trait_candidates(goal, candidates)
     }
 }

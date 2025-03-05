@@ -11,8 +11,8 @@ use tracing::instrument;
 use super::assembly::{Candidate, structural_traits};
 use crate::delegate::SolverDelegate;
 use crate::solve::{
-    BuiltinImplSource, CandidateSource, Certainty, EvalCtxt, Goal, GoalSource, NoSolution,
-    QueryResult, assembly,
+    BuiltinImplSource, CandidateSource, Certainty, EvalCtxt, Goal, GoalSource, MaybeCause,
+    NoSolution, QueryResult, assembly,
 };
 
 impl<D, I> assembly::GoalKind<D> for ty::HostEffectPredicate<I>
@@ -399,12 +399,19 @@ where
         &mut self,
         goal: Goal<I, ty::HostEffectPredicate<I>>,
     ) -> QueryResult<I> {
-        let candidates = self.assemble_and_evaluate_candidates(goal);
         let (_, proven_via) = self.probe(|_| ProbeKind::ShadowedEnvProbing).enter(|ecx| {
             let trait_goal: Goal<I, ty::TraitPredicate<I>> =
                 goal.with(ecx.cx(), goal.predicate.trait_ref);
             ecx.compute_trait_goal(trait_goal)
         })?;
-        self.merge_candidates(proven_via, candidates, |_ecx| Err(NoSolution))
+        if let Some(proven_via) = proven_via {
+            let candidates = self.assemble_and_evaluate_candidates(goal, Some(proven_via));
+            self.merge_candidates(proven_via, candidates, |_ecx| Err(NoSolution))
+        } else {
+            // We don't care about overflow. If proving the trait goal overflowed, then
+            // it's enough to report an overflow error for that, we don't also have to
+            // overflow during normalization.
+            Ok(self.make_ambiguous_response_no_constraints(MaybeCause::Ambiguity))
+        }
     }
 }
