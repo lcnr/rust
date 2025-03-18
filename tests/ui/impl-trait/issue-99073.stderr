@@ -1,14 +1,14 @@
 error: concrete type differs from previous defining opaque type use
-  --> $DIR/issue-99073.rs:5:36
-   |
-LL | fn fix<F: Fn(G), G: Fn()>(f: F) -> impl Fn() {
-   |                                    ^^^^^^^^^ expected `G`, got `{closure@$DIR/issue-99073.rs:6:3: 6:10}`
-   |
-note: previous use here
   --> $DIR/issue-99073.rs:6:13
    |
 LL |   move || f(fix(&f))
-   |             ^^^^^^^
+   |             ^^^^^^^ expected `{closure@$DIR/issue-99073.rs:6:3: 6:10}`, got `G`
+   |
+note: previous use here
+  --> $DIR/issue-99073.rs:5:36
+   |
+LL | fn fix<F: Fn(G), G: Fn()>(f: F) -> impl Fn() {
+   |                                    ^^^^^^^^^
 
 error: aborting due to 1 previous error
 

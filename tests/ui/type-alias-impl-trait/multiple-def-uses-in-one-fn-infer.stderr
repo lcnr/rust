@@ -4,7 +4,7 @@ error: concrete type differs from previous defining opaque type use
 LL | fn g<A, B>() -> (Y<A, B>, Y<B, A>) {
    |                 ^^^^^^^^^^^^^^^^^^
    |                 |
-   |                 expected `i32`, got `i64`
+   |                 expected `i64`, got `i32`
    |                 this expression supplies two conflicting concrete types for the same opaque type
 
 error: aborting due to 1 previous error

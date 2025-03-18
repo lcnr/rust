@@ -1,14 +1,14 @@
 error: concrete type differs from previous defining opaque type use
-  --> $DIR/issue-99073-2.rs:7:45
-   |
-LL | fn test<T: Display>(t: T, recurse: bool) -> impl Display {
-   |                                             ^^^^^^^^^^^^ expected `u32`, got `T`
-   |
-note: previous use here
   --> $DIR/issue-99073-2.rs:9:22
    |
 LL |         let i: u32 = test::<i32>(-1, false);
-   |                      ^^^^^^^^^^^^^^^^^^^^^^
+   |                      ^^^^^^^^^^^^^^^^^^^^^^ expected `T`, got `u32`
+   |
+note: previous use here
+  --> $DIR/issue-99073-2.rs:7:45
+   |
+LL | fn test<T: Display>(t: T, recurse: bool) -> impl Display {
+   |                                             ^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 

@@ -43,16 +43,16 @@ LL | type FutNothing<'a> = impl 'a + Future<Output = ()>;
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
 error: concrete type differs from previous defining opaque type use
-  --> $DIR/hkl_forbidden4.rs:12:1
-   |
-LL | async fn operation(_: &mut ()) -> () {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `FutNothing<'_>`, got `{async fn body of operation()}`
-   |
-note: previous use here
   --> $DIR/hkl_forbidden4.rs:15:5
    |
 LL |     call(operation).await
-   |     ^^^^^^^^^^^^^^^
+   |     ^^^^^^^^^^^^^^^ expected `{async fn body of operation()}`, got `FutNothing<'_>`
+   |
+note: previous use here
+  --> $DIR/hkl_forbidden4.rs:12:1
+   |
+LL | async fn operation(_: &mut ()) -> () {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 4 previous errors
 
