@@ -13,16 +13,6 @@ error[E0121]: the placeholder `_` is not allowed within types on item signatures
 LL |     fn bar() -> Pointer<_>;
    |                         ^ not allowed in type signatures
 
-error[E0792]: expected generic type parameter, found `i32`
-  --> $DIR/issue-77179.rs:10:5
-   |
-LL | type Pointer<T> = impl std::ops::Deref<Target = T>;
-   |              - this generic parameter must be used with a generic type parameter
-...
-LL |     Box::new(1)
-   |     ^^^^^^^^^^^
+error: aborting due to 2 previous errors
 
-error: aborting due to 3 previous errors
-
-Some errors have detailed explanations: E0121, E0792.
-For more information about an error, try `rustc --explain E0121`.
+For more information about this error, try `rustc --explain E0121`.

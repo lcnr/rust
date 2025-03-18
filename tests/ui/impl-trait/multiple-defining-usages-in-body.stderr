@@ -1,13 +1,13 @@
 error: concrete type differs from previous defining opaque type use
-  --> $DIR/multiple-defining-usages-in-body.rs:8:16
-   |
-LL |     let _: T = foo::<U, T>();
-   |                ^^^^^^^^^^^^^ expected `T`, got `U`
-   |
-note: previous use here
   --> $DIR/multiple-defining-usages-in-body.rs:6:16
    |
 LL |     let a: T = foo::<T, U>();
+   |                ^^^^^^^^^^^^^ expected `U`, got `T`
+   |
+note: previous use here
+  --> $DIR/multiple-defining-usages-in-body.rs:8:16
+   |
+LL |     let _: T = foo::<U, T>();
    |                ^^^^^^^^^^^^^
 
 warning: function cannot return without recursing

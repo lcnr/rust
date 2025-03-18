@@ -20,12 +20,6 @@ pub(super) struct ReverseMapper<'tcx> {
     /// for an explanation of this field.
     do_not_error: bool,
 
-    /// We do not want to emit any errors in typeck because
-    /// the spans in typeck are subpar at the moment.
-    /// Borrowck will do the same work again (this time with
-    /// lifetime information) and thus report better errors.
-    ignore_errors: bool,
-
     /// Span of function being checked.
     span: Span,
 }
@@ -35,9 +29,8 @@ impl<'tcx> ReverseMapper<'tcx> {
         tcx: TyCtxt<'tcx>,
         map: FxHashMap<GenericArg<'tcx>, GenericArg<'tcx>>,
         span: Span,
-        ignore_errors: bool,
     ) -> Self {
-        Self { tcx, map, do_not_error: false, ignore_errors, span }
+        Self { tcx, map, do_not_error: false, span }
     }
 
     fn fold_kind_no_missing_regions_error(&mut self, kind: GenericArg<'tcx>) -> GenericArg<'tcx> {
@@ -103,18 +96,16 @@ impl<'tcx> TypeFolder<TyCtxt<'tcx>> for ReverseMapper<'tcx> {
     #[instrument(skip(self), level = "debug")]
     fn fold_region(&mut self, r: ty::Region<'tcx>) -> ty::Region<'tcx> {
         match *r {
-            // Ignore bound regions and `'static` regions that appear in the
-            // type, we only need to remap regions that reference lifetimes
-            // from the function declaration.
+            // Ignore bound regions as these are local to the hidden type.
             //
             // E.g. We ignore `'r` in a type like `for<'r> fn(&'r u32)`.
-            ty::ReBound(..) | ty::ReStatic => return r,
+            ty::ReBound(..) => return r,
+            // We also don't have to remap any other regions not local
+            // to the function.
+            ty::ReStatic | ty::ReError(_) => return r,
 
-            // If regions have been erased (by writeback), don't try to unerase
-            // them.
+            // If regions have been erased, just keep them this way.
             ty::ReErased => return r,
-
-            ty::ReError(_) => return r,
 
             // The regions that we expect from borrow checking.
             ty::ReEarlyParam(_) | ty::ReLateParam(_) => {}
@@ -176,20 +167,18 @@ impl<'tcx> TypeFolder<TyCtxt<'tcx>> for ReverseMapper<'tcx> {
                     Some(u) => panic!("type mapped to unexpected kind: {u:?}"),
                     None => {
                         debug!(?param, ?self.map);
-                        if !self.ignore_errors {
-                            self.tcx
-                                .dcx()
-                                .struct_span_err(
-                                    self.span,
-                                    format!(
-                                        "type parameter `{ty}` is part of concrete type but not \
+                        let guar = self
+                            .tcx
+                            .dcx()
+                            .struct_span_err(
+                                self.span,
+                                format!(
+                                    "type parameter `{ty}` is part of concrete type but not \
                                           used in parameter list for the `impl Trait` type alias"
-                                    ),
-                                )
-                                .emit();
-                        }
-
-                        Ty::new_misc_error(self.tcx)
+                                ),
+                            )
+                            .emit();
+                        Ty::new_error(self.tcx, guar)
                     }
                 }
             }
@@ -217,7 +206,7 @@ impl<'tcx> TypeFolder<TyCtxt<'tcx>> for ReverseMapper<'tcx> {
                                 ct: ct.to_string(),
                                 span: self.span,
                             })
-                            .emit_unless(self.ignore_errors);
+                            .emit();
 
                         ty::Const::new_error(self.tcx, guar)
                     }

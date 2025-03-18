@@ -2,6 +2,7 @@ use hir::def_id::{DefId, LocalDefId};
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir as hir;
 use rustc_middle::bug;
+use rustc_middle::query::plumbing::CyclePlaceholder;
 use rustc_middle::traits::ObligationCause;
 use rustc_middle::traits::solve::Goal;
 use rustc_middle::ty::error::{ExpectedFound, TypeError};
@@ -12,7 +13,7 @@ use rustc_middle::ty::{
 use rustc_span::Span;
 use tracing::{debug, instrument};
 
-use super::DefineOpaqueTypes;
+use super::{DefineOpaqueTypes, RegionVariableOrigin};
 use crate::errors::OpaqueHiddenTypeDiag;
 use crate::infer::{InferCtxt, InferOk};
 use crate::traits::{self, Obligation, PredicateObligations};
@@ -250,6 +251,39 @@ impl<'tcx> InferCtxt<'tcx> {
                             .map(Goal::from),
                     );
                 }
+            }
+            ty::TypingMode::Borrowck { .. } => {
+                let prev = self
+                    .inner
+                    .borrow_mut()
+                    .opaque_types()
+                    .register(opaque_type_key, OpaqueHiddenType { ty: hidden_ty, span });
+
+                // We either equate the new hidden type with the previous entry or with the type
+                // inferred by HIR typeck.
+                let actual = prev.unwrap_or_else(|| {
+                    let actual =
+                        self.tcx.type_of_opaque_hir_typeck(opaque_type_key.def_id).map_or_else(
+                            |CyclePlaceholder(guar)| Ty::new_error(self.tcx, guar),
+                            |ty| ty.instantiate(self.tcx, opaque_type_key.args),
+                        );
+                    let actual = ty::fold_regions(self.tcx, actual, |re, _dbi| match re.kind() {
+                        ty::ReErased => {
+                            self.next_region_var(RegionVariableOrigin::MiscVariable(span))
+                        }
+                        _ => re,
+                    });
+                    actual
+                });
+
+                goals.extend(
+                    self.at(&ObligationCause::dummy_with_span(span), param_env)
+                        .eq(DefineOpaqueTypes::Yes, hidden_ty, actual)?
+                        .obligations
+                        .into_iter()
+                        // FIXME: Shuttling between obligations and goals is awkward.
+                        .map(Goal::from),
+                );
             }
             mode @ (ty::TypingMode::PostBorrowckAnalysis { .. } | ty::TypingMode::PostAnalysis) => {
                 bug!("insert hidden type in {mode:?}")

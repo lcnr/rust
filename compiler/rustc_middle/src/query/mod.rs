@@ -261,6 +261,17 @@ rustc_queries! {
         cycle_stash
     }
 
+    /// The *hidden type* computed by HIR typeck. Unlike `type_of_opaque`, this has erased regions
+    /// and should not be used outside of MIR borrowck where we infer the actual regions used in the
+    /// opaque.
+    query type_of_opaque_hir_typeck(key: LocalDefId) -> Result<ty::EarlyBinder<'tcx, Ty<'tcx>>, CyclePlaceholder> {
+        desc { |tcx|
+            "computing type of opaque `{path}` via HIR typeck",
+            path = tcx.def_path_str(key),
+        }
+        cycle_stash
+    }
+
     /// Returns whether the type alias given by `DefId` is lazy.
     ///
     /// I.e., if the type alias expands / ought to expand to a [weak] [alias type]

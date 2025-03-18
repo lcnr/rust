@@ -50,7 +50,7 @@ impl<'tcx> Drop for OpaqueTypeStorage<'tcx> {
     }
 }
 
-pub(crate) struct OpaqueTypeTable<'a, 'tcx> {
+pub struct OpaqueTypeTable<'a, 'tcx> {
     storage: &'a mut OpaqueTypeStorage<'tcx>,
 
     undo_log: &'a mut InferCtxtUndoLogs<'tcx>,
@@ -58,7 +58,7 @@ pub(crate) struct OpaqueTypeTable<'a, 'tcx> {
 
 impl<'a, 'tcx> OpaqueTypeTable<'a, 'tcx> {
     #[instrument(skip(self), level = "debug")]
-    pub(crate) fn register(
+    pub fn register(
         &mut self,
         key: OpaqueTypeKey<'tcx>,
         hidden_type: OpaqueHiddenType<'tcx>,

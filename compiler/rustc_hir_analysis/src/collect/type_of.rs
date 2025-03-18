@@ -324,10 +324,10 @@ pub(super) fn type_of_opaque(
     if let Some(def_id) = def_id.as_local() {
         Ok(ty::EarlyBinder::bind(match tcx.hir_node_by_def_id(def_id).expect_opaque_ty().origin {
             hir::OpaqueTyOrigin::TyAlias { in_assoc_ty: false, .. } => {
-                opaque::find_opaque_ty_constraints_for_tait(tcx, def_id)
+                opaque::find_opaque_ty_constraints_for_tait(tcx, def_id, false)
             }
             hir::OpaqueTyOrigin::TyAlias { in_assoc_ty: true, .. } => {
-                opaque::find_opaque_ty_constraints_for_impl_trait_in_assoc_type(tcx, def_id)
+                opaque::find_opaque_ty_constraints_for_impl_trait_in_assoc_type(tcx, def_id, false)
             }
             // Opaque types desugared from `impl Trait`.
             hir::OpaqueTyOrigin::FnReturn { parent: owner, in_trait_or_impl }
@@ -348,6 +348,33 @@ pub(super) fn type_of_opaque(
         // and load the type from metadata.
         Ok(tcx.type_of(def_id))
     }
+}
+
+pub(super) fn type_of_opaque_hir_typeck(
+    tcx: TyCtxt<'_>,
+    def_id: LocalDefId,
+) -> Result<ty::EarlyBinder<'_, Ty<'_>>, CyclePlaceholder> {
+    Ok(ty::EarlyBinder::bind(match tcx.hir_node_by_def_id(def_id).expect_opaque_ty().origin {
+        hir::OpaqueTyOrigin::TyAlias { in_assoc_ty: false, .. } => {
+            opaque::find_opaque_ty_constraints_for_tait(tcx, def_id, true)
+        }
+        hir::OpaqueTyOrigin::TyAlias { in_assoc_ty: true, .. } => {
+            opaque::find_opaque_ty_constraints_for_impl_trait_in_assoc_type(tcx, def_id, true)
+        }
+        // Opaque types desugared from `impl Trait`.
+        hir::OpaqueTyOrigin::FnReturn { parent: owner, in_trait_or_impl }
+        | hir::OpaqueTyOrigin::AsyncFn { parent: owner, in_trait_or_impl } => {
+            if in_trait_or_impl == Some(hir::RpitContext::Trait)
+                && !tcx.defaultness(owner).has_value()
+            {
+                span_bug!(
+                    tcx.def_span(def_id),
+                    "tried to get type of this RPITIT with no definition"
+                );
+            }
+            opaque::find_hir_opaque_ty_constraints_for_rpit(tcx, def_id, owner)
+        }
+    }))
 }
 
 fn infer_placeholder_type<'tcx>(

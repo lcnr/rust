@@ -1,14 +1,40 @@
 error: concrete type differs from previous defining opaque type use
-  --> $DIR/recursive-fn-tait.rs:16:5
+  --> $DIR/recursive-fn-tait.rs:15:6
    |
-LL |     move |x: usize| m(n(x))
-   |     ^^^^^^^^^^^^^^^^^^^^^^^ expected `{closure@$DIR/recursive-fn-tait.rs:8:5: 8:16}`, got `{closure@$DIR/recursive-fn-tait.rs:16:5: 16:20}`
+LL | ) -> Diff {
+   |      ^^^^ expected `{closure@$DIR/recursive-fn-tait.rs:8:5: 8:16}`, got `{closure@$DIR/recursive-fn-tait.rs:16:5: 16:20}`
    |
 note: previous use here
+  --> $DIR/recursive-fn-tait.rs:7:18
+   |
+LL | pub fn lift() -> Diff {
+   |                  ^^^^
+
+error: item does not constrain `Diff::{opaque#0}`
   --> $DIR/recursive-fn-tait.rs:8:5
    |
 LL |     |_: usize |loop {}
-   |     ^^^^^^^^^^^^^^^^^^
+   |     ^^^^^^^^^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/recursive-fn-tait.rs:4:17
+   |
+LL | pub type Diff = impl Fn(usize) -> usize;
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 1 previous error
+error: item does not constrain `Diff::{opaque#0}`
+  --> $DIR/recursive-fn-tait.rs:16:5
+   |
+LL |     move |x: usize| m(n(x))
+   |     ^^^^^^^^^^^^^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/recursive-fn-tait.rs:4:17
+   |
+LL | pub type Diff = impl Fn(usize) -> usize;
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to 3 previous errors
 

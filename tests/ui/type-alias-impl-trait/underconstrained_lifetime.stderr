@@ -1,4 +1,4 @@
-error[E0491]: in type `&'b &'a ()`, reference has a longer lifetime than the data it references
+error[E0491]: in type `&&()`, reference has a longer lifetime than the data it references
   --> $DIR/underconstrained_lifetime.rs:20:5
    |
 LL |     x

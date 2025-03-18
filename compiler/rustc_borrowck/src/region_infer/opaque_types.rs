@@ -149,15 +149,12 @@ impl<'tcx> RegionInferenceContext<'tcx> {
             // only know that once we convert the generic parameters to those of the opaque type.
             if let Some(prev) = result.get_mut(&opaque_type_key.def_id) {
                 if prev.ty != ty {
-                    let guar = ty.error_reported().err().unwrap_or_else(|| {
-                        let (Ok(e) | Err(e)) = prev
-                            .build_mismatch_error(
-                                &OpaqueHiddenType { ty, span: concrete_type.span },
-                                infcx.tcx,
-                            )
-                            .map(|d| d.emit());
-                        e
-                    });
+                    let (Ok(guar) | Err(guar)) = prev
+                        .build_mismatch_error(
+                            &OpaqueHiddenType { ty, span: concrete_type.span },
+                            infcx.tcx,
+                        )
+                        .map(|d| d.emit());
                     prev.ty = Ty::new_error(infcx.tcx, guar);
                 }
                 // Pick a better span if there is one.

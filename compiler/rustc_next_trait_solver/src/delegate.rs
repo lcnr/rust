@@ -62,14 +62,15 @@ pub trait SolverDelegate: Deref<Target = Self::Infcx> + Sized {
         universe_map: impl Fn(ty::UniverseIndex) -> ty::UniverseIndex,
     ) -> <Self::Interner as Interner>::GenericArg;
 
-    // FIXME: Can we implement this in terms of `add` and `inject`?
-    fn insert_hidden_type(
+    /// Inserts an opaque type in the `opaque_type_storage` returning
+    /// the previous value in case we already had a structurally equal
+    /// key.
+    fn register_hidden_type(
         &self,
         opaque_type_key: ty::OpaqueTypeKey<Self::Interner>,
-        param_env: <Self::Interner as Interner>::ParamEnv,
         hidden_ty: <Self::Interner as Interner>::Ty,
-        goals: &mut Vec<Goal<Self::Interner, <Self::Interner as Interner>::Predicate>>,
-    ) -> Result<(), NoSolution>;
+        span: <Self::Interner as Interner>::Span,
+    ) -> Option<<Self::Interner as Interner>::Ty>;
 
     fn add_item_bounds_for_hidden_type(
         &self,
@@ -78,13 +79,6 @@ pub trait SolverDelegate: Deref<Target = Self::Infcx> + Sized {
         param_env: <Self::Interner as Interner>::ParamEnv,
         hidden_ty: <Self::Interner as Interner>::Ty,
         goals: &mut Vec<Goal<Self::Interner, <Self::Interner as Interner>::Predicate>>,
-    );
-
-    fn inject_new_hidden_type_unchecked(
-        &self,
-        key: ty::OpaqueTypeKey<Self::Interner>,
-        hidden_ty: <Self::Interner as Interner>::Ty,
-        span: <Self::Interner as Interner>::Span,
     );
 
     fn reset_opaque_types(&self);

@@ -65,7 +65,7 @@ use crate::middle::codegen_fn_attrs::{CodegenFnAttrs, TargetFeature};
 use crate::middle::{resolve_bound_vars, stability};
 use crate::mir::interpret::{self, Allocation, ConstAllocation};
 use crate::mir::{Body, Local, Place, PlaceElem, ProjectionKind, Promoted};
-use crate::query::plumbing::QuerySystem;
+use crate::query::plumbing::{CyclePlaceholder, QuerySystem};
 use crate::query::{IntoQueryParam, LocalCrate, Providers, TyCtxtAt};
 use crate::thir::Thir;
 use crate::traits;
@@ -203,6 +203,11 @@ impl<'tcx> Interner for TyCtxt<'tcx> {
 
     fn type_of(self, def_id: DefId) -> ty::EarlyBinder<'tcx, Ty<'tcx>> {
         self.type_of(def_id)
+    }
+    fn type_of_opaque_hir_typeck(self, def_id: LocalDefId) -> ty::EarlyBinder<'tcx, Ty<'tcx>> {
+        self.type_of_opaque_hir_typeck(def_id).unwrap_or_else(|CyclePlaceholder(guar)| {
+            ty::EarlyBinder::bind(Ty::new_error(self, guar))
+        })
     }
 
     type AdtDef = ty::AdtDef<'tcx>;
