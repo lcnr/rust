@@ -593,7 +593,7 @@ impl<'cx, 'tcx> WritebackCx<'cx, 'tcx> {
                     .unwrap();
                 if prev.ty != hidden_type.ty {
                     let (Ok(guar) | Err(guar)) =
-                        hidden_type.build_mismatch_error(&prev, tcx).map(|d| d.emit());
+                        prev.build_mismatch_error(&hidden_type, tcx).map(|d| d.emit());
                     entry.ty = Ty::new_error(tcx, guar);
                 }
 
