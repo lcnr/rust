@@ -6,6 +6,19 @@ LL | impl Trait for Wrapper<OpaqueClosure> {}
 LL | impl<T: Sync> Trait for Wrapper<T> {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ conflicting implementation for `Wrapper<OpaqueClosure>`
 
-error: aborting due to 1 previous error
+error: item does not constrain `OpaqueClosure::{opaque#0}`
+  --> $DIR/coherence-with-closure.rs:6:5
+   |
+LL |     || ()
+   |     ^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/coherence-with-closure.rs:3:22
+   |
+LL | type OpaqueClosure = impl Sized;
+   |                      ^^^^^^^^^^
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0119`.

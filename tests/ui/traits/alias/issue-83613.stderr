@@ -6,6 +6,19 @@ LL | impl<T: Send> AnotherTrait for T {}
 LL | impl AnotherTrait for OpaqueType {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ conflicting implementation
 
-error: aborting due to 1 previous error
+error: item does not constrain `OpaqueType::{opaque#0}`
+  --> $DIR/issue-83613.rs:7:5
+   |
+LL |     || 0
+   |     ^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/issue-83613.rs:4:19
+   |
+LL | type OpaqueType = impl OpaqueTrait;
+   |                   ^^^^^^^^^^^^^^^^
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0119`.

@@ -7,6 +7,19 @@ LL | type Two<'a, 'b> = impl std::fmt::Debug;
 LL |     let c1 = || set(x);
    |                 ^^^^^^
 
-error: aborting due to 1 previous error
+error: item does not constrain `Two::{opaque#0}`
+  --> $DIR/taint.rs:13:4
+   |
+LL | fn d(x: Two) {
+   |    ^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/taint.rs:6:20
+   |
+LL | type Two<'a, 'b> = impl std::fmt::Debug;
+   |                    ^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0792`.

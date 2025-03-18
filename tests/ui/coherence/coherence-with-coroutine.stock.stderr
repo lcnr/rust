@@ -6,6 +6,19 @@ LL | impl Trait for Wrapper<OpaqueCoroutine> {}
 LL | impl<T: Sync> Trait for Wrapper<T> {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ conflicting implementation for `Wrapper<OpaqueCoroutine>`
 
-error: aborting due to 1 previous error
+error: item does not constrain `OpaqueCoroutine::{opaque#0}`
+  --> $DIR/coherence-with-coroutine.rs:13:5
+   |
+LL |     || {
+   |     ^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/coherence-with-coroutine.rs:9:24
+   |
+LL | type OpaqueCoroutine = impl Sized;
+   |                        ^^^^^^^^^^
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0119`.

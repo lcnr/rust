@@ -9,13 +9,18 @@ LL |     fn bar<'a: 'a>()
 LL |             let _: Self::Assoc<'a> = x;
    |                    ^^^^^^^^^^^^^^^
 
-error: unconstrained opaque type
+error: item does not constrain `<() as Foo>::Assoc::{opaque#0}`
+  --> $DIR/in-assoc-ty-early-bound2.rs:10:8
+   |
+LL |     fn bar<'a: 'a>()
+   |        ^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
   --> $DIR/in-assoc-ty-early-bound2.rs:9:22
    |
 LL |     type Assoc<'a> = impl Sized;
    |                      ^^^^^^^^^^
-   |
-   = note: `Assoc` must be used in combination with a concrete type within the same impl
 
 error: aborting due to 2 previous errors
 

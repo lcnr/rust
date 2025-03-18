@@ -1,15 +1,15 @@
-error: `extern` block uses type `A`, which is not FFI-safe
-  --> $DIR/opaque-ty-ffi-unsafe.rs:12:24
+error: item does not constrain `A::{opaque#0}`
+  --> $DIR/opaque-ty-ffi-unsafe.rs:8:5
    |
-LL |     pub(crate) fn a(_: A);
-   |                        ^ not FFI-safe
+LL |     || {}
+   |     ^^
    |
-   = note: opaque types have no C equivalent
-note: the lint level is defined here
-  --> $DIR/opaque-ty-ffi-unsafe.rs:2:9
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/opaque-ty-ffi-unsafe.rs:4:10
    |
-LL | #![deny(improper_ctypes)]
-   |         ^^^^^^^^^^^^^^^
+LL | type A = impl Fn();
+   |          ^^^^^^^^^
 
 error: aborting due to 1 previous error
 

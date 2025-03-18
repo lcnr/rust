@@ -14,7 +14,20 @@ error[E0271]: expected `{async block@$DIR/issue-78722.rs:11:13: 11:18}` to be a 
 LL |         fn concrete_use() -> F {
    |                              ^ expected `u8`, found `()`
 
-error: aborting due to 2 previous errors
+error: item does not constrain `F::{opaque#0}`
+  --> $DIR/issue-78722.rs:13:20
+   |
+LL |         let f: F = async { 1 };
+   |                    ^^^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/issue-78722.rs:7:18
+   |
+LL |         type F = impl core::future::Future<Output = u8>;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to 3 previous errors
 
 Some errors have detailed explanations: E0271, E0658.
 For more information about an error, try `rustc --explain E0271`.

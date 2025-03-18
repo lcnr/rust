@@ -7,6 +7,19 @@ LL | type IterBitsIter<T, E, I> = impl std::iter::Iterator<Item = I>;
 LL |         (0u8..n).rev().map(move |shift| ((self >> T::from(shift)) & T::from(1)).try_into().unwrap())
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 1 previous error
+error: item does not constrain `IterBitsIter::{opaque#0}`
+  --> $DIR/issue-60564.rs:21:28
+   |
+LL |         (0u8..n).rev().map(move |shift| ((self >> T::from(shift)) & T::from(1)).try_into().unwrap())
+   |                            ^^^^^^^^^^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/issue-60564.rs:8:30
+   |
+LL | type IterBitsIter<T, E, I> = impl std::iter::Iterator<Item = I>;
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0792`.

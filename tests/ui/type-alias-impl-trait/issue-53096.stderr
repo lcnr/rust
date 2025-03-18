@@ -1,8 +1,15 @@
-error: fatal error triggered by #[rustc_error]
-  --> $DIR/issue-53096.rs:12:1
+error: item does not constrain `Foo::{opaque#0}`
+  --> $DIR/issue-53096.rs:7:5
    |
-LL | fn main() {}
-   | ^^^^^^^^^
+LL |     || 0usize
+   |     ^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/issue-53096.rs:4:16
+   |
+LL | pub type Foo = impl Fn() -> usize;
+   |                ^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 

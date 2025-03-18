@@ -6,5 +6,18 @@ LL | pub type OpaqueBlock = impl Trait;
    |
    = note: `OpaqueBlock` must be used in combination with a concrete type within the same crate
 
-error: aborting due to 1 previous error
+error: item does not constrain `OpaqueIf::{opaque#0}`
+  --> $DIR/drop-analysis-on-unconstrained-tait.rs:14:27
+   |
+LL |     bind(option(block()), |_| block())
+   |                           ^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/drop-analysis-on-unconstrained-tait.rs:7:21
+   |
+LL | pub type OpaqueIf = impl Trait;
+   |                     ^^^^^^^^^^
+
+error: aborting due to 2 previous errors
 

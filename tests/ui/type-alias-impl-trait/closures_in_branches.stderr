@@ -9,6 +9,19 @@ help: consider giving this closure parameter an explicit type
 LL |         |x: /* Type */| x.len()
    |           ++++++++++++
 
+error: item does not constrain `Foo1::{opaque#0}`
+  --> $DIR/closures_in_branches.rs:17:5
+   |
+LL |     |x| x.len()
+   |     ^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/closures_in_branches.rs:14:13
+   |
+LL | type Foo1 = impl std::ops::FnOnce(String) -> usize;
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 error[E0282]: type annotations needed
   --> $DIR/closures_in_branches.rs:22:10
    |
@@ -20,6 +33,6 @@ help: consider giving this closure parameter an explicit type
 LL |         |x: /* Type */| x.len()
    |           ++++++++++++
 
-error: aborting due to 2 previous errors
+error: aborting due to 3 previous errors
 
 For more information about this error, try `rustc --explain E0282`.

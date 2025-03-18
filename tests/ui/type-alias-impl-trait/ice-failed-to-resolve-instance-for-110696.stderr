@@ -17,6 +17,20 @@ note: this opaque type is supposed to be constrained
 LL | type DummyT<T> = impl F;
    |                  ^^^^^^
 
-error: aborting due to 2 previous errors
+error: item does not constrain `DummyT::{opaque#0}`
+  --> $DIR/ice-failed-to-resolve-instance-for-110696.rs:30:8
+   |
+LL |     fn new() -> Self {
+   |        ^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/ice-failed-to-resolve-instance-for-110696.rs:20:18
+   |
+LL | type DummyT<T> = impl F;
+   |                  ^^^^^^
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error: aborting due to 3 previous errors
 
 For more information about this error, try `rustc --explain E0207`.
