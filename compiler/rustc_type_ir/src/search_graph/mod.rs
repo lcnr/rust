@@ -19,6 +19,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use derive_where::derive_where;
+use indexmap::IndexSet;
 use rustc_index::{Idx, IndexVec};
 #[cfg(feature = "nightly")]
 use rustc_macros::{Decodable_NoContext, Encodable_NoContext, HashStable_NoContext};
@@ -214,7 +215,7 @@ impl AllPathsToHeadCoinductive {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct AvailableDepth(usize);
 impl AvailableDepth {
     /// Returns the remaining depth allowed for nested goals.
@@ -433,6 +434,151 @@ impl<X: Cx> NestedGoals<X> {
     }
 }
 
+/// The value of a stack entry used when lazily recomputing
+/// nested goals in case a provisional result changed.
+///
+/// This only stores the information necessary to recompute a
+/// nested goal. All other fields get initialized when actually
+/// reevaluating the goal.
+#[derive_where(Debug, PartialEq, Eq; X: Cx)]
+struct BottomUpStackEntryInfo<X: Cx> {
+    input: X::Input,
+    step_kind_from_parent: PathKind,
+    available_depth: AvailableDepth,
+    /// In case we've only encountered this cycle when rerunning
+    /// a nested goal, we do not rerun the initial iteration of
+    /// that nested goal.
+    provisional_result: Option<X::Result>,
+}
+impl<X: Cx> BottomUpStackEntryInfo<X> {
+    fn new(entry: &StackEntry<X>) -> Self {
+        let &StackEntry {
+            input,
+            step_kind_from_parent,
+            available_depth,
+            provisional_result,
+            // These fields aren't relied on while computing nested goals.
+            reached_depth: _,
+            heads: _,
+            encountered_overflow: _,
+            has_been_used: _,
+            bottom_up_info: _,
+            nested_goals: _,
+        } = entry;
+        BottomUpStackEntryInfo { input, step_kind_from_parent, available_depth, provisional_result }
+    }
+}
+
+#[derive_where(Debug; X: Cx)]
+struct BottomUpStackEntry<X: Cx> {
+    info: BottomUpStackEntryInfo<X>,
+    /// Only set for leaf nodes. If a goal depends on the cycle head directly and
+    /// via a nested goal, we have to recompute that goal regardless, so first trying
+    /// to evaluate its nested goals in a bottom up way is not useful.
+    depends_on_head: bool,
+    first_child: Option<BottomUpStorageIndex>,
+    next_sibling: Option<BottomUpStorageIndex>,
+
+    /// Starts out as `None`. Expected to be `Some` for all nested entries once we're
+    /// actually reevaluating the cycle head.
+    result: Option<X::Result>,
+}
+
+impl<X: Cx> BottomUpStackEntry<X> {
+    fn new(info: BottomUpStackEntryInfo<X>) -> BottomUpStackEntry<X> {
+        BottomUpStackEntry {
+            info,
+            depends_on_head: false,
+            first_child: None,
+            next_sibling: None,
+            result: None,
+        }
+    }
+}
+
+rustc_index::newtype_index! {
+    #[orderable]
+    #[gate_rustc_only]
+    pub struct BottomUpStorageIndex {}
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BottomUpLeafGoal {
+    index: BottomUpStorageIndex,
+    stack_length: usize,
+}
+
+/// This stores all paths between the current head and goals which depend on it.
+#[derive_where(Debug, Default; X: Cx)]
+struct BottomUpInfo<X: Cx> {
+    /// The acyclic graph of nested goals. This contains the goal itself in case there is a cycle.
+    tree: IndexVec<BottomUpStorageIndex, BottomUpStackEntry<X>>,
+}
+
+impl<X: Cx> BottomUpInfo<X> {
+    fn insert_trace(&mut self, trace: &[StackEntry<X>]) {
+        let mut trace_iter = trace.iter();
+        let first = trace_iter.next().unwrap();
+        let mut parent = if self.tree.is_empty() {
+            self.tree.push(BottomUpStackEntry::new(BottomUpStackEntryInfo::new(first)))
+        } else {
+            let first_index = BottomUpStorageIndex::ZERO;
+            debug_assert_eq!(self.tree[first_index].info, BottomUpStackEntryInfo::new(first));
+            first_index
+        };
+
+        for entry in trace_iter {
+            if self.tree[parent].depends_on_head {
+                return;
+            }
+
+            let info = BottomUpStackEntryInfo::new(entry);
+            if let Some(mut child) = self.tree[parent].first_child {
+                while let Some(next) = self.tree[child].next_sibling {
+                    // We should never evaluate the same child goal twice for the same parent.
+                    debug_assert_ne!(info, self.tree[next].info);
+                    child = next;
+                }
+
+                parent = if self.tree[child].info == info {
+                    child
+                } else {
+                    let new_entry = self.tree.push(BottomUpStackEntry::new(info));
+                    self.tree[child].next_sibling = Some(new_entry);
+                    new_entry
+                };
+            } else {
+                let new_entry = self.tree.push(BottomUpStackEntry::new(info));
+                self.tree[parent].first_child = Some(new_entry);
+                parent = new_entry;
+            }
+        }
+
+        self.tree[parent].depends_on_head = true;
+        // In we first evaluated a nested goal which also depends on this head,
+        // we erase this information here. See the documentation for `depends_on_head`.
+        self.tree[parent].first_child = None;
+    }
+
+    fn set_result(&mut self, trace: &[StackEntry<X>], result: X::Result) {
+        let mut trace_iter = trace.iter();
+        let first = trace_iter.next().unwrap();
+        let mut parent = BottomUpStorageIndex::ZERO;
+        debug_assert_eq!(self.tree[parent].info, BottomUpStackEntryInfo::new(first));
+        for entry in trace_iter {
+            let mut child = self.tree[parent].first_child.unwrap();
+            while let Some(sibling) = self.tree[child].next_sibling {
+                child = sibling;
+            }
+            parent = child;
+            debug_assert_eq!(self.tree[parent].info, BottomUpStackEntryInfo::new(entry));
+        }
+
+        let prev = self.tree[parent].result.replace(result);
+        debug_assert_eq!(prev, None);
+    }
+}
+
 rustc_index::newtype_index! {
     #[orderable]
     #[gate_rustc_only]
@@ -440,7 +586,7 @@ rustc_index::newtype_index! {
 }
 
 /// Stack entries of the evaluation stack. Its fields tend to be lazily
-/// when popping a child goal or completely immutable.
+/// updated when popping a child goal or completely immutable.
 #[derive_where(Debug; X: Cx)]
 struct StackEntry<X: Cx> {
     input: X::Input,
@@ -468,6 +614,10 @@ struct StackEntry<X: Cx> {
     /// Whether this goal has been used as the root of a cycle. This gets
     /// eagerly updated when encountering a cycle.
     has_been_used: Option<UsageKind>,
+    /// If this goal has been used as a cycle head. Store goals which depend on
+    /// it to lazily reevaluate them from the bottom up. Changes to the provisional
+    /// result often do not actually impact most leaf goals.
+    bottom_up_info: BottomUpInfo<X>,
 
     /// The nested goals of this goal, see the doc comment of the type.
     nested_goals: NestedGoals<X>,
@@ -666,6 +816,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             heads: Default::default(),
             encountered_overflow: false,
             has_been_used: None,
+            bottom_up_info: Default::default(),
             nested_goals: Default::default(),
             provisional_result: None,
         };
