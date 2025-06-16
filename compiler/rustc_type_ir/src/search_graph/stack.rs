@@ -84,8 +84,19 @@ impl<X: Cx> Stack<X> {
         self.entries.push(entry)
     }
 
+    pub(super) fn extend(&mut self, entries: impl IntoIterator<Item = StackEntry<X>>) {
+        self.entries.extend(entries)
+    }
+
     pub(super) fn pop(&mut self) -> StackEntry<X> {
         self.entries.pop().unwrap()
+    }
+
+    pub(super) fn drain_children(
+        &mut self,
+        parent: StackDepth,
+    ) -> impl Iterator<Item = StackEntry<X>> {
+        self.entries.raw.drain(parent.index() + 1..)
     }
 
     pub(super) fn cycle_step_kinds(&self, head: StackDepth) -> impl Iterator<Item = PathKind> {

@@ -2,7 +2,7 @@ use std::hash::BuildHasherDefault;
 
 pub use ena::unify::{NoError, UnifyKey, UnifyValue};
 use rustc_hash::FxHasher;
-pub use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+pub use rustc_hash::{FxBuildHasher as BuildHasher, FxHashMap as HashMap, FxHashSet as HashSet};
 
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 pub type IndexSet<V> = indexmap::IndexSet<V, BuildHasherDefault<FxHasher>>;

@@ -1,16 +1,20 @@
+use std::hash::Hash;
 use std::ops::Range;
 
 use derive_where::derive_where;
 use rustc_index::IndexVec;
-use rustc_type_ir::data_structures::HashMap;
+use rustc_type_ir::data_structures::{BuildHasher, HashMap};
 
-use crate::search_graph::{AvailableDepth, Cx, CycleHeads, PathKind, Stack};
+use crate::search_graph::{AvailableDepth, Cx, CycleHeads, PathKind, Stack, StackEntry};
 
-#[derive_where(Debug; X: Cx)]
-struct GoalInfo<X: Cx> {
+#[derive_where(Debug, Clone, Copy; X: Cx)]
+pub(super) struct GoalInfo<X: Cx> {
     input: X::Input,
     step_kind_from_parent: PathKind,
     available_depth: AvailableDepth,
+    /// The provisional result used while evaluating this goal. We create a separate
+    /// node for every rerun.
+    provisional_result: Option<X::Result>,
 }
 
 rustc_index::newtype_index! {
@@ -26,18 +30,20 @@ rustc_index::newtype_index! {
 }
 
 #[derive_where(Debug; X: Cx)]
-enum NodeKind<X: Cx> {
+pub(super) enum NodeKind<X: Cx> {
     InProgress {
         cycles_start: CycleId,
     },
     Regular {
         cycles: Range<CycleId>,
-        /// The provisional result used while evaluating this goal. We create a separate
-        /// node for every rerun.
-        provisional_result: Option<X::Result>,
         encountered_overflow: bool,
         heads: CycleHeads,
         result: X::Result,
+    },
+    Rerun {
+        prev: NodeId,
+        diff: HashMap<NodeId, NodeId>,
+        cycles: Range<CycleId>,
     },
     ProvisionalCacheHit {
         entry_node_id: NodeId,
@@ -70,8 +76,9 @@ impl<X: Cx> SearchTree<X> {
         input: X::Input,
         step_kind_from_parent: PathKind,
         available_depth: AvailableDepth,
+        provisional_result: Option<X::Result>,
     ) -> NodeId {
-        let info = GoalInfo { input, step_kind_from_parent, available_depth };
+        let info = GoalInfo { input, step_kind_from_parent, available_depth, provisional_result };
         let parent = stack.last().map(|e| e.node_id);
         self.nodes.push(Node {
             info,
@@ -108,7 +115,6 @@ impl<X: Cx> SearchTree<X> {
     pub(super) fn finish_evaluate(
         &mut self,
         node_id: NodeId,
-        provisional_result: Option<X::Result>,
         encountered_overflow: bool,
         heads: CycleHeads,
         result: X::Result,
@@ -119,10 +125,59 @@ impl<X: Cx> SearchTree<X> {
         let cycles_end = self.cycles.next_index();
         self.nodes[node_id].kind = NodeKind::Regular {
             cycles: cycles_start..cycles_end,
-            provisional_result,
             encountered_overflow,
             heads,
             result,
         }
+    }
+
+    pub(super) fn cycle_node_id(&mut self, cycle_id: CycleId) -> NodeId {
+        self.cycles[cycle_id]
+    }
+
+    pub(super) fn node_kind_raw(&self, node_id: NodeId) -> &NodeKind<X> {
+        &self.nodes[node_id].kind
+    }
+
+    pub(super) fn get_diff(&self, node_id: NodeId) -> &HashMap<NodeId, NodeId> {
+        match &self.nodes[node_id].kind {
+            NodeKind::Regular { .. } => const { &HashMap::with_hasher(BuildHasher) },
+            NodeKind::Rerun { diff, .. } => diff,
+            _ => panic!("unexpected node kind: {:?}", self.nodes[node_id]),
+        }
+    }
+
+    pub(super) fn get_cycles(&mut self, node_id: NodeId) -> Range<CycleId> {
+        if let NodeKind::Regular { ref cycles, .. } = self.nodes[node_id].kind {
+            cycles.clone()
+        } else {
+            panic!("unexpected node kind: {:?}", self.nodes[node_id]);
+        }
+    }
+
+    pub(super) fn compute_rev_stack(
+        &self,
+        diff: &HashMap<NodeId, NodeId>,
+        mut node_id: NodeId,
+        until: X::Input,
+    ) -> Option<Vec<GoalInfo<X>>> {
+        let mut rev_stack = Vec::new();
+        loop {
+            if diff.contains_key(&node_id) {
+                return None;
+            }
+            let node = &self.nodes[node_id];
+            if node.info.input == until {
+                break;
+            }
+
+            rev_stack.push(node.info);
+            if let Some(parent) = node.parent {
+                node_id = parent;
+            } else {
+                break;
+            }
+        }
+        Some(rev_stack)
     }
 }
