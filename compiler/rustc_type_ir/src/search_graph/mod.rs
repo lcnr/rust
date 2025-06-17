@@ -763,13 +763,16 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
     /// When reevaluating a goal with a changed provisional result, all provisional cache entry
     /// which depend on this goal get invalidated.
-    fn clear_dependent_provisional_results(&mut self) {
+    fn invalidate_dependent_provisional_results(&mut self) {
         let head = self.stack.next_index();
         #[allow(rustc::potential_query_instability)]
-        self.provisional_cache.retain(|_, entries| {
-            entries.retain(|entry| entry.heads.highest_cycle_head() != head);
-            !entries.is_empty()
-        });
+        for (_, entries) in self.provisional_cache.iter_mut() {
+            for entry in entries {
+                if entry.heads.highest_cycle_head() == head {
+                    entry.invalidated_by_rerun = true;
+                }
+            }
+        }
     }
 
     /// A necessary optimization to handle complex solver cycles. A provisional cache entry
@@ -1178,7 +1181,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
             // Clear all provisional cache entries which depend on a previous provisional
             // result of this goal and rerun.
-            self.clear_dependent_provisional_results();
+            self.invalidate_dependent_provisional_results();
 
             debug!(?result, "fixpoint changed provisional results");
             match self.reevaluate_goal_on_stack(stack_entry, result) {
@@ -1238,17 +1241,20 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 continue;
             };
 
-            match self.tree.node_kind_raw(cycle_node_id) {
+            let result = match self.tree.node_kind_raw(cycle_node_id) {
                 tree::NodeKind::InProgress { .. }
                 | tree::NodeKind::Regular { .. }
-                | tree::NodeKind::Rerun { .. } => unreachable!(),
-                tree::NodeKind::ProvisionalCacheHit { entry_node_id } => todo!(),
-                tree::NodeKind::CycleOnStack { entry_node_id, result } => todo!(),
-            }
-            // - check whether the cycle is still reached. build list of parents, if one is in `diff` it's over
-            //   - has the same stack as the current goal + additional ones, keep list of `parent` until we get one
-            //     with `node_id == self.stack.last().node_id`
+                | tree::NodeKind::Rerun { .. } => panic!(),
+                tree::NodeKind::CycleOnStack { entry_node_id, result } => {
+                    // check whether `entry_node_id` == `prev_stack_entry`
 
+                    // check if provisional result is different from `prev_result`
+                }
+
+                tree::NodeKind::ProvisionalCacheHit { entry_node_id } => {
+                    // if this provisional cache entry has been invalidated here, 
+                }
+            };
             // if on stack, reevaluate the parent goal:
 
             // if provisional result and it has been invalidated:

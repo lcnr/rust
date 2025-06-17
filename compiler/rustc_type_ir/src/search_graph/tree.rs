@@ -45,14 +45,14 @@ pub(super) enum NodeKind<X: Cx> {
         diff: HashMap<NodeId, NodeId>,
         cycles: Range<CycleId>,
     },
-    ProvisionalCacheHit {
-        entry_node_id: NodeId,
-    },
     CycleOnStack {
         entry_node_id: NodeId,
         /// The provisional result used by the cycle. During the first iteration this
         /// depends on the cycle kind.
         result: X::Result,
+    },
+    ProvisionalCacheHit {
+        entry_node_id: NodeId,
     },
 }
 
@@ -155,6 +155,13 @@ impl<X: Cx> SearchTree<X> {
         }
     }
 
+    /// Compute the list of parents of `node_id` until encountering the node
+    /// `until`. We're excluding `until` and are including `node_id`.
+    ///
+    /// We're using `X::Input` instead of `node_id` as we reevaluating provisional
+    /// cache entries use the their highest head for this and we're already reevaluating
+    /// that one, so the pointed-to stack entry has a different `node_id` than the one
+    /// used when computing the provisional cache entry.
     pub(super) fn compute_rev_stack(
         &self,
         diff: &HashMap<NodeId, NodeId>,
@@ -168,16 +175,11 @@ impl<X: Cx> SearchTree<X> {
             }
             let node = &self.nodes[node_id];
             if node.info.input == until {
-                break;
+                return Some(rev_stack);
             }
 
             rev_stack.push(node.info);
-            if let Some(parent) = node.parent {
-                node_id = parent;
-            } else {
-                break;
-            }
+            node_id = node.parent.unwrap();
         }
-        Some(rev_stack)
     }
 }
