@@ -1225,7 +1225,6 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             has_been_used: None,
         });
 
-        let diff = self.tree.get_diff(prev_stack_entry.node_id);
         let mut cycles = self.tree.get_cycles(prev_stack_entry.node_id);
         for cycle in cycles {
             let cycle_node_id = self.tree.cycle_node_id(cycle);
@@ -1241,6 +1240,9 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 continue;
             };
 
+            // TODO: This should also check whether we've already reevaluated parts of its
+            // `rev_stack`.
+
             let result = match self.tree.node_kind_raw(cycle_node_id) {
                 tree::NodeKind::InProgress { .. }
                 | tree::NodeKind::Regular { .. }
@@ -1252,16 +1254,20 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 }
 
                 tree::NodeKind::ProvisionalCacheHit { entry_node_id } => {
-                    // if this provisional cache entry has been invalidated here, 
+                    // if this provisional cache entry has been invalidated above,
+                    // we need to reevaluate it
+
+                    // TODO: check that whether reevaluating it changed its result. What if
+                    // reevaluating it required us to drop it entirely. This feels impossible
+                    // as we've already recomputed the subgraph where we've computed this entry.
+                    //
+                    // We could simply reevaluate the parent of this access which then
+                    // goes through `reevaluate_provisional_cache_entries` instead
                 }
             };
+            // we've got a stack with a changed leaf, evaluate parent, if same, yeet stack and continue
+            // if not, pop parent and reevaluate
             // if on stack, reevaluate the parent goal:
-
-            // if provisional result and it has been invalidated:
-            // - prepare stack when evaluating the cache entry and recursively call `changed_provisional_result_reevaluate_goal`
-            //    - may have an entirely different stack, only sharing the initial part
-            //      - walking back to its highest head, then reuse stack as much as possible (should only matter as an opt)
-            // - if the provisional result has a different final result, recompute the parent goal
         }
 
         todo!();
@@ -1307,6 +1313,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         })
     }
 
+    // TODO: what does this do to the provisional cache?
     fn with_stashed_stack<R>(&mut self, parent: StackDepth, f: impl FnOnce(&mut Self) -> R) -> R {
         let stash: Vec<_> = self.stack.drain_children(parent).collect();
         let result = f(self);
