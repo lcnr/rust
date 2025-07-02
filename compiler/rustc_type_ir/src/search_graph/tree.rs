@@ -1,5 +1,4 @@
 use std::hash::Hash;
-use std::ops::Range;
 
 use derive_where::derive_where;
 use rustc_index::IndexVec;
@@ -7,7 +6,7 @@ use rustc_type_ir::data_structures::{HashMap, HashSet};
 
 use crate::search_graph::{AvailableDepth, Cx, CycleHeads, PathKind, Stack, StackDepth};
 
-#[derive_where(Debug, Clone, Copy; X: Cx)]
+#[derive_where(Debug, Clone, Copy, PartialEq, Eq, Hash; X: Cx)]
 pub(super) struct GoalInfo<X: Cx> {
     pub input: X::Input,
     pub step_kind_from_parent: PathKind,
@@ -20,15 +19,9 @@ rustc_index::newtype_index! {
     pub struct NodeId {} // TODO: private
 }
 
-rustc_index::newtype_index! {
-    #[orderable]
-    #[gate_rustc_only]
-    pub(super) struct CycleId {}
-}
-
 #[derive_where(Debug; X: Cx)]
 pub(super) enum NodeKind<X: Cx> {
-    InProgress { cycles_start: CycleId },
+    InProgress { cycles: Vec<Cycle<X>> },
     Finished { encountered_overflow: bool, heads: CycleHeads, result: X::Result },
     CycleOnStack { entry_node_id: NodeId, result: X::Result },
     ProvisionalCacheHit { entry_node_id: NodeId },
@@ -50,7 +43,6 @@ pub(super) struct Cycle<X: Cx> {
 #[derive_where(Debug, Default; X: Cx)]
 pub(super) struct SearchTree<X: Cx> {
     nodes: IndexVec<NodeId, Node<X>>,
-    cycles: IndexVec<CycleId, Cycle<X>>,
 }
 
 impl<X: Cx> SearchTree<X> {
@@ -63,11 +55,7 @@ impl<X: Cx> SearchTree<X> {
     ) -> NodeId {
         let info = GoalInfo { input, step_kind_from_parent, available_depth };
         let parent = stack.last().map(|e| e.node_id);
-        self.nodes.push(Node {
-            info,
-            parent,
-            kind: NodeKind::InProgress { cycles_start: self.cycles.next_index() },
-        })
+        self.nodes.push(Node { info, parent, kind: NodeKind::InProgress { cycles: vec![] } })
     }
 
     pub(super) fn global_cache_hit(&mut self, node_id: NodeId) {
@@ -78,14 +66,21 @@ impl<X: Cx> SearchTree<X> {
 
     pub(super) fn provisional_cache_hit(
         &mut self,
+        stack: &Stack<X>,
         node_id: NodeId,
         entry_node_id: NodeId,
-        provisional_results: HashMap<StackDepth, X::Result>,
+        heads: &CycleHeads,
+        mut provisional_results: impl FnMut() -> HashMap<StackDepth, X::Result>,
     ) {
         debug_assert_eq!(node_id, self.nodes.last_index().unwrap());
         debug_assert!(matches!(self.nodes[node_id].kind, NodeKind::InProgress { .. }));
-        self.cycles.push(Cycle { node_id, provisional_results });
         self.nodes[node_id].kind = NodeKind::ProvisionalCacheHit { entry_node_id };
+        for (h, _) in heads.iter() {
+            let head_node_id = stack[h].node_id;
+            if let NodeKind::InProgress { cycles } = &mut self.nodes[head_node_id].kind {
+                cycles.push(Cycle { node_id, provisional_results: provisional_results() });
+            };
+        }
     }
 
     pub(super) fn cycle_on_stack(
@@ -93,11 +88,13 @@ impl<X: Cx> SearchTree<X> {
         node_id: NodeId,
         entry_node_id: NodeId,
         result: X::Result,
-        provisional_results: HashMap<StackDepth, X::Result>,
+        mut provisional_results: impl FnMut() -> HashMap<StackDepth, X::Result>,
     ) {
         debug_assert_eq!(node_id, self.nodes.last_index().unwrap());
         debug_assert!(matches!(self.nodes[node_id].kind, NodeKind::InProgress { .. }));
-        self.cycles.push(Cycle { node_id, provisional_results });
+        if let NodeKind::InProgress { cycles } = &mut self.nodes[entry_node_id].kind {
+            cycles.push(Cycle { node_id, provisional_results: provisional_results() });
+        };
         self.nodes[node_id].kind = NodeKind::CycleOnStack { entry_node_id, result }
     }
 
@@ -108,14 +105,10 @@ impl<X: Cx> SearchTree<X> {
         heads: CycleHeads,
         result: X::Result,
     ) {
-        let NodeKind::InProgress { cycles_start: _ } = self.nodes[node_id].kind else {
+        let NodeKind::InProgress { cycles: _ } = self.nodes[node_id].kind else {
             panic!("unexpected node kind: {:?}", self.nodes[node_id]);
         };
         self.nodes[node_id].kind = NodeKind::Finished { encountered_overflow, heads, result }
-    }
-
-    pub(super) fn get_cycle(&self, cycle_id: CycleId) -> &Cycle<X> {
-        &self.cycles[cycle_id]
     }
 
     pub(super) fn node_kind_raw(&self, node_id: NodeId) -> &NodeKind<X> {
@@ -157,11 +150,9 @@ impl<X: Cx> SearchTree<X> {
         }
     }
 
-    pub(super) fn rerun_get_and_reset_cycles(&mut self, node_id: NodeId) -> Range<CycleId> {
-        if let NodeKind::InProgress { cycles_start, .. } = &mut self.nodes[node_id].kind {
-            let prev = *cycles_start;
-            *cycles_start = self.cycles.next_index();
-            prev..self.cycles.next_index()
+    pub(super) fn rerun_get_and_reset_cycles(&mut self, node_id: NodeId) -> Vec<Cycle<X>> {
+        if let NodeKind::InProgress { cycles, .. } = &mut self.nodes[node_id].kind {
+            std::mem::take(cycles)
         } else {
             panic!("unexpected node kind: {:?}", self.nodes[node_id]);
         }
@@ -179,15 +170,44 @@ impl<X: Cx> SearchTree<X> {
         &self,
         cycle_head: NodeId,
         was_reevaluated: &HashSet<NodeId>,
+        node_id: NodeId,
+    ) -> bool {
+        self.path_contains(cycle_head, node_id, |node_id| was_reevaluated.contains(&node_id))
+    }
+
+    pub(super) fn path_contains(
+        &self,
+        cycle_head: NodeId,
         mut node_id: NodeId,
+        mut cond: impl FnMut(NodeId) -> bool,
     ) -> bool {
         loop {
             if node_id == cycle_head {
                 return false;
-            } else if was_reevaluated.contains(&node_id) {
+            } else if cond(node_id) {
                 return true;
             } else {
                 node_id = self.nodes[node_id].parent.unwrap();
+            }
+        }
+    }
+
+    pub(super) fn uwu(
+        &self,
+        cycle_head: NodeId,
+        mut node_id: NodeId,
+        mut cond: impl FnMut(NodeId) -> bool,
+    ) -> Option<GoalInfo<X>> {
+        loop {
+            if node_id == cycle_head {
+                return None;
+            } else  {
+                let parent = self.nodes[node_id].parent.unwrap();
+                if cond(parent) {
+                    return Some(self.nodes[node_id].info);
+                } else {
+                    node_id = parent;
+                };
             }
         }
     }

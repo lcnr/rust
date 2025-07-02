@@ -197,7 +197,7 @@ impl UsageKind {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct AvailableDepth(usize);
 impl AvailableDepth {
     /// Returns the remaining depth allowed for nested goals.
@@ -934,12 +934,12 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 );
                 debug_assert!(self.stack[head].has_been_used.is_some());
                 debug!(?head, ?path_from_head, "provisional cache hit");
-                let provisional_results = self
-                    .stack
-                    .iter_enumerated()
-                    .filter_map(|(depth, entry)| entry.provisional_result.map(|r| (depth, r)))
-                    .collect();
-                self.tree.provisional_cache_hit(node_id, entry_node_id, provisional_results);
+                self.tree.provisional_cache_hit(&self.stack, node_id, entry_node_id, heads, || {
+                    self.stack
+                        .iter_enumerated()
+                        .filter_map(|(depth, entry)| entry.provisional_result.map(|r| (depth, r)))
+                        .collect()
+                });
                 return Some(result);
             }
         }
@@ -1106,12 +1106,12 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             .provisional_result
             .unwrap_or_else(|| D::initial_provisional_result(cx, path_kind, input));
 
-        let provisional_results = self
-            .stack
-            .iter_enumerated()
-            .filter_map(|(depth, entry)| entry.provisional_result.map(|r| (depth, r)))
-            .collect();
-        self.tree.cycle_on_stack(node_id, self.stack[head].node_id, result, provisional_results);
+        self.tree.cycle_on_stack(node_id, self.stack[head].node_id, result, || {
+            self.stack
+                .iter_enumerated()
+                .filter_map(|(depth, entry)| entry.provisional_result.map(|r| (depth, r)))
+                .collect()
+        });
         Some(result)
     }
 
@@ -1298,13 +1298,13 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             }
         };
 
-        let cycles = self.tree.rerun_get_and_reset_cycles(prev_stack_entry.node_id);
+        let mut cycles =
+            self.tree.rerun_get_and_reset_cycles(prev_stack_entry.node_id).into_iter().peekable();
         let current_stack_len = self.stack.len();
         let mut was_reevaluated = HashSet::default();
-        'outer: for cycle in cycles {
-            let &tree::Cycle { node_id: cycle_node_id, ref provisional_results } =
-                self.tree.get_cycle(cycle);
-
+        'outer: while let Some(tree::Cycle { node_id: cycle_node_id, provisional_results }) =
+            cycles.next()
+        {
             match self.tree.node_kind_raw(cycle_node_id) {
                 &tree::NodeKind::InProgress { .. } | &tree::NodeKind::Finished { .. } => {
                     unreachable!()
@@ -1425,6 +1425,34 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                     step_kind_from_parent = ?current_goal.1.step_kind_from_parent
                 );
                 let _span = span.enter();
+
+                let mut skipped_cycles = 0;
+                let mut nested_map: HashMap<_, Vec<_>> = HashMap::default();
+                while let Some(next_cycle) = cycles.peek() {
+                    // if the next cycle has `current_goal.0` as a parent, drop it
+                    if let Some(nested_info) = self.tree.uwu(node_id, next_cycle.node_id, |node_id| {
+                        node_id == current_goal.0
+                    }) {
+                        if self.stack.iter_enumerated().skip(current_stack_len).all(|(d, c)| {
+                            next_cycle.provisional_results.get(&d).copied() == c.provisional_result
+                        }) {
+                            debug!(next_cycle = ?next_cycle.node_id, "dropping next cycle");
+                            let next_cycle = cycles.next().unwrap();
+                            if next_cycle.provisional_results.get(&self.stack.next_index()).is_none() {
+                                nested_map.entry(nested_info).or_default().push(next_cycle);
+                            }   
+                            skipped_cycles += 1;
+                        } else {
+                            println!("wowsers");
+                            debug!(next_cycle = ?next_cycle, "cycle with different provisional results");
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                println!("skipped_cycles: {}, nested_map: {:?}", skipped_cycles, nested_map);
+
                 let (node_id, result) = self.evaluate_goal(
                     cx,
                     current_goal.1.input,
