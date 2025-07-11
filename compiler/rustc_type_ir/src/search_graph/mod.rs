@@ -625,6 +625,19 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
         let node_id =
             self.tree.create_node(&self.stack, input, step_kind_from_parent, available_depth);
+
+        // We check the provisional cache before checking the global cache. This simplifies
+        // the implementation as we can avoid worrying about cases where both the global and
+        // provisional cache may apply, e.g. consider the following example
+        //
+        // - xxBA overflow
+        // - A
+        //     - BA cycle
+        //     - CB :x:
+        if let Some(result) = self.lookup_provisional_cache(node_id, input, step_kind_from_parent) {
+            return result;
+        }
+
         self.evaluate_goal_raw(
             cx,
             node_id,
@@ -646,18 +659,6 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         has_been_used: Option<UsageKind>,
         inspect: &mut D::ProofTreeBuilder,
     ) -> X::Result {
-        // We check the provisional cache before checking the global cache. This simplifies
-        // the implementation as we can avoid worrying about cases where both the global and
-        // provisional cache may apply, e.g. consider the following example
-        //
-        // - xxBA overflow
-        // - A
-        //     - BA cycle
-        //     - CB :x:
-        if let Some(result) = self.lookup_provisional_cache(node_id, input, step_kind_from_parent) {
-            return result;
-        }
-
         // Lookup the global cache unless we're building proof trees or are currently
         // fuzzing.
         let validate_cache = if !D::inspect_is_noop(inspect) {
@@ -951,11 +952,6 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 );
                 debug_assert!(self.stack[head].has_been_used.is_some());
                 debug!(?head, ?path_from_head, "provisional cache hit");
-                self.tree.clear_cycles(node_id);
-                self.provisional_cache.retain(|_, entries| {
-                    entries.retain(|cache_entry| cache_entry.entry_node_id < node_id);
-                    !entries.is_empty()
-                });
                 self.tree.provisional_cache_hit(node_id, entry_node_id);
                 return Some(result);
             }
