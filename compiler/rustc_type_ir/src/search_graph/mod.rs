@@ -574,7 +574,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
     pub fn is_empty(&self) -> bool {
         if self.stack.is_empty() {
-            debug_assert!(self.provisional_cache.is_empty());
+            debug_assert!(self.provisional_cache.is_empty(), "{:?}", self.provisional_cache);
             true
         } else {
             false
@@ -625,7 +625,27 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
         let node_id =
             self.tree.create_node(&self.stack, input, step_kind_from_parent, available_depth);
+        self.evaluate_goal_raw(
+            cx,
+            node_id,
+            input,
+            step_kind_from_parent,
+            available_depth,
+            None,
+            inspect,
+        )
+    }
 
+    fn evaluate_goal_raw(
+        &mut self,
+        cx: X,
+        node_id: tree::NodeId,
+        input: X::Input,
+        step_kind_from_parent: PathKind,
+        available_depth: AvailableDepth,
+        has_been_used: Option<UsageKind>,
+        inspect: &mut D::ProofTreeBuilder,
+    ) -> X::Result {
         // We check the provisional cache before checking the global cache. This simplifies
         // the implementation as we can avoid worrying about cases where both the global and
         // provisional cache may apply, e.g. consider the following example
@@ -677,7 +697,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             required_depth: 0,
             heads: Default::default(),
             encountered_overflow: false,
-            has_been_used: None,
+            has_been_used,
             nested_goals: Default::default(),
             rerun_info: None,
         });
@@ -689,7 +709,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         // must not be added to the global cache. Notably, this is the case for
         // trait solver cycles participants.
         let (evaluation_result, dep_node) =
-            cx.with_cached_task(|| self.evaluate_goal_on_stack(cx, inspect));
+            cx.with_cached_task(|| self.evaluate_goal_in_task(cx, inspect));
 
         // We've finished computing the goal and have popped it from the stack,
         // lazily update its parent goal.
@@ -785,7 +805,10 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         let head = stack.next_index();
         #[allow(rustc::potential_query_instability)]
         provisional_cache.retain(|_, entries| {
-            entries.retain(|entry| entry.heads.highest_cycle_head() != head);
+            entries.retain(|entry| {
+                debug_assert!(entry.heads.highest_cycle_head() <= head);
+                entry.heads.highest_cycle_head() != head
+            });
             !entries.is_empty()
         });
     }
@@ -830,6 +853,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 let ep = if heads.highest_cycle_head() == popped_head {
                     heads.remove_highest_cycle_head()
                 } else {
+                    debug_assert!(entry.heads.highest_cycle_head() <= popped_head);
                     return true;
                 };
 
@@ -927,6 +951,11 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 );
                 debug_assert!(self.stack[head].has_been_used.is_some());
                 debug!(?head, ?path_from_head, "provisional cache hit");
+                self.tree.clear_cycles(node_id);
+                self.provisional_cache.retain(|_, entries| {
+                    entries.retain(|cache_entry| cache_entry.entry_node_id < node_id);
+                    !entries.is_empty()
+                });
                 self.tree.provisional_cache_hit(node_id, entry_node_id);
                 return Some(result);
             }
@@ -1118,7 +1147,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
     /// of this we continuously recompute the cycle until the result
     /// of the previous iteration is equal to the final result, at which
     /// point we are done.
-    fn evaluate_goal_on_stack(
+    fn evaluate_goal_in_task(
         &mut self,
         cx: X,
         inspect: &mut D::ProofTreeBuilder,
@@ -1289,22 +1318,35 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
             let mut rev_stack = self.tree.compute_rev_stack(cycle_id, node_id).into_iter();
             let leaf = rev_stack.next().unwrap();
-            let mut path_to_leaf = rev_stack.rev();
-            for depth in (current_depth.as_usize()..).map(StackDepth::from_usize) {
+            let mut path_to_leaf: std::iter::Rev<std::vec::IntoIter<tree::RevStackEntry<X>>> =
+                rev_stack.rev();
+            for depth in (next_depth.as_usize()..).map(StackDepth::from_usize) {
                 let entry = match (path_to_leaf.next(), self.stack.get(depth)) {
                     (Some(cycle_entry), Some(stack_entry)) => {
-                        if cycle_entry.node_id == stack_entry.node_id
+                        if cycle_entry.node_id == stack_entry.rerun_info.unwrap().0
                             && cycle_entry.provisional_result == stack_entry.provisional_result
                         {
                             continue;
                         } else {
-                            self.pop_stack_until(cx, &mut needs_reeval, &mut did_fully_reeval, depth, inspect);
+                            self.pop_stack_until(
+                                cx,
+                                &mut needs_reeval,
+                                &mut did_fully_reeval,
+                                depth,
+                                inspect,
+                            );
                             cycle_entry
                         }
                     }
                     (Some(cycle_entry), None) => cycle_entry,
                     (None, Some(_)) => {
-                        self.pop_stack_until(cx, &mut needs_reeval, &mut did_fully_reeval, depth, inspect);
+                        self.pop_stack_until(
+                            cx,
+                            &mut needs_reeval,
+                            &mut did_fully_reeval,
+                            depth,
+                            inspect,
+                        );
                         break;
                     }
                     (None, None) => break,
@@ -1338,8 +1380,11 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             let next_node_id = self.tree.next_node_id();
             self.evaluate_goal(cx, leaf.info.input, leaf.info.step_kind_from_parent, inspect);
             if !self.tree.result_matches(leaf.node_id, next_node_id) {
+                debug!("leaf has changed");
                 needs_reeval.push(self.stack.last_index().unwrap());
                 needs_reeval.dedup();
+            } else {
+                debug!("leaf has not changed");
             }
         }
 
@@ -1367,23 +1412,98 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         depth: StackDepth,
         inspect: &mut D::ProofTreeBuilder,
     ) {
+        debug!(?self.stack, ?depth);
         while self.stack.len() > depth.as_usize() {
-            if *needs_reeval.last().unwrap() == self.stack.last_index().unwrap() {
-                if self.stack.last().unwrap().provisional_result.is_some() {
-                    todo!();
+            let entry = self.stack.pop();
+            let (prev, is_final_iteration) = entry.rerun_info.unwrap();
+            Self::update_parent_goal(
+                &mut self.stack,
+                entry.step_kind_from_parent,
+                entry.required_depth,
+                &entry.heads,
+                entry.encountered_overflow,
+                UpdateParentGoalCtxt::Ordinary(&entry.nested_goals),
+            );
+            if needs_reeval.last().is_some_and(|&index| index == self.stack.next_index()) {
+                needs_reeval.pop();
+                if entry.provisional_result.is_some() {
+                    self.tree.clear_cycles(entry.node_id);
+                    #[allow(rustc::potential_query_instability)]
+                    self.provisional_cache.retain(|_, entries| {
+                        entries.retain(|cache_entry| cache_entry.entry_node_id < entry.node_id);
+                        !entries.is_empty()
+                    });
                 }
 
-                let (prev_node, is_final_iteration) = self.stack.last().unwrap().rerun_info.unwrap();
-                let reeval_result   = self.evaluate_goal_on_stack(cx, inspect);
-                if !self.tree.result_matches(prev_node, reeval_result.node_id) {
-
-                } else {
+                did_fully_reeval.insert(entry.node_id);
+                let span = tracing::debug_span!("reevaluate_goal", input = ?entry.input, step_kind_from_parent = ?entry.step_kind_from_parent);
+                {
+                    let _span = span.enter();
+                    self.evaluate_goal_raw(
+                        cx,
+                        entry.node_id,
+                        entry.input,
+                        entry.step_kind_from_parent,
+                        entry.available_depth,
+                        entry.has_been_used,
+                        inspect,
+                    );
+                }
+                if !self.tree.result_matches(entry.rerun_info.unwrap().0, entry.node_id) {
+                    debug!("has changed");
                     needs_reeval.push(self.stack.last_index().unwrap());
+                    needs_reeval.dedup();
+                } else {
+                    debug!("has not changed");
                 }
             } else {
-                let entry = self.stack.pop();
-                let (orig, is_final_iteration) = entry.rerun_info.unwrap();
-                if is_final_iteration
+                let &tree::NodeKind::Finished {
+                    encountered_overflow,
+                    ref heads,
+                    final_result,
+                    step_results: _,
+                    rebase_entries_kind,
+                } = self.tree.node_kind_raw(prev)
+                else {
+                    panic!("unexpected node kind: {:?}", self.tree.node_kind_raw(prev));
+                };
+                match rebase_entries_kind.filter(|_| is_final_iteration) {
+                    Some(tree::RebaseEntriesKind::Normal) => {
+                        Self::rebase_provisional_cache_entries(
+                            &self.stack,
+                            &mut self.provisional_cache,
+                            &entry,
+                            |_, result| result,
+                        )
+                    }
+                    Some(tree::RebaseEntriesKind::Ambiguity) => {
+                        Self::rebase_provisional_cache_entries(
+                            &self.stack,
+                            &mut self.provisional_cache,
+                            &entry,
+                            |input, result| D::propagate_ambiguity(cx, input, result),
+                        )
+                    }
+                    Some(tree::RebaseEntriesKind::Overflow) => {
+                        Self::rebase_provisional_cache_entries(
+                            &self.stack,
+                            &mut self.provisional_cache,
+                            &entry,
+                            |input, _| D::on_fixpoint_overflow(cx, input),
+                        )
+                    }
+                    None => Self::clear_dependent_provisional_results(
+                        &self.stack,
+                        &mut self.provisional_cache,
+                    ),
+                }
+
+                self.tree.finish_evaluation(
+                    entry.node_id,
+                    encountered_overflow,
+                    heads.clone(),
+                    final_result,
+                );
             };
         }
     }

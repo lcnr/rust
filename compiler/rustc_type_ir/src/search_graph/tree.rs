@@ -3,7 +3,6 @@ use std::ops::Range;
 
 use derive_where::derive_where;
 use rustc_index::IndexVec;
-use rustc_type_ir::data_structures::{HashMap, HashSet};
 
 use crate::search_graph::{AvailableDepth, Cx, CycleHeads, PathKind, Stack, StackDepth};
 
@@ -84,14 +83,12 @@ impl<X: Cx> SearchTree<X> {
     ) -> NodeId {
         let info = GoalInfo { input, step_kind_from_parent, available_depth };
         let parent = stack.last().map(|e| {
-            if let NodeKind::InProgress {
-            cycles_start: _,
-            step_results,
-            rebase_entries_kind: _,
-            } = &self.nodes[e.node_id].kind {
+            if let NodeKind::InProgress { cycles_start: _, step_results, rebase_entries_kind: _ } =
+                &self.nodes[e.node_id].kind
+            {
                 let rerun = step_results.len();
-                 (rerun, e.node_id)
-            }else {
+                (rerun, e.node_id)
+            } else {
                 panic!("unexpected node kind: {:?}", self.nodes[e.node_id]);
             }
         });
@@ -113,12 +110,7 @@ impl<X: Cx> SearchTree<X> {
         self.nodes.pop();
     }
 
-    pub(super) fn provisional_cache_hit(
-        &mut self,
-        node_id: NodeId,
-        entry_node_id: NodeId,
-    ) {
-        debug_assert_eq!(node_id, self.nodes.last_index().unwrap());
+    pub(super) fn provisional_cache_hit(&mut self, node_id: NodeId, entry_node_id: NodeId) {
         debug_assert!(matches!(self.nodes[node_id].kind, NodeKind::InProgress { .. }));
         self.cycles.push(node_id);
         self.nodes[node_id].kind = NodeKind::ProvisionalCacheHit { entry_node_id };
@@ -143,11 +135,8 @@ impl<X: Cx> SearchTree<X> {
         heads: CycleHeads,
         final_result: X::Result,
     ) {
-        let NodeKind::InProgress {
-            cycles_start: _,
-            step_results,
-            rebase_entries_kind,
-        } = &mut self.nodes[node_id].kind
+        let NodeKind::InProgress { cycles_start: _, step_results, rebase_entries_kind } =
+            &mut self.nodes[node_id].kind
         else {
             panic!("unexpected node kind: {:?}", self.nodes[node_id]);
         };
@@ -169,21 +158,11 @@ impl<X: Cx> SearchTree<X> {
         &self.nodes[node_id].kind
     }
 
-    pub(super) fn current_rerun(&self, node_id: NodeId) -> (usize, X::Result) {
-                if let NodeKind::InProgress {
-            cycles_start: _,
-            step_results,
-            rebase_entries_kind: _,
-        } = &self.nodes[node_id].kind
-        {
-            (step_results.len(), *step_results.last().unwrap())
-        } else {
-            panic!("unexpected node kind: {:?}", self.nodes[node_id]);
-        }
-    }
-
     pub(super) fn result_matches(&self, prev: NodeId, new: NodeId) -> bool {
-        match (&self.nodes[prev].kind, &self.nodes[new].kind) {
+        let Some(new_node) = self.nodes.get(new) else {
+            return false;
+        };
+        match (&self.nodes[prev].kind, &new_node.kind) {
             (
                 NodeKind::Finished {
                     step_results: _,
@@ -223,14 +202,21 @@ impl<X: Cx> SearchTree<X> {
     }
 
     pub(super) fn set_rebase_kind(&mut self, node_id: NodeId, rebase_kind: RebaseEntriesKind) {
-        if let NodeKind::InProgress {
-            cycles_start: _,
-            step_results: _,
-            rebase_entries_kind,
-        } = &mut self.nodes[node_id].kind
+        if let NodeKind::InProgress { cycles_start: _, step_results: _, rebase_entries_kind } =
+            &mut self.nodes[node_id].kind
         {
             let prev = rebase_entries_kind.replace(rebase_kind);
             debug_assert!(prev.is_none());
+        } else {
+            panic!("unexpected node kind: {:?}", self.nodes[node_id]);
+        }
+    }
+
+    pub(super) fn clear_cycles(&mut self, node_id: NodeId) {
+        if let NodeKind::InProgress { cycles_start, step_results: _, rebase_entries_kind: _ } =
+            &mut self.nodes[node_id].kind
+        {
+            self.cycles.truncate(cycles_start.as_usize());
         } else {
             panic!("unexpected node kind: {:?}", self.nodes[node_id]);
         }
@@ -241,11 +227,8 @@ impl<X: Cx> SearchTree<X> {
         node_id: NodeId,
         provisional_result: X::Result,
     ) -> Range<CycleId> {
-        if let NodeKind::InProgress {
-            cycles_start,
-            step_results,
-            rebase_entries_kind,
-        } = &mut self.nodes[node_id].kind
+        if let NodeKind::InProgress { cycles_start, step_results, rebase_entries_kind } =
+            &mut self.nodes[node_id].kind
         {
             debug_assert!(rebase_entries_kind.is_none());
             let prev = *cycles_start;
@@ -281,23 +264,6 @@ impl<X: Cx> SearchTree<X> {
         }
     }
 
-    pub(super) fn goal_or_parent_was_reevaluated(
-        &self,
-        cycle_head: NodeId,
-        was_reevaluated: &HashSet<NodeId>,
-        mut node_id: NodeId,
-    ) -> bool {
-        loop {
-            if node_id == cycle_head {
-                return false;
-            } else if was_reevaluated.contains(&node_id) {
-                return true;
-            } else {
-                node_id = self.nodes[node_id].parent.unwrap().1;
-            }
-        }
-    }
-
     /// Compute the list of parents of `node_id` until encountering the node
     /// `until`. We're excluding `until` and are including `node_id`.
     pub(super) fn compute_rev_stack(
@@ -309,20 +275,32 @@ impl<X: Cx> SearchTree<X> {
         let mut rerun = 0usize;
         loop {
             if node_id == until {
+                tracing::debug!(?rev_stack);
                 return rev_stack;
             }
 
             let node = &self.nodes[node_id];
-            let NodeKind::Finished { step_results, .. } = &node.kind else {
-                panic!("unexpected node kind: {:?}", self.nodes[node_id]);
+            let (provisional_result, is_final_iteration) = match &node.kind {
+                NodeKind::InProgress { .. } => unreachable!(),
+                NodeKind::Finished { step_results, .. } => (
+                    rerun.checked_sub(1).map(|prev| step_results[prev]),
+                    rerun == step_results.len(),
+                ),
+                NodeKind::CycleOnStack { .. } => (None, true),
+                NodeKind::ProvisionalCacheHit { .. } => (None, true),
             };
-            let provisional_result = rerun.checked_sub(1).map(|prev| step_results[prev]);
-            rev_stack.push(RevStackEntry { node_id, info: node.info, is_final_iteration: rerun == step_results.len(), provisional_result });
+            rev_stack.push(RevStackEntry {
+                node_id,
+                info: node.info,
+                is_final_iteration,
+                provisional_result,
+            });
             (rerun, node_id) = node.parent.unwrap();
         }
     }
 }
 
+#[derive_where(Debug; X: Cx)]
 pub(super) struct RevStackEntry<X: Cx> {
     pub node_id: NodeId,
     pub info: GoalInfo<X>,

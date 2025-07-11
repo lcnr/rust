@@ -105,10 +105,6 @@ impl<X: Cx> Stack<X> {
         self.entries.iter()
     }
 
-    pub(super) fn iter_enumerated(&self) -> impl Iterator<Item = (StackDepth, &StackEntry<X>)> {
-        self.entries.iter_enumerated()
-    }
-
     pub(super) fn find(&self, input: X::Input) -> Option<StackDepth> {
         self.entries.iter_enumerated().find(|(_, e)| e.input == input).map(|(idx, _)| idx)
     }
