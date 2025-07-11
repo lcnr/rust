@@ -98,7 +98,7 @@ impl<X: Cx> Stack<X> {
     }
 
     pub(super) fn cycle_step_kinds(&self, head: StackDepth) -> impl Iterator<Item = PathKind> {
-        self.entries.raw[head.index() + 1..].iter().map(|entry| entry.step_kind_from_parent)
+        self.entries.raw[head.index()..].iter().skip(1).map(|entry| entry.step_kind_from_parent)
     }
 
     pub(super) fn iter(&self) -> impl Iterator<Item = &StackEntry<X>> {

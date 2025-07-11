@@ -766,7 +766,11 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 result,
             };
             for e in &*entry {
-                if e.encountered_overflow == provisional_cache_entry.encountered_overflow && e.heads.heads == provisional_cache_entry.heads.heads && e.path_from_head == provisional_cache_entry.path_from_head && e.result == provisional_cache_entry.result {
+                if e.encountered_overflow == provisional_cache_entry.encountered_overflow
+                    && e.heads.heads == provisional_cache_entry.heads.heads
+                    && e.path_from_head == provisional_cache_entry.path_from_head
+                    && e.result == provisional_cache_entry.result
+                {
                     println!("duplicate!");
                     return result;
                 }
@@ -960,8 +964,15 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 debug!(?head, ?path_from_head, "provisional cache hit");
 
                 self.tree.clear_cycles(node_id);
+                #[allow(rustc::potential_query_instability)]
                 self.provisional_cache.retain(|_, entries| {
-                    entries.retain(|e| !self.tree.parent_at_depth(e.entry_node_id, self.stack.next_index(), node_id));
+                    entries.retain(|e| {
+                        !self.tree.parent_at_depth(
+                            e.entry_node_id,
+                            self.stack.next_index(),
+                            node_id,
+                        )
+                    });
                     !entries.is_empty()
                 });
                 self.tree.provisional_cache_hit(node_id, entry_node_id);
@@ -1202,32 +1213,32 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             return EvaluationResult::finalize(stack_entry, encountered_overflow, result);
         }
 
-        // If computing this goal results in ambiguity with no constraints,
-        // we do not rerun it. It's incredibly difficult to get a different
-        // response in the next iteration in this case. These changes would
-        // likely either be caused by incompleteness or can change the maybe
-        // cause from ambiguity to overflow. Returning ambiguity always
-        // preserves soundness and completeness even if the goal is be known
-        // to succeed or fail.
-        //
-        // This prevents exponential blowup affecting multiple major crates.
-        // As we only get to this branch if we haven't yet reached a fixpoint,
-        // we also taint all provisional cache entries which depend on the
-        // current goal.
-        if D::is_ambiguous_result(result) {
-            Self::rebase_provisional_cache_entries(
-                &self.stack,
-                &mut self.provisional_cache,
-                &stack_entry,
-                |input, _| D::propagate_ambiguity(cx, input, result),
-            );
-
-            self.tree.set_rebase_kind(stack_entry.node_id, tree::RebaseEntriesKind::Ambiguity);
-            return EvaluationResult::finalize(stack_entry, encountered_overflow, result);
-        };
-
         let mut i = 0;
         loop {
+            // If computing this goal results in ambiguity with no constraints,
+            // we do not rerun it. It's incredibly difficult to get a different
+            // response in the next iteration in this case. These changes would
+            // likely either be caused by incompleteness or can change the maybe
+            // cause from ambiguity to overflow. Returning ambiguity always
+            // preserves soundness and completeness even if the goal is be known
+            // to succeed or fail.
+            //
+            // This prevents exponential blowup affecting multiple major crates.
+            // As we only get to this branch if we haven't yet reached a fixpoint,
+            // we also taint all provisional cache entries which depend on the
+            // current goal.
+            if D::is_ambiguous_result(result) {
+                Self::rebase_provisional_cache_entries(
+                    &self.stack,
+                    &mut self.provisional_cache,
+                    &stack_entry,
+                    |input, _| D::propagate_ambiguity(cx, input, result),
+                );
+
+                self.tree.set_rebase_kind(stack_entry.node_id, tree::RebaseEntriesKind::Ambiguity);
+                return EvaluationResult::finalize(stack_entry, encountered_overflow, result);
+            };
+
             // If we've reached the fixpoint step limit, we bail with overflow and taint all
             // provisional cache entries which depend on the current goal.
             i += 1;
@@ -1377,6 +1388,8 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                         entry.info.step_kind_from_parent,
                         entry.info.available_depth,
                     );
+                    let mut heads = CycleHeads::default();
+                    heads.insert(current_depth, PathsToNested::COINDUCTIVE);
                     self.stack.push(StackEntry {
                         node_id,
                         input: entry.info.input,
@@ -1384,7 +1397,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                         available_depth: entry.info.available_depth,
                         provisional_result: entry.provisional_result,
                         required_depth: 0,
-                        heads: Default::default(),
+                        heads,
                         encountered_overflow: false,
                         has_been_used: None,
                         nested_goals: NestedGoals::default(),
@@ -1483,35 +1496,37 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 else {
                     panic!("unexpected node kind: {:?}", self.tree.node_kind_raw(prev));
                 };
-                match rebase_entries_kind.filter(|_| is_final_iteration) {
-                    Some(tree::RebaseEntriesKind::Normal) => {
-                        Self::rebase_provisional_cache_entries(
+                if entry.has_been_used.is_some() {
+                    match rebase_entries_kind.filter(|_| is_final_iteration) {
+                        Some(tree::RebaseEntriesKind::Normal) => {
+                            Self::rebase_provisional_cache_entries(
+                                &self.stack,
+                                &mut self.provisional_cache,
+                                &entry,
+                                |_, result| result,
+                            )
+                        }
+                        Some(tree::RebaseEntriesKind::Ambiguity) => {
+                            Self::rebase_provisional_cache_entries(
+                                &self.stack,
+                                &mut self.provisional_cache,
+                                &entry,
+                                |input, result| D::propagate_ambiguity(cx, input, result),
+                            )
+                        }
+                        Some(tree::RebaseEntriesKind::Overflow) => {
+                            Self::rebase_provisional_cache_entries(
+                                &self.stack,
+                                &mut self.provisional_cache,
+                                &entry,
+                                |input, _| D::on_fixpoint_overflow(cx, input),
+                            )
+                        }
+                        None => Self::clear_dependent_provisional_results(
                             &self.stack,
                             &mut self.provisional_cache,
-                            &entry,
-                            |_, result| result,
-                        )
+                        ),
                     }
-                    Some(tree::RebaseEntriesKind::Ambiguity) => {
-                        Self::rebase_provisional_cache_entries(
-                            &self.stack,
-                            &mut self.provisional_cache,
-                            &entry,
-                            |input, result| D::propagate_ambiguity(cx, input, result),
-                        )
-                    }
-                    Some(tree::RebaseEntriesKind::Overflow) => {
-                        Self::rebase_provisional_cache_entries(
-                            &self.stack,
-                            &mut self.provisional_cache,
-                            &entry,
-                            |input, _| D::on_fixpoint_overflow(cx, input),
-                        )
-                    }
-                    None => Self::clear_dependent_provisional_results(
-                        &self.stack,
-                        &mut self.provisional_cache,
-                    ),
                 }
 
                 self.tree.finish_evaluation(

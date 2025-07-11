@@ -105,9 +105,8 @@ impl<X: Cx> SearchTree<X> {
     }
 
     pub(super) fn global_cache_hit(&mut self, node_id: NodeId) {
-        debug_assert_eq!(node_id, self.nodes.last_index().unwrap());
         debug_assert!(matches!(self.nodes[node_id].kind, NodeKind::InProgress { .. }));
-        self.nodes.pop();
+        self.nodes.truncate(node_id.as_usize());
     }
 
     pub(super) fn provisional_cache_hit(&mut self, node_id: NodeId, entry_node_id: NodeId) {
@@ -194,6 +193,9 @@ impl<X: Cx> SearchTree<X> {
             (_, &NodeKind::ProvisionalCacheHit { entry_node_id }) => {
                 self.result_matches(prev, entry_node_id)
             }
+            n @ (NodeKind::InProgress { .. }, _) | n @ (_, NodeKind::InProgress { .. }) => {
+                unreachable!("comparing result of in-progress nodes: {n:?}")
+            }
             result_matches => {
                 tracing::debug!(?result_matches);
                 false
@@ -240,7 +242,12 @@ impl<X: Cx> SearchTree<X> {
         }
     }
 
-    pub(super) fn parent_at_depth(&self, mut node_id: NodeId, depth: StackDepth, parent: NodeId) -> bool {
+    pub(super) fn parent_at_depth(
+        &self,
+        mut node_id: NodeId,
+        depth: StackDepth,
+        parent: NodeId,
+    ) -> bool {
         while self.nodes[node_id].at_depth > depth {
             node_id = self.nodes[node_id].parent.unwrap().1;
         }
