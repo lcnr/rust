@@ -240,6 +240,13 @@ impl<X: Cx> SearchTree<X> {
         }
     }
 
+    pub(super) fn parent_at_depth(&self, mut node_id: NodeId, depth: StackDepth, parent: NodeId) -> bool {
+        while self.nodes[node_id].at_depth > depth {
+            node_id = self.nodes[node_id].parent.unwrap().1;
+        }
+        node_id == parent
+    }
+
     pub(super) fn node_depends_on_head(&self, mut node_id: NodeId, head: StackDepth) -> bool {
         loop {
             let heads = self.get_heads(node_id);
