@@ -21,14 +21,16 @@ use std::marker::PhantomData;
 use derive_where::derive_where;
 #[cfg(feature = "nightly")]
 use rustc_macros::{Decodable_NoContext, Encodable_NoContext, HashStable_NoContext};
-use rustc_type_ir::data_structures::HashMap;
+use rustc_type_ir::data_structures::{HashMap, HashSet};
 use tracing::{debug, instrument};
 
 mod stack;
 use stack::{Stack, StackDepth, StackEntry};
 mod global_cache;
+mod tree;
 use global_cache::CacheData;
 pub use global_cache::GlobalCache;
+use tree::SearchTree;
 
 /// The search graph does not simply use `Interner` directly
 /// to enable its fuzzing without having to stub the rest of
@@ -282,6 +284,10 @@ impl CycleHeads {
             self.insert(head, path_from_entry.extend_with(step_kind));
         }
     }
+
+    fn contains(&self, other: &CycleHeads) -> bool {
+        other.heads.iter().all(|(h, &path)| self.heads.get(h).is_some_and(|p| p.contains(path)))
+    }
 }
 
 bitflags::bitflags! {
@@ -436,6 +442,7 @@ impl<X: Cx> NestedGoals<X> {
 /// goals still on the stack.
 #[derive_where(Debug; X: Cx)]
 struct ProvisionalCacheEntry<X: Cx> {
+    entry_node_id: tree::NodeId,
     /// Whether evaluating the goal encountered overflow. This is used to
     /// disable the cache entry except if the last goal on the stack is
     /// already involved in this cycle.
@@ -459,6 +466,7 @@ struct ProvisionalCacheEntry<X: Cx> {
 /// evaluation.
 #[derive_where(Debug; X: Cx)]
 struct EvaluationResult<X: Cx> {
+    node_id: tree::NodeId,
     encountered_overflow: bool,
     required_depth: usize,
     heads: CycleHeads,
@@ -473,13 +481,15 @@ impl<X: Cx> EvaluationResult<X> {
         result: X::Result,
     ) -> EvaluationResult<X> {
         EvaluationResult {
-            encountered_overflow,
+            encountered_overflow: final_entry.encountered_overflow | encountered_overflow,
             // Unlike `encountered_overflow`, we share `heads`, `required_depth`,
             // and `nested_goals` between evaluations.
             required_depth: final_entry.required_depth,
             heads: final_entry.heads,
             nested_goals: final_entry.nested_goals,
-            // We only care about the final result.
+            // The `node_id` should stay the same between all iterations, we just
+            // use the final one.
+            node_id: final_entry.node_id,
             result,
         }
     }
@@ -496,6 +506,8 @@ pub struct SearchGraph<D: Delegate<Cx = X>, X: Cx = <D as Delegate>::Cx> {
     /// global cache and track them locally instead. A provisional cache entry
     /// is only valid until the result of one of its cycle heads changes.
     provisional_cache: HashMap<X::Input, Vec<ProvisionalCacheEntry<X>>>,
+
+    tree: SearchTree<X>,
 
     _marker: PhantomData<D>,
 }
@@ -520,6 +532,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             root_depth: AvailableDepth(root_depth),
             stack: Default::default(),
             provisional_cache: Default::default(),
+            tree: Default::default(),
             _marker: PhantomData,
         }
     }
@@ -574,6 +587,11 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         self.stack.len()
     }
 
+    /// This should only be used for debugging purposes.
+    pub fn debug_stack(&self) -> &impl std::fmt::Debug {
+        &self.stack
+    }
+
     /// Whether the path from `head` to the current stack entry is inductive or coinductive.
     ///
     /// The `step_kind_to_head` is used to add a single additional path segment to the path on
@@ -605,6 +623,9 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             return self.handle_overflow(cx, input, inspect);
         };
 
+        let node_id =
+            self.tree.create_node(&self.stack, input, step_kind_from_parent, available_depth);
+
         // We check the provisional cache before checking the global cache. This simplifies
         // the implementation as we can avoid worrying about cases where both the global and
         // provisional cache may apply, e.g. consider the following example
@@ -613,7 +634,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         // - A
         //     - BA cycle
         //     - CB :x:
-        if let Some(result) = self.lookup_provisional_cache(input, step_kind_from_parent) {
+        if let Some(result) = self.lookup_provisional_cache(node_id, input, step_kind_from_parent) {
             return result;
         }
 
@@ -630,7 +651,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 .inspect(|expected| debug!(?expected, "validate cache entry"))
                 .map(|r| (scope, r))
         } else if let Some(result) =
-            self.lookup_global_cache(cx, input, step_kind_from_parent, available_depth)
+            self.lookup_global_cache(cx, node_id, input, step_kind_from_parent, available_depth)
         {
             return result;
         } else {
@@ -641,13 +662,14 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         // avoid iterating over the stack in case a goal has already been computed.
         // This may not have an actual performance impact and we could reorder them
         // as it may reduce the number of `nested_goals` we need to track.
-        if let Some(result) = self.check_cycle_on_stack(cx, input, step_kind_from_parent) {
+        if let Some(result) = self.check_cycle_on_stack(cx, node_id, input, step_kind_from_parent) {
             debug_assert!(validate_cache.is_none(), "global cache and cycle on stack: {input:?}");
             return result;
         }
 
         // Unfortunate, it looks like we actually have to compute this goal.
         self.stack.push(StackEntry {
+            node_id,
             input,
             step_kind_from_parent,
             available_depth,
@@ -657,6 +679,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             encountered_overflow: false,
             has_been_used: None,
             nested_goals: Default::default(),
+            rerun_info: None,
         });
 
         // This is for global caching, so we properly track query dependencies.
@@ -666,7 +689,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         // must not be added to the global cache. Notably, this is the case for
         // trait solver cycles participants.
         let (evaluation_result, dep_node) =
-            cx.with_cached_task(|| self.evaluate_goal_in_task(cx, input, inspect));
+            cx.with_cached_task(|| self.evaluate_goal_on_stack(cx, inspect));
 
         // We've finished computing the goal and have popped it from the stack,
         // lazily update its parent goal.
@@ -677,6 +700,14 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             &evaluation_result.heads,
             evaluation_result.encountered_overflow,
             UpdateParentGoalCtxt::Ordinary(&evaluation_result.nested_goals),
+        );
+        // FIXME: Cloning the cycle heads here is quite ass. We should make cycle heads
+        // CoW and use reference counting.
+        self.tree.finish_evaluation(
+            evaluation_result.node_id,
+            evaluation_result.encountered_overflow,
+            evaluation_result.heads.clone(),
+            evaluation_result.result,
         );
         let result = evaluation_result.result;
 
@@ -694,6 +725,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             debug_assert!(validate_cache.is_none(), "unexpected non-root: {input:?}");
             let entry = self.provisional_cache.entry(input).or_default();
             let EvaluationResult {
+                node_id,
                 encountered_overflow,
                 required_depth: _,
                 heads,
@@ -705,8 +737,13 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 step_kind_from_parent,
                 heads.highest_cycle_head(),
             );
-            let provisional_cache_entry =
-                ProvisionalCacheEntry { encountered_overflow, heads, path_from_head, result };
+            let provisional_cache_entry = ProvisionalCacheEntry {
+                entry_node_id: node_id,
+                encountered_overflow,
+                heads,
+                path_from_head,
+                result,
+            };
             debug!(?provisional_cache_entry);
             entry.push(provisional_cache_entry);
         } else {
@@ -741,10 +778,13 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
     /// When reevaluating a goal with a changed provisional result, all provisional cache entry
     /// which depend on this goal get invalidated.
-    fn clear_dependent_provisional_results(&mut self) {
-        let head = self.stack.next_index();
+    fn clear_dependent_provisional_results(
+        stack: &Stack<X>,
+        provisional_cache: &mut HashMap<X::Input, Vec<ProvisionalCacheEntry<X>>>,
+    ) {
+        let head = stack.next_index();
         #[allow(rustc::potential_query_instability)]
-        self.provisional_cache.retain(|_, entries| {
+        provisional_cache.retain(|_, entries| {
             entries.retain(|entry| entry.heads.highest_cycle_head() != head);
             !entries.is_empty()
         });
@@ -771,15 +811,17 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
     /// goals whose result doesn't actually depend on this cycle head, but that's acceptable
     /// to me.
     fn rebase_provisional_cache_entries(
-        &mut self,
+        stack: &Stack<X>,
+        provisional_cache: &mut HashMap<X::Input, Vec<ProvisionalCacheEntry<X>>>,
         stack_entry: &StackEntry<X>,
         mut mutate_result: impl FnMut(X::Input, X::Result) -> X::Result,
     ) {
-        let popped_head = self.stack.next_index();
+        let popped_head = stack.next_index();
         #[allow(rustc::potential_query_instability)]
-        self.provisional_cache.retain(|&input, entries| {
+        provisional_cache.retain(|&input, entries| {
             entries.retain_mut(|entry| {
                 let ProvisionalCacheEntry {
+                    entry_node_id: _,
                     encountered_overflow: _,
                     heads,
                     path_from_head,
@@ -800,8 +842,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 // to make sure that forall possible paths `hep` and `heph`
                 // is equal to `hph.`
                 for (h, ph) in stack_entry.heads.iter() {
-                    let hp =
-                        Self::cycle_path_kind(&self.stack, stack_entry.step_kind_from_parent, h);
+                    let hp = Self::cycle_path_kind(&stack, stack_entry.step_kind_from_parent, h);
                     let hph = ph.extend_with(hp);
                     let he = hp.extend(*path_from_head);
                     let hep = ep.extend_with(he);
@@ -823,13 +864,14 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 // We now care about the path from the next highest cycle head to the
                 // provisional cache entry.
                 *path_from_head = path_from_head.extend(Self::cycle_path_kind(
-                    &self.stack,
+                    &stack,
                     stack_entry.step_kind_from_parent,
                     head,
                 ));
                 // Mutate the result of the provisional cache entry in case we did
                 // not reach a fixpoint.
                 *result = mutate_result(input, *result);
+                debug!(?input, ?entry, "rebased entry");
                 true
             });
             !entries.is_empty()
@@ -838,6 +880,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
     fn lookup_provisional_cache(
         &mut self,
+        node_id: tree::NodeId,
         input: X::Input,
         step_kind_from_parent: PathKind,
     ) -> Option<X::Result> {
@@ -846,8 +889,13 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         }
 
         let entries = self.provisional_cache.get(&input)?;
-        for &ProvisionalCacheEntry { encountered_overflow, ref heads, path_from_head, result } in
-            entries
+        for &ProvisionalCacheEntry {
+            entry_node_id,
+            encountered_overflow,
+            ref heads,
+            path_from_head,
+            result,
+        } in entries
         {
             let head = heads.highest_cycle_head();
             if encountered_overflow {
@@ -879,6 +927,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 );
                 debug_assert!(self.stack[head].has_been_used.is_some());
                 debug!(?head, ?path_from_head, "provisional cache hit");
+                self.tree.provisional_cache_hit(node_id, entry_node_id);
                 return Some(result);
             }
         }
@@ -919,6 +968,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             // A provisional cache entry is applicable if the path to
             // its highest cycle head is equal to the expected path.
             for &ProvisionalCacheEntry {
+                entry_node_id: _,
                 encountered_overflow,
                 ref heads,
                 path_from_head: head_to_provisional,
@@ -977,6 +1027,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
     fn lookup_global_cache(
         &mut self,
         cx: X,
+        node_id: tree::NodeId,
         input: X::Input,
         step_kind_from_parent: PathKind,
         available_depth: AvailableDepth,
@@ -1000,6 +1051,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             );
 
             debug!(?required_depth, "global cache hit");
+            self.tree.global_cache_hit(node_id);
             Some(result)
         })
     }
@@ -1007,6 +1059,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
     fn check_cycle_on_stack(
         &mut self,
         cx: X,
+        node_id: tree::NodeId,
         input: X::Input,
         step_kind_from_parent: PathKind,
     ) -> Option<X::Result> {
@@ -1037,16 +1090,15 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
 
         // Return the provisional result or, if we're in the first iteration,
         // start with no constraints.
-        if let Some(result) = self.stack[head].provisional_result {
-            Some(result)
-        } else {
-            Some(D::initial_provisional_result(cx, path_kind, input))
-        }
+        let result = self.stack[head]
+            .provisional_result
+            .unwrap_or_else(|| D::initial_provisional_result(cx, path_kind, input));
+        self.tree.cycle_on_stack(node_id, self.stack[head].node_id, result);
+        Some(result)
     }
 
     /// Whether we've reached a fixpoint when evaluating a cycle head.
     fn reached_fixpoint(
-        &mut self,
         cx: X,
         stack_entry: &StackEntry<X>,
         usage_kind: UsageKind,
@@ -1066,101 +1118,273 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
     /// of this we continuously recompute the cycle until the result
     /// of the previous iteration is equal to the final result, at which
     /// point we are done.
-    fn evaluate_goal_in_task(
+    fn evaluate_goal_on_stack(
         &mut self,
         cx: X,
-        input: X::Input,
         inspect: &mut D::ProofTreeBuilder,
     ) -> EvaluationResult<X> {
-        // We reset `encountered_overflow` each time we rerun this goal
-        // but need to make sure we currently propagate it to the global
-        // cache even if only some of the evaluations actually reach the
-        // recursion limit.
-        let mut encountered_overflow = false;
+        let input = self.stack.last().unwrap().input;
+        let mut result = D::compute_goal(self, cx, input, inspect);
+        let mut stack_entry = self.stack.pop();
+        let mut encountered_overflow = stack_entry.encountered_overflow;
+        debug_assert_eq!(stack_entry.input, input);
+        // If the current goal is not the root of a cycle, we are done.
+        //
+        // There are no provisional cache entries which depend on this goal.
+        let Some(usage_kind) = stack_entry.has_been_used else {
+            return EvaluationResult::finalize(stack_entry, encountered_overflow, result);
+        };
+
+        // If it is a cycle head, we have to keep trying to prove it until
+        // we reach a fixpoint. We need to do so for all cycle heads,
+        // not only for the root.
+        //
+        // See tests/ui/traits/next-solver/cycles/fixpoint-rerun-all-cycle-heads.rs
+        // for an example.
+        //
+        // Check whether we reached a fixpoint, either because the final result
+        // is equal to the provisional result of the previous iteration, or because
+        // this was only the root of either coinductive or inductive cycles, and the
+        // final result is equal to the initial response for that case.
+        if Self::reached_fixpoint(cx, &stack_entry, usage_kind, result) {
+            Self::rebase_provisional_cache_entries(
+                &self.stack,
+                &mut self.provisional_cache,
+                &stack_entry,
+                |_, result| result,
+            );
+            self.tree.set_rebase_kind(stack_entry.node_id, tree::RebaseEntriesKind::Normal);
+            return EvaluationResult::finalize(stack_entry, encountered_overflow, result);
+        }
+
+        // If computing this goal results in ambiguity with no constraints,
+        // we do not rerun it. It's incredibly difficult to get a different
+        // response in the next iteration in this case. These changes would
+        // likely either be caused by incompleteness or can change the maybe
+        // cause from ambiguity to overflow. Returning ambiguity always
+        // preserves soundness and completeness even if the goal is be known
+        // to succeed or fail.
+        //
+        // This prevents exponential blowup affecting multiple major crates.
+        // As we only get to this branch if we haven't yet reached a fixpoint,
+        // we also taint all provisional cache entries which depend on the
+        // current goal.
+        if D::is_ambiguous_result(result) {
+            Self::rebase_provisional_cache_entries(
+                &self.stack,
+                &mut self.provisional_cache,
+                &stack_entry,
+                |input, _| D::propagate_ambiguity(cx, input, result),
+            );
+
+            self.tree.set_rebase_kind(stack_entry.node_id, tree::RebaseEntriesKind::Ambiguity);
+            return EvaluationResult::finalize(stack_entry, encountered_overflow, result);
+        };
+
         let mut i = 0;
         loop {
-            let result = D::compute_goal(self, cx, input, inspect);
-            let stack_entry = self.stack.pop();
-            encountered_overflow |= stack_entry.encountered_overflow;
-            debug_assert_eq!(stack_entry.input, input);
-
-            // If the current goal is not the root of a cycle, we are done.
-            //
-            // There are no provisional cache entries which depend on this goal.
-            let Some(usage_kind) = stack_entry.has_been_used else {
-                return EvaluationResult::finalize(stack_entry, encountered_overflow, result);
-            };
-
-            // If it is a cycle head, we have to keep trying to prove it until
-            // we reach a fixpoint. We need to do so for all cycle heads,
-            // not only for the root.
-            //
-            // See tests/ui/traits/next-solver/cycles/fixpoint-rerun-all-cycle-heads.rs
-            // for an example.
-            //
-            // Check whether we reached a fixpoint, either because the final result
-            // is equal to the provisional result of the previous iteration, or because
-            // this was only the root of either coinductive or inductive cycles, and the
-            // final result is equal to the initial response for that case.
-            if self.reached_fixpoint(cx, &stack_entry, usage_kind, result) {
-                self.rebase_provisional_cache_entries(&stack_entry, |_, result| result);
-                return EvaluationResult::finalize(stack_entry, encountered_overflow, result);
-            }
-
-            // If computing this goal results in ambiguity with no constraints,
-            // we do not rerun it. It's incredibly difficult to get a different
-            // response in the next iteration in this case. These changes would
-            // likely either be caused by incompleteness or can change the maybe
-            // cause from ambiguity to overflow. Returning ambiguity always
-            // preserves soundness and completeness even if the goal is be known
-            // to succeed or fail.
-            //
-            // This prevents exponential blowup affecting multiple major crates.
-            // As we only get to this branch if we haven't yet reached a fixpoint,
-            // we also taint all provisional cache entries which depend on the
-            // current goal.
-            if D::is_ambiguous_result(result) {
-                self.rebase_provisional_cache_entries(&stack_entry, |input, _| {
-                    D::propagate_ambiguity(cx, input, result)
-                });
-                return EvaluationResult::finalize(stack_entry, encountered_overflow, result);
-            };
-
             // If we've reached the fixpoint step limit, we bail with overflow and taint all
             // provisional cache entries which depend on the current goal.
             i += 1;
+            debug!(?i, ?result, "changed provisional results");
             if i >= D::FIXPOINT_STEP_LIMIT {
-                debug!("canonical cycle overflow");
-                let result = D::on_fixpoint_overflow(cx, input);
-                self.rebase_provisional_cache_entries(&stack_entry, |input, _| {
-                    D::on_fixpoint_overflow(cx, input)
-                });
+                debug!(?result, "canonical cycle overflow");
+                let result = D::on_fixpoint_overflow(cx, stack_entry.input);
+                Self::rebase_provisional_cache_entries(
+                    &self.stack,
+                    &mut self.provisional_cache,
+                    &stack_entry,
+                    |input, _| D::on_fixpoint_overflow(cx, input),
+                );
+                self.tree.set_rebase_kind(stack_entry.node_id, tree::RebaseEntriesKind::Overflow);
                 return EvaluationResult::finalize(stack_entry, encountered_overflow, result);
             }
 
-            // Clear all provisional cache entries which depend on a previous provisional
-            // result of this goal and rerun.
-            self.clear_dependent_provisional_results();
+            match self.reevaluate_goal_step(cx, stack_entry, result, inspect) {
+                (new_stack_entry, new_result) => {
+                    if new_result == result {
+                        Self::rebase_provisional_cache_entries(
+                            &self.stack,
+                            &mut self.provisional_cache,
+                            &new_stack_entry,
+                            |_, result| result,
+                        );
+                        self.tree.set_rebase_kind(
+                            new_stack_entry.node_id,
+                            tree::RebaseEntriesKind::Normal,
+                        );
+                        return EvaluationResult::finalize(
+                            new_stack_entry,
+                            encountered_overflow,
+                            result,
+                        );
+                    } else {
+                        result = new_result;
+                        encountered_overflow |= new_stack_entry.encountered_overflow;
+                        stack_entry = new_stack_entry;
+                    }
+                }
+            }
+        }
+    }
 
-            debug!(?result, "fixpoint changed provisional results");
-            self.stack.push(StackEntry {
-                input,
-                step_kind_from_parent: stack_entry.step_kind_from_parent,
-                available_depth: stack_entry.available_depth,
-                provisional_result: Some(result),
-                // We can keep these goals from previous iterations as they are only
-                // ever read after finalizing this evaluation.
-                required_depth: stack_entry.required_depth,
-                heads: stack_entry.heads,
-                nested_goals: stack_entry.nested_goals,
-                // We reset these two fields when rerunning this goal. We could
-                // keep `encountered_overflow` as it's only used as a performance
-                // optimization. However, given that the proof tree will likely look
-                // similar to the previous iterations when reevaluating, it's better
-                // for caching if the reevaluation also starts out with `false`.
-                encountered_overflow: false,
-                has_been_used: None,
-            });
+    fn reevaluate_goal_step(
+        &mut self,
+        cx: X,
+        prev_stack_entry: StackEntry<X>,
+        provisional_result: X::Result,
+        inspect: &mut D::ProofTreeBuilder,
+    ) -> (StackEntry<X>, X::Result) {
+        let node_id = prev_stack_entry.node_id;
+        let current_depth = self.stack.next_index();
+        // Clear all provisional cache entries which depend on a previous provisional
+        // result of this goal and rerun.
+        Self::clear_dependent_provisional_results(&self.stack, &mut self.provisional_cache);
+        self.stack.push(StackEntry {
+            node_id,
+            input: prev_stack_entry.input,
+            step_kind_from_parent: prev_stack_entry.step_kind_from_parent,
+            available_depth: prev_stack_entry.available_depth,
+            required_depth: prev_stack_entry.required_depth,
+            heads: prev_stack_entry.heads,
+            nested_goals: prev_stack_entry.nested_goals,
+            provisional_result: Some(provisional_result),
+            encountered_overflow: false,
+            has_been_used: None,
+            rerun_info: None,
+        });
+        let next_depth = self.stack.next_index();
+
+        if !D::ENABLE_PROVISIONAL_CACHE {
+            let result = D::compute_goal(self, cx, prev_stack_entry.input, inspect);
+            let reeval_entry = self.stack.pop();
+            return (reeval_entry, result);
+        }
+
+        let mut needs_reeval = vec![];
+        let mut did_fully_reeval = HashSet::default();
+        'cycles: for cycle in self.tree.rerun_get_and_reset_cycles(node_id, provisional_result) {
+            let cycle_id = self.tree.get_cycle(cycle);
+
+            match *self.tree.node_kind_raw(cycle_id) {
+                tree::NodeKind::InProgress { .. } | tree::NodeKind::Finished { .. } => {
+                    unreachable!()
+                }
+                tree::NodeKind::CycleOnStack { entry_node_id, result: _ } => {
+                    if entry_node_id != node_id {
+                        continue 'cycles;
+                    }
+                }
+                tree::NodeKind::ProvisionalCacheHit { entry_node_id } => {
+                    // The cache entry does not depend on the goal we're rerunning right now.
+                    if entry_node_id < node_id {
+                        continue 'cycles;
+                    }
+
+                    if !self.tree.node_depends_on_head(entry_node_id, current_depth) {
+                        continue 'cycles;
+                    }
+                }
+            }
+
+            let mut rev_stack = self.tree.compute_rev_stack(cycle_id, node_id).into_iter();
+            let leaf = rev_stack.next().unwrap();
+            let mut path_to_leaf = rev_stack.rev();
+            for depth in (current_depth.as_usize()..).map(StackDepth::from_usize) {
+                let entry = match (path_to_leaf.next(), self.stack.get(depth)) {
+                    (Some(cycle_entry), Some(stack_entry)) => {
+                        if cycle_entry.node_id == stack_entry.node_id
+                            && cycle_entry.provisional_result == stack_entry.provisional_result
+                        {
+                            continue;
+                        } else {
+                            self.pop_stack_until(cx, &mut needs_reeval, &mut did_fully_reeval, depth, inspect);
+                            cycle_entry
+                        }
+                    }
+                    (Some(cycle_entry), None) => cycle_entry,
+                    (None, Some(_)) => {
+                        self.pop_stack_until(cx, &mut needs_reeval, &mut did_fully_reeval, depth, inspect);
+                        break;
+                    }
+                    (None, None) => break,
+                };
+
+                if did_fully_reeval.contains(&entry.node_id) {
+                    continue 'cycles;
+                } else {
+                    let node_id = self.tree.create_node(
+                        &self.stack,
+                        entry.info.input,
+                        entry.info.step_kind_from_parent,
+                        entry.info.available_depth,
+                    );
+                    self.stack.push(StackEntry {
+                        node_id,
+                        input: entry.info.input,
+                        step_kind_from_parent: entry.info.step_kind_from_parent,
+                        available_depth: entry.info.available_depth,
+                        provisional_result: entry.provisional_result,
+                        required_depth: 0,
+                        heads: Default::default(),
+                        encountered_overflow: false,
+                        has_been_used: None,
+                        nested_goals: NestedGoals::default(),
+                        rerun_info: Some((entry.node_id, entry.is_final_iteration)),
+                    });
+                }
+            }
+
+            let next_node_id = self.tree.next_node_id();
+            self.evaluate_goal(cx, leaf.info.input, leaf.info.step_kind_from_parent, inspect);
+            if !self.tree.result_matches(leaf.node_id, next_node_id) {
+                needs_reeval.push(self.stack.last_index().unwrap());
+                needs_reeval.dedup();
+            }
+        }
+
+        self.pop_stack_until(cx, &mut needs_reeval, &mut did_fully_reeval, next_depth, inspect);
+        match needs_reeval.as_slice() {
+            &[d] => {
+                debug_assert_eq!(d, current_depth);
+                let result = D::compute_goal(self, cx, prev_stack_entry.input, inspect);
+                let reeval_entry = self.stack.pop();
+                (reeval_entry, result)
+            }
+            [] => {
+                let unchanged_entry = self.stack.pop();
+                (unchanged_entry, provisional_result)
+            }
+            _ => unreachable!("unexpected needs_reeval: {needs_reeval:?}"),
+        }
+    }
+
+    fn pop_stack_until(
+        &mut self,
+        cx: X,
+        needs_reeval: &mut Vec<StackDepth>,
+        did_fully_reeval: &mut HashSet<tree::NodeId>,
+        depth: StackDepth,
+        inspect: &mut D::ProofTreeBuilder,
+    ) {
+        while self.stack.len() > depth.as_usize() {
+            if *needs_reeval.last().unwrap() == self.stack.last_index().unwrap() {
+                if self.stack.last().unwrap().provisional_result.is_some() {
+                    todo!();
+                }
+
+                let (prev_node, is_final_iteration) = self.stack.last().unwrap().rerun_info.unwrap();
+                let reeval_result   = self.evaluate_goal_on_stack(cx, inspect);
+                if !self.tree.result_matches(prev_node, reeval_result.node_id) {
+
+                } else {
+                    needs_reeval.push(self.stack.last_index().unwrap());
+                }
+            } else {
+                let entry = self.stack.pop();
+                let (orig, is_final_iteration) = entry.rerun_info.unwrap();
+                if is_final_iteration
+            };
         }
     }
 
