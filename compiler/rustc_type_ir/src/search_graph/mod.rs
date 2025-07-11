@@ -181,6 +181,13 @@ impl From<PathKind> for UsageKind {
         UsageKind::Single(path)
     }
 }
+impl From<PathsToNested> for UsageKind {
+    fn from(paths: PathsToNested) -> Self {
+        let mut paths = paths.iter_paths();
+        let p = paths.next().unwrap();
+        if paths.next().is_some() { UsageKind::Mixed } else { UsageKind::Single(p) }
+    }
+}
 impl UsageKind {
     #[must_use]
     fn merge(self, other: impl Into<Self>) -> Self {
@@ -864,7 +871,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 let ep = if heads.highest_cycle_head() == popped_head {
                     heads.remove_highest_cycle_head()
                 } else {
-                    debug_assert!(entry.heads.highest_cycle_head() <= popped_head);
+                    debug_assert!(entry.heads.highest_cycle_head() < popped_head);
                     return true;
                 };
 
@@ -1441,7 +1448,6 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         depth: StackDepth,
         inspect: &mut D::ProofTreeBuilder,
     ) {
-        debug!(?self.stack, ?depth);
         while self.stack.len() > depth.as_usize() {
             let entry = self.stack.pop();
             let (prev, is_final_iteration) = entry.rerun_info.unwrap();
@@ -1496,7 +1502,12 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 else {
                     panic!("unexpected node kind: {:?}", self.tree.node_kind_raw(prev));
                 };
+                let heads = heads.clone();
                 if entry.has_been_used.is_some() {
+                    // TODO: is this necessary?
+                    if let Some(rebase_entries_kind) = rebase_entries_kind {
+                        self.tree.set_rebase_kind(entry.node_id, rebase_entries_kind);
+                    }
                     match rebase_entries_kind.filter(|_| is_final_iteration) {
                         Some(tree::RebaseEntriesKind::Normal) => {
                             Self::rebase_provisional_cache_entries(
@@ -1535,7 +1546,46 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                     heads.clone(),
                     final_result,
                 );
-            };
+
+                let cache_entry = self.provisional_cache.entry(entry.input).or_default();
+                let path_from_head = Self::cycle_path_kind(
+                    &self.stack,
+                    entry.step_kind_from_parent,
+                    heads.highest_cycle_head(),
+                );
+                for (head, path) in heads.iter() {
+                    let path_from_head =
+                        Self::cycle_path_kind(&self.stack, entry.step_kind_from_parent, head);
+                    let usage_kind = path.extend_with(path_from_head).into();
+                    self.stack[head].has_been_used = Some(
+                        self.stack[head]
+                            .has_been_used
+                            .map_or(usage_kind, |prev| prev.merge(usage_kind)),
+                    );
+                }
+                let provisional_cache_entry = ProvisionalCacheEntry {
+                    entry_node_id: entry.node_id,
+                    encountered_overflow,
+                    heads,
+                    path_from_head,
+                    result: final_result,
+                };
+
+                let mut has_dups = false;
+                for e in &*cache_entry {
+                    if e.encountered_overflow == provisional_cache_entry.encountered_overflow
+                        && e.heads.heads == provisional_cache_entry.heads.heads
+                        && e.path_from_head == provisional_cache_entry.path_from_head
+                        && e.result == provisional_cache_entry.result
+                    {
+                        has_dups = true;
+                    }
+                }
+                if !has_dups {
+                    debug!(?provisional_cache_entry);
+                    cache_entry.push(provisional_cache_entry);
+                }
+            }
         }
     }
 
