@@ -13,7 +13,9 @@ use tracing::{debug, instrument, trace};
 
 use crate::delegate::SolverDelegate;
 use crate::solve::assembly::structural_traits::{self, AsyncCallableRelevantTypes};
-use crate::solve::assembly::{self, AllowInferenceConstraints, AssembleCandidatesFrom, Candidate};
+use crate::solve::assembly::{
+    self, AllowInferenceConstraints, AssembleCandidatesFrom, Candidate, FastRejectAssumptionMode,
+};
 use crate::solve::inspect::ProbeKind;
 use crate::solve::{
     BuiltinImplSource, CandidateSource, Certainty, EvalCtxt, Goal, GoalSource, MaybeCause,
@@ -126,6 +128,7 @@ where
         ecx: &mut EvalCtxt<'_, D>,
         goal: Goal<I, Self>,
         assumption: I::Clause,
+        mode: FastRejectAssumptionMode,
     ) -> Result<(), NoSolution> {
         fn trait_def_id_matches<I: Interner>(
             cx: I,
@@ -144,12 +147,25 @@ where
         if let Some(trait_clause) = assumption.as_trait_clause()
             && trait_clause.polarity() == goal.predicate.polarity
             && trait_def_id_matches(ecx.cx(), trait_clause.def_id(), goal.predicate.def_id())
-            && DeepRejectCtxt::relate_rigid_rigid(ecx.cx()).args_may_unify(
-                goal.predicate.trait_ref.args,
-                trait_clause.skip_binder().trait_ref.args,
-            )
         {
-            return Ok(());
+            if match mode {
+                FastRejectAssumptionMode::Normalizable => {
+                    DeepRejectCtxt::relate_rigid_rigid(ecx.cx()).args_may_unify(
+                        goal.predicate.trait_ref.args,
+                        trait_clause.skip_binder().trait_ref.args,
+                    )
+                }
+                FastRejectAssumptionMode::Rigid => {
+                    DeepRejectCtxt::relate_rigid_normalized(ecx.cx()).args_may_unify(
+                        goal.predicate.trait_ref.args,
+                        trait_clause.skip_binder().trait_ref.args,
+                    )
+                }
+            } {
+                Ok(())
+            } else {
+                Err(NoSolution)
+            }
         } else {
             Err(NoSolution)
         }

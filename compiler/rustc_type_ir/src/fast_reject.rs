@@ -46,6 +46,7 @@ pub enum SimplifiedType<DefId> {
     Function(usize),
     UnsafeBinder,
     Placeholder,
+    Alias(DefId),
     Error,
 }
 
@@ -151,13 +152,13 @@ pub fn simplify_type<I: Interner>(
             TreatParams::AsRigid => Some(SimplifiedType::Placeholder),
             TreatParams::InstantiateWithInfer => None,
         },
-        ty::Alias(..) => match treat_params {
+        ty::Alias(_, alias) => match treat_params {
             // When treating `ty::Param` as a placeholder, projections also
             // don't unify with anything else as long as they are fully normalized.
             TreatParams::AsRigid
                 if !ty.has_non_region_infer() || cx.next_trait_solver_globally() =>
             {
-                Some(SimplifiedType::Placeholder)
+                Some(SimplifiedType::Alias(alias.def_id))
             }
             TreatParams::AsRigid | TreatParams::InstantiateWithInfer => None,
         },
@@ -196,6 +197,7 @@ pub struct DeepRejectCtxt<
     I: Interner,
     const INSTANTIATE_LHS_WITH_INFER: bool,
     const INSTANTIATE_RHS_WITH_INFER: bool,
+    const RIGID_RHS: bool = false,
 > {
     _interner: PhantomData<I>,
 }
@@ -203,6 +205,13 @@ pub struct DeepRejectCtxt<
 impl<I: Interner> DeepRejectCtxt<I, false, false> {
     /// Treat parameters in both the lhs and the rhs as rigid.
     pub fn relate_rigid_rigid(_interner: I) -> DeepRejectCtxt<I, false, false> {
+        DeepRejectCtxt { _interner: PhantomData }
+    }
+}
+
+impl<I: Interner> DeepRejectCtxt<I, false, false, true> {
+    /// Treat parameters in both the lhs and the rhs as rigid.
+    pub fn relate_rigid_normalized(_interner: I) -> DeepRejectCtxt<I, false, true> {
         DeepRejectCtxt { _interner: PhantomData }
     }
 }
@@ -221,8 +230,12 @@ impl<I: Interner> DeepRejectCtxt<I, false, true> {
     }
 }
 
-impl<I: Interner, const INSTANTIATE_LHS_WITH_INFER: bool, const INSTANTIATE_RHS_WITH_INFER: bool>
-    DeepRejectCtxt<I, INSTANTIATE_LHS_WITH_INFER, INSTANTIATE_RHS_WITH_INFER>
+impl<
+    I: Interner,
+    const INSTANTIATE_LHS_WITH_INFER: bool,
+    const INSTANTIATE_RHS_WITH_INFER: bool,
+    const RIGID_RHS: bool,
+> DeepRejectCtxt<I, INSTANTIATE_LHS_WITH_INFER, INSTANTIATE_RHS_WITH_INFER, RIGID_RHS>
 {
     // Quite arbitrary. Large enough to only affect a very tiny amount of impls/crates
     // and small enough to prevent hangs.
@@ -278,6 +291,11 @@ impl<I: Interner, const INSTANTIATE_LHS_WITH_INFER: bool, const INSTANTIATE_RHS_
             // pretty much everything. Just return `true` in that case.
             ty::Param(_) => {
                 if INSTANTIATE_RHS_WITH_INFER {
+                    return true;
+                }
+            }
+            ty::Alias(ty::AliasTyKind::Projection, ..) => {
+                if !RIGID_RHS {
                     return true;
                 }
             }

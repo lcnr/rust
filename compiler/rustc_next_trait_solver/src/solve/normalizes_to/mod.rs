@@ -12,7 +12,7 @@ use tracing::instrument;
 
 use crate::delegate::SolverDelegate;
 use crate::solve::assembly::structural_traits::{self, AsyncCallableRelevantTypes};
-use crate::solve::assembly::{self, Candidate};
+use crate::solve::assembly::{self, Candidate, FastRejectAssumptionMode};
 use crate::solve::inspect::ProbeKind;
 use crate::solve::{
     BuiltinImplSource, CandidateSource, Certainty, EvalCtxt, Goal, GoalSource, MaybeCause,
@@ -111,15 +111,29 @@ where
         ecx: &mut EvalCtxt<'_, D>,
         goal: Goal<I, Self>,
         assumption: I::Clause,
+        mode: FastRejectAssumptionMode,
     ) -> Result<(), NoSolution> {
         if let Some(projection_pred) = assumption.as_projection_clause()
             && projection_pred.item_def_id() == goal.predicate.def_id()
-            && DeepRejectCtxt::relate_rigid_rigid(ecx.cx()).args_may_unify(
-                goal.predicate.alias.args,
-                projection_pred.skip_binder().projection_term.args,
-            )
         {
-            Ok(())
+            if match mode {
+                FastRejectAssumptionMode::Normalizable => {
+                    DeepRejectCtxt::relate_rigid_rigid(ecx.cx()).args_may_unify(
+                        goal.predicate.alias.args,
+                        projection_pred.skip_binder().projection_term.args,
+                    )
+                }
+                FastRejectAssumptionMode::Rigid => {
+                    DeepRejectCtxt::relate_rigid_normalized(ecx.cx()).args_may_unify(
+                        goal.predicate.alias.args,
+                        projection_pred.skip_binder().projection_term.args,
+                    )
+                }
+            } {
+                Ok(())
+            } else {
+                Err(NoSolution)
+            }
         } else {
             Err(NoSolution)
         }

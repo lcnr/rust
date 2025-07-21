@@ -39,6 +39,11 @@ pub(super) struct Candidate<I: Interner> {
     pub(super) result: CanonicalResponse<I>,
 }
 
+pub(super) enum FastRejectAssumptionMode {
+    Normalizable,
+    Rigid,
+}
+
 /// Methods used to assemble candidates for either trait or projection goals.
 pub(super) trait GoalKind<D, I = <D as SolverDelegate>::Interner>:
     TypeFoldable<I> + Copy + Eq + std::fmt::Display
@@ -117,7 +122,7 @@ where
         goal: Goal<I, Self>,
         assumption: I::Clause,
     ) -> Result<Candidate<I>, NoSolution> {
-        Self::fast_reject_assumption(ecx, goal, assumption)?;
+        Self::fast_reject_assumption(ecx, goal, assumption, FastRejectAssumptionMode::Rigid)?;
 
         // Dealing with `ParamEnv` candidates is a bit of a mess as we need to lazily
         // check whether the candidate is global while considering normalization.
@@ -150,7 +155,12 @@ where
         assumption: I::Clause,
         then: impl FnOnce(&mut EvalCtxt<'_, D>) -> QueryResult<I>,
     ) -> Result<Candidate<I>, NoSolution> {
-        Self::fast_reject_assumption(ecx, goal, assumption)?;
+        Self::fast_reject_assumption(
+            ecx,
+            goal,
+            assumption,
+            FastRejectAssumptionMode::Normalizable,
+        )?;
 
         ecx.probe_trait_candidate(source)
             .enter(|ecx| Self::match_assumption(ecx, goal, assumption, then))
@@ -162,6 +172,7 @@ where
         ecx: &mut EvalCtxt<'_, D>,
         goal: Goal<I, Self>,
         assumption: I::Clause,
+        mode: FastRejectAssumptionMode,
     ) -> Result<(), NoSolution>;
 
     /// Relate the goal and assumption.

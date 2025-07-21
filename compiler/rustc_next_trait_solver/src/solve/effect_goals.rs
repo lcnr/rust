@@ -11,6 +11,7 @@ use tracing::instrument;
 
 use super::assembly::{Candidate, structural_traits};
 use crate::delegate::SolverDelegate;
+use crate::solve::assembly::FastRejectAssumptionMode;
 use crate::solve::{
     BuiltinImplSource, CandidateSource, Certainty, EvalCtxt, Goal, GoalSource, NoSolution,
     QueryResult, assembly,
@@ -41,16 +42,30 @@ where
         ecx: &mut EvalCtxt<'_, D>,
         goal: Goal<I, Self>,
         assumption: I::Clause,
+        mode: FastRejectAssumptionMode,
     ) -> Result<(), NoSolution> {
         if let Some(host_clause) = assumption.as_host_effect_clause()
             && host_clause.def_id() == goal.predicate.def_id()
             && host_clause.constness().satisfies(goal.predicate.constness)
-            && DeepRejectCtxt::relate_rigid_rigid(ecx.cx()).args_may_unify(
-                goal.predicate.trait_ref.args,
-                host_clause.skip_binder().trait_ref.args,
-            )
         {
-            Ok(())
+            if match mode {
+                FastRejectAssumptionMode::Normalizable => {
+                    DeepRejectCtxt::relate_rigid_rigid(ecx.cx()).args_may_unify(
+                        goal.predicate.trait_ref.args,
+                        host_clause.skip_binder().trait_ref.args,
+                    )
+                }
+                FastRejectAssumptionMode::Rigid => {
+                    DeepRejectCtxt::relate_rigid_normalized(ecx.cx()).args_may_unify(
+                        goal.predicate.trait_ref.args,
+                        host_clause.skip_binder().trait_ref.args,
+                    )
+                }
+            } {
+                Ok(())
+            } else {
+                Err(NoSolution)
+            }
         } else {
             Err(NoSolution)
         }
