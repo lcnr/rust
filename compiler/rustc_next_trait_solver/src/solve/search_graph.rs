@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use rustc_type_ir::data_structures::ensure_sufficient_stack;
 use rustc_type_ir::search_graph::{self, PathKind};
-use rustc_type_ir::solve::{CanonicalInput, Certainty, NoSolution, QueryResult};
+use rustc_type_ir::solve::{CanonicalInput, Certainty, MaybeCause, NoSolution, QueryResult};
 use rustc_type_ir::{Interner, TypingMode};
 
 use crate::delegate::SolverDelegate;
@@ -96,6 +96,17 @@ where
         result.is_ok_and(|response| {
             has_no_inference_or_external_constraints(response)
                 && matches!(response.value.certainty, Certainty::Maybe(_))
+        })
+    }
+    fn is_overflow_result(result: QueryResult<I>) -> bool {
+        result.is_ok_and(|response| {
+            matches!(
+                response.value.certainty,
+                Certainty::Maybe(MaybeCause::Overflow {
+                    suggest_increasing_limit: _,
+                    keep_constraints: _
+                })
+            )
         })
     }
 

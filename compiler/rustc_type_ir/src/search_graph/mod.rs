@@ -103,6 +103,7 @@ pub trait Delegate: Sized {
     ) -> <Self::Cx as Cx>::Result;
 
     fn is_ambiguous_result(result: <Self::Cx as Cx>::Result) -> bool;
+    fn is_overflow_result(result: <Self::Cx as Cx>::Result) -> bool;
     fn propagate_ambiguity(
         cx: Self::Cx,
         for_input: <Self::Cx as Cx>::Input,
@@ -240,7 +241,7 @@ impl AvailableDepth {
                 return None;
             }
 
-            Some(if last.encountered_overflow {
+            Some(if last.lower_nested_depth {
                 AvailableDepth(last.available_depth.0 / D::DIVIDE_AVAILABLE_DEPTH_ON_OVERFLOW)
             } else {
                 AvailableDepth(last.available_depth.0 - 1)
@@ -521,6 +522,10 @@ enum UpdateParentGoalCtxt<'a, X: Cx> {
     ProvisionalCacheHit,
 }
 
+pub struct ProbeInfo {
+    lower_nested_depth: bool,
+}
+
 impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
     pub fn new(root_depth: usize) -> SearchGraph<D> {
         Self {
@@ -541,12 +546,14 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         required_depth_for_nested: usize,
         heads: &CycleHeads,
         encountered_overflow: bool,
+        result_was_overflow: bool,
         context: UpdateParentGoalCtxt<'_, X>,
     ) {
         if let Some(parent_index) = stack.last_index() {
             let parent = &mut stack[parent_index];
             parent.required_depth = parent.required_depth.max(required_depth_for_nested + 1);
             parent.encountered_overflow |= encountered_overflow;
+            parent.lower_nested_depth |= result_was_overflow;
 
             parent.heads.extend_from_child(parent_index, step_kind_from_parent, heads);
             let parent_depends_on_cycle = match context {
@@ -592,6 +599,15 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
         head: StackDepth,
     ) -> PathKind {
         stack.cycle_step_kinds(head).fold(step_kind_to_head, |curr, step| curr.extend(step))
+    }
+
+    pub fn probe_start(&mut self) -> ProbeInfo {
+        let entry = self.stack.last().unwrap();
+        ProbeInfo { lower_nested_depth: entry.lower_nested_depth }
+    }
+    pub fn probe_end(&mut self, info: ProbeInfo) {
+        let entry = self.stack.last_mut().unwrap();
+        entry.lower_nested_depth = info.lower_nested_depth;
     }
 
     /// Probably the most involved method of the whole solver.
@@ -662,6 +678,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             required_depth: 0,
             heads: Default::default(),
             encountered_overflow: false,
+            lower_nested_depth: false,
             has_been_used: None,
             nested_goals: Default::default(),
         });
@@ -683,6 +700,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
             evaluation_result.required_depth,
             &evaluation_result.heads,
             evaluation_result.encountered_overflow,
+            D::is_overflow_result(evaluation_result.result),
             UpdateParentGoalCtxt::Ordinary(&evaluation_result.nested_goals),
         );
         let result = evaluation_result.result;
@@ -875,6 +893,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                     0,
                     heads,
                     encountered_overflow,
+                    D::is_overflow_result(result),
                     UpdateParentGoalCtxt::ProvisionalCacheHit,
                 );
                 debug_assert!(self.stack[head].has_been_used.is_some());
@@ -996,6 +1015,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 required_depth,
                 &heads,
                 encountered_overflow,
+                D::is_overflow_result(result),
                 UpdateParentGoalCtxt::Ordinary(nested_goals),
             );
 
@@ -1159,6 +1179,7 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D> {
                 // similar to the previous iterations when reevaluating, it's better
                 // for caching if the reevaluation also starts out with `false`.
                 encountered_overflow: false,
+                lower_nested_depth: false,
                 has_been_used: None,
             });
         }

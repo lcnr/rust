@@ -30,6 +30,7 @@ where
 
         let delegate = outer.delegate;
         let max_input_universe = outer.max_input_universe;
+        let info = outer.search_graph.probe_start();
         let mut nested = EvalCtxt {
             delegate,
             variables: outer.variables,
@@ -54,6 +55,7 @@ where
             nested.inspect.probe_kind(probe_kind);
             outer.inspect = nested.inspect.finish_probe();
         }
+        outer.search_graph.probe_end(info);
         r
     }
 }

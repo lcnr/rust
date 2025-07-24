@@ -39,6 +39,7 @@ pub(super) struct StackEntry<X: Cx> {
 
     /// Whether evaluating this goal encountered overflow. Lazily updated.
     pub encountered_overflow: bool,
+    pub lower_nested_depth: bool,
 
     /// Whether this goal has been used as the root of a cycle. This gets
     /// eagerly updated when encountering a cycle.
