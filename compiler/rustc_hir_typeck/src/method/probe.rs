@@ -753,8 +753,8 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
         let raw_self_ty = self_ty.value.value;
         match *raw_self_ty.kind() {
             ty::Dynamic(data, ..) if let Some(p) = data.principal() => {
-                // Subtle: we can't use `instantiate_query_response` here: using it will
-                // commit to all of the type equalities assumed by inference going through
+                // Subtle: we fudge inference here as we'd otherwise commit to all
+                // of the type equalities assumed by inference going through
                 // autoderef (see the `method-probe-no-guessing` test).
                 //
                 // However, in this code, it is OK if we end up with an object type that is
@@ -764,14 +764,16 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
                 // `ObjectCandidate`, and it should be discoverable "exactly" through one
                 // of the iterations in the autoderef loop, so there is no problem with it
                 // being discoverable in another one of these iterations.
-                //
-                // Using `instantiate_canonical` on our
-                // `Canonical<QueryResponse<Ty<'tcx>>>` and then *throwing away* the
-                // `CanonicalVarValues` will exactly give us such a generalization - it
-                // will still match the original object type, but it won't pollute our
-                // type variables in any form, so just do that!
-                let (QueryResponse { value: generalized_self_ty, .. }, _ignored_var_values) =
-                    self.fcx.instantiate_canonical(self.span, self_ty);
+                let Ok(generalized_self_ty) = self.fudge_inference_if_ok(|| {
+                    self.probe_instantiate_query_response(
+                        self.span,
+                        self.orig_steps_var_values,
+                        self_ty,
+                    )
+                    .map(|ok| ok.value)
+                }) else {
+                    return;
+                };
 
                 self.assemble_inherent_candidates_from_object(generalized_self_ty);
                 self.assemble_inherent_impl_candidates_for_type(p.def_id(), receiver_steps);
