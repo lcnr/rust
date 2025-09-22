@@ -9,6 +9,7 @@ use rustc_infer::infer::canonical::{
 };
 use rustc_infer::infer::{InferCtxt, RegionVariableOrigin, SubregionOrigin, TyCtxtInferExt};
 use rustc_infer::traits::solve::Goal;
+use rustc_macros::extension;
 use rustc_middle::traits::query::NoSolution;
 use rustc_middle::traits::solve::Certainty;
 use rustc_middle::ty::{
@@ -25,6 +26,13 @@ impl<'a, 'tcx> From<&'a InferCtxt<'tcx>> for &'a SolverDelegate<'tcx> {
     fn from(infcx: &'a InferCtxt<'tcx>) -> Self {
         // SAFETY: `repr(transparent)`
         unsafe { std::mem::transmute(infcx) }
+    }
+}
+
+#[extension(pub trait InferCtxtDelegateExt<'tcx>)]
+impl<'tcx> InferCtxt<'tcx> {
+    fn as_solver_delegate(&self) -> &SolverDelegate<'tcx> {
+        self.into()
     }
 }
 

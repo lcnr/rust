@@ -16,16 +16,16 @@ use rustc_index::IndexVec;
 use rustc_type_ir::inherent::*;
 use rustc_type_ir::relate::solver_relating::RelateExt;
 use rustc_type_ir::{
-    self as ty, Canonical, CanonicalVarKind, CanonicalVarValues, InferCtxtLike, Interner,
-    TypeFoldable,
+    self as ty, Canonical, CanonicalQueryInput, CanonicalVarKind, CanonicalVarValues,
+    InferCtxtLike, Interner, TypeFoldable,
 };
-use tracing::instrument;
+use tracing::{debug, instrument};
 
 use crate::delegate::SolverDelegate;
 use crate::resolve::eager_resolve_vars;
 use crate::solve::{
-    CanonicalInput, CanonicalResponse, Certainty, ExternalConstraintsData, Goal,
-    NestedNormalizationGoals, PredefinedOpaquesData, QueryInput, Response, inspect,
+    CanonicalInput, CanonicalResponse, CanonicalState, Certainty, ExternalConstraintsData, Goal,
+    NestedNormalizationGoals, PredefinedOpaquesData, QueryInput, Response, State,
 };
 
 pub mod canonicalizer;
@@ -40,7 +40,7 @@ impl<I: Interner> ResponseT<I> for Response<I> {
     }
 }
 
-impl<I: Interner, T> ResponseT<I> for inspect::State<I, T> {
+impl<I: Interner, T> ResponseT<I> for State<I, T> {
     fn var_values(&self) -> CanonicalVarValues<I> {
         self.var_values
     }
@@ -50,14 +50,15 @@ impl<I: Interner, T> ResponseT<I> for inspect::State<I, T> {
 /// for each bound variable.
 ///
 /// This expects `goal` and `opaque_types` to be eager resolved.
-pub(super) fn canonicalize_goal<D, I>(
+pub fn canonicalize_goal<D, I, P>(
     delegate: &D,
-    goal: Goal<I, I::Predicate>,
+    goal: Goal<I, P>,
     opaque_types: Vec<(ty::OpaqueTypeKey<I>, I::Ty)>,
-) -> (Vec<I::GenericArg>, CanonicalInput<I, I::Predicate>)
+) -> (Vec<I::GenericArg>, CanonicalInput<I, P>)
 where
     D: SolverDelegate<Interner = I>,
     I: Interner,
+    P: TypeFoldable<I>,
 {
     let mut orig_values = Default::default();
     let canonical = Canonicalizer::canonicalize_input(
@@ -74,7 +75,38 @@ where
     (orig_values, query_input)
 }
 
-pub(super) fn canonicalize_response<D, I, T>(
+pub fn instantiate_query_input<D, I, P>(
+    cx: I,
+    canonical_input: &CanonicalQueryInput<I, QueryInput<I, P>>,
+) -> (D, CanonicalVarValues<I>, Goal<I, P>)
+where
+    D: SolverDelegate<Interner = I>,
+    I: Interner,
+    P: TypeFoldable<I>,
+{
+    let (delegate, input, var_values) = D::build_with_canonical(cx, canonical_input);
+    for &(key, ty) in &input.predefined_opaques_in_body.opaque_types {
+        let prev = delegate.register_hidden_type_in_storage(key, ty, I::Span::dummy());
+        // It may be possible that two entries in the opaque type storage end up
+        // with the same key after resolving contained inference variables.
+        //
+        // We could put them in the duplicate list but don't have to. The opaques we
+        // encounter here are already tracked in the caller, so there's no need to
+        // also store them here. We'd take them out when computing the query response
+        // and then discard them, as they're already present in the input.
+        //
+        // Ideally we'd drop duplicate opaque type definitions when computing
+        // the canonical input. This is more annoying to implement and may cause a
+        // perf regression, so we do it inside of the query for now.
+        if let Some(prev) = prev {
+            debug!(?key, ?ty, ?prev, "ignore duplicate in `opaque_types_storage`");
+        }
+    }
+
+    (delegate, var_values, input.goal)
+}
+
+pub fn canonicalize_response<D, I, T>(
     delegate: &D,
     max_input_universe: ty::UniverseIndex,
     value: T,
@@ -98,7 +130,7 @@ where
 /// - we unify the `var_values` of the response with the `original_values`
 /// - we apply the `external_constraints` returned by the query, returning
 ///   the `normalization_nested_goals`
-pub(super) fn instantiate_and_apply_query_response<D, I>(
+pub fn instantiate_and_apply_query_response<D, I>(
     delegate: &D,
     param_env: I::ParamEnv,
     original_values: &[I::GenericArg],
@@ -301,26 +333,27 @@ pub fn make_canonical_state<D, I, T>(
     var_values: &[I::GenericArg],
     max_input_universe: ty::UniverseIndex,
     data: T,
-) -> inspect::CanonicalState<I, T>
+) -> CanonicalState<I, T>
 where
     D: SolverDelegate<Interner = I>,
     I: Interner,
     T: TypeFoldable<I>,
 {
     let var_values = CanonicalVarValues { var_values: delegate.cx().mk_args(var_values) };
-    let state = inspect::State { var_values, data };
+    let state = State { var_values, data };
     let state = eager_resolve_vars(delegate, state);
     Canonicalizer::canonicalize_response(delegate, max_input_universe, &mut vec![], state)
 }
 
-// FIXME: needs to be pub to be accessed by downstream
-// `rustc_trait_selection::solve::inspect::analyse`.
-pub fn instantiate_canonical_state<D, I, T>(
+/// When creating inference variables in the trait solver, we extend the list of
+/// `var_values` as we create new infer vars. This is necessary to link inference
+/// variables from separate instantiation together.
+pub fn instantiate_canonical_state_append_values<D, I, T>(
     delegate: &D,
     span: I::Span,
     param_env: I::ParamEnv,
     orig_values: &mut Vec<I::GenericArg>,
-    state: inspect::CanonicalState<I, T>,
+    state: CanonicalState<I, T>,
 ) -> T
 where
     D: SolverDelegate<Interner = I>,
@@ -335,10 +368,25 @@ where
             .map(|&arg| delegate.fresh_var_for_kind_with_span(arg, span)),
     );
 
+    instantiate_canonical_state(delegate, span, param_env, orig_values, state)
+}
+
+pub fn instantiate_canonical_state<D, I, T>(
+    delegate: &D,
+    span: I::Span,
+    param_env: I::ParamEnv,
+    orig_values: &[I::GenericArg],
+    state: CanonicalState<I, T>,
+) -> T
+where
+    D: SolverDelegate<Interner = I>,
+    I: Interner,
+    T: TypeFoldable<I>,
+{
     let instantiation =
         compute_query_response_instantiation_values(delegate, orig_values, &state, span);
 
-    let inspect::State { var_values, data } = delegate.instantiate_canonical(state, instantiation);
+    let State { var_values, data } = delegate.instantiate_canonical(state, instantiation);
 
     unify_query_var_values(delegate, param_env, orig_values, var_values, span);
     data

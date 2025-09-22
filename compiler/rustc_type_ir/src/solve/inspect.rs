@@ -20,26 +20,8 @@
 use derive_where::derive_where;
 use rustc_type_ir_macros::{TypeFoldable_Generic, TypeVisitable_Generic};
 
-use crate::solve::{CandidateSource, Certainty, Goal, GoalSource, QueryResult};
-use crate::{Canonical, CanonicalVarValues, Interner};
-
-/// Some `data` together with information about how they relate to the input
-/// of the canonical query.
-///
-/// This is only ever used as [CanonicalState]. Any type information in proof
-/// trees used mechanically has to be canonicalized as we otherwise leak
-/// inference variables from a nested `InferCtxt`.
-#[derive_where(Clone, PartialEq, Hash, Debug; I: Interner, T)]
-#[derive_where(Copy; I: Interner, T: Copy)]
-#[derive(TypeVisitable_Generic, TypeFoldable_Generic)]
-pub struct State<I: Interner, T> {
-    pub var_values: CanonicalVarValues<I>,
-    pub data: T,
-}
-
-impl<I: Interner, T: Eq> Eq for State<I, T> {}
-
-pub type CanonicalState<I, T> = Canonical<I, State<I, T>>;
+use crate::Interner;
+use crate::solve::{CandidateSource, CanonicalState, Certainty, Goal, GoalSource, QueryResult};
 
 /// When evaluating a goal we also store the original values
 /// for the `CanonicalVarValues` of the canonicalized goal.

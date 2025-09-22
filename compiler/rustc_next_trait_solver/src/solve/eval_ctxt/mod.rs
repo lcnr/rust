@@ -19,7 +19,7 @@ use tracing::{debug, instrument, trace};
 use super::has_only_region_constraints;
 use crate::canonical::{
     canonicalize_goal, canonicalize_response, instantiate_and_apply_query_response,
-    response_no_constraints_raw,
+    instantiate_query_input, response_no_constraints_raw,
 };
 use crate::coherence;
 use crate::delegate::SolverDelegate;
@@ -30,7 +30,7 @@ use crate::solve::ty::may_use_unstable_feature;
 use crate::solve::{
     CanonicalInput, CanonicalResponse, Certainty, ExternalConstraintsData, FIXPOINT_STEP_LIMIT,
     Goal, GoalEvaluation, GoalSource, GoalStalledOn, HasChanged, MaybeCause,
-    NestedNormalizationGoals, NoSolution, QueryInput, QueryResult, Response, inspect,
+    NestedNormalizationGoals, NoSolution, QueryResult, Response, inspect,
 };
 
 mod probe;
@@ -58,8 +58,8 @@ enum CurrentGoalKind {
 }
 
 impl CurrentGoalKind {
-    fn from_query_input<I: Interner>(cx: I, input: QueryInput<I, I::Predicate>) -> CurrentGoalKind {
-        match input.goal.predicate.kind().skip_binder() {
+    fn from_goal<I: Interner>(cx: I, goal: Goal<I, I::Predicate>) -> CurrentGoalKind {
+        match goal.predicate.kind().skip_binder() {
             ty::PredicateKind::Clause(ty::ClauseKind::Trait(pred)) => {
                 if cx.trait_is_coinductive(pred.trait_ref.def_id) {
                     CurrentGoalKind::CoinductiveTrait
@@ -356,31 +356,15 @@ where
         proof_tree_builder: &mut inspect::ProofTreeBuilder<D>,
         f: impl FnOnce(&mut EvalCtxt<'_, D>, Goal<I, I::Predicate>) -> R,
     ) -> R {
-        let (ref delegate, input, var_values) = D::build_with_canonical(cx, &canonical_input);
-        for &(key, ty) in &input.predefined_opaques_in_body.opaque_types {
-            let prev = delegate.register_hidden_type_in_storage(key, ty, I::Span::dummy());
-            // It may be possible that two entries in the opaque type storage end up
-            // with the same key after resolving contained inference variables.
-            //
-            // We could put them in the duplicate list but don't have to. The opaques we
-            // encounter here are already tracked in the caller, so there's no need to
-            // also store them here. We'd take them out when computing the query response
-            // and then discard them, as they're already present in the input.
-            //
-            // Ideally we'd drop duplicate opaque type definitions when computing
-            // the canonical input. This is more annoying to implement and may cause a
-            // perf regression, so we do it inside of the query for now.
-            if let Some(prev) = prev {
-                debug!(?key, ?ty, ?prev, "ignore duplicate in `opaque_types_storage`");
-            }
-        }
+        let (ref delegate, var_values, goal): (D, _, _) =
+            instantiate_query_input(cx, &canonical_input);
 
         let initial_opaque_types_storage_num_entries = delegate.opaque_types_storage_num_entries();
         let mut ecx = EvalCtxt {
             delegate,
             variables: canonical_input.canonical.variables,
             var_values,
-            current_goal_kind: CurrentGoalKind::from_query_input(cx, input),
+            current_goal_kind: CurrentGoalKind::from_goal(cx, goal),
             max_input_universe: canonical_input.canonical.max_universe,
             initial_opaque_types_storage_num_entries,
             search_graph,
@@ -390,7 +374,7 @@ where
             inspect: proof_tree_builder.new_evaluation_step(var_values),
         };
 
-        let result = f(&mut ecx, input.goal);
+        let result = f(&mut ecx, goal);
         ecx.inspect.probe_final_state(ecx.delegate, ecx.max_input_universe);
         proof_tree_builder.finish_evaluation_step(ecx.inspect);
 

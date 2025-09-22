@@ -12,7 +12,7 @@ use rustc_type_ir::{self as ty, Interner};
 
 use crate::canonical;
 use crate::delegate::SolverDelegate;
-use crate::solve::{Certainty, Goal, GoalSource, QueryResult, inspect};
+use crate::solve::{CanonicalState, Certainty, Goal, GoalSource, QueryResult, inspect};
 
 /// We need to know whether to build a prove tree while evaluating. We
 /// pass a `ProofTreeBuilder` with `state: Some(None)` into the search
@@ -129,7 +129,7 @@ struct WipProbe<I: Interner> {
     initial_num_var_values: usize,
     steps: Vec<WipProbeStep<I>>,
     kind: Option<inspect::ProbeKind<I>>,
-    final_state: Option<inspect::CanonicalState<I, ()>>,
+    final_state: Option<CanonicalState<I, ()>>,
 }
 
 impl<I: Interner> Eq for WipProbe<I> {}
@@ -146,10 +146,10 @@ impl<I: Interner> WipProbe<I> {
 
 #[derive_where(PartialEq, Debug; I: Interner)]
 enum WipProbeStep<I: Interner> {
-    AddGoal(GoalSource, inspect::CanonicalState<I, Goal<I, I::Predicate>>),
+    AddGoal(GoalSource, CanonicalState<I, Goal<I, I::Predicate>>),
     NestedProbe(WipProbe<I>),
     MakeCanonicalResponse { shallow_certainty: Certainty },
-    RecordImplArgs { impl_args: inspect::CanonicalState<I, I::GenericArgs> },
+    RecordImplArgs { impl_args: CanonicalState<I, I::GenericArgs> },
 }
 
 impl<I: Interner> Eq for WipProbeStep<I> {}

@@ -216,6 +216,24 @@ pub enum BuiltinImplSource {
     TraitUpcasting(usize),
 }
 
+/// Some `data` together with information about how they relate to the input
+/// of the canonical query.
+///
+/// This is only ever used as [CanonicalState]. This is a greatly slimmed down
+/// variant of [Response] which is used for intermediate states or if we don't
+/// care about all the information of the query. It's used by [inspect] and
+/// by `query method_autoderef_steps`.
+#[derive_where(Clone, PartialEq, Hash, Debug; I: Interner, T)]
+#[derive_where(Copy; I: Interner, T: Copy)]
+#[derive_where(Eq; I: Interner, T: Eq)]
+#[derive(TypeVisitable_Generic, TypeFoldable_Generic)]
+#[cfg_attr(feature = "nightly", derive(HashStable_NoContext))]
+pub struct State<I: Interner, T> {
+    pub var_values: CanonicalVarValues<I>,
+    pub data: T,
+}
+pub type CanonicalState<I, T> = Canonical<I, State<I, T>>;
+
 #[derive_where(Clone, Copy, Hash, PartialEq, Debug; I: Interner)]
 #[derive(TypeVisitable_Generic, TypeFoldable_Generic)]
 #[cfg_attr(feature = "nightly", derive(HashStable_NoContext))]

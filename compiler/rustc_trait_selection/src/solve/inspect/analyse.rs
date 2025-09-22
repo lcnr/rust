@@ -18,13 +18,13 @@ use rustc_middle::traits::ObligationCause;
 use rustc_middle::traits::solve::{Certainty, Goal, GoalSource, NoSolution, QueryResult};
 use rustc_middle::ty::{TyCtxt, VisitorResult, try_visit};
 use rustc_middle::{bug, ty};
-use rustc_next_trait_solver::canonical::instantiate_canonical_state;
-use rustc_next_trait_solver::resolve::eager_resolve_vars;
-use rustc_next_trait_solver::solve::{MaybeCause, SolverDelegateEvalExt as _, inspect};
+use rustc_next_trait_solver::canonical::instantiate_canonical_state_append_values;
+use rustc_next_trait_solver::solve::CanonicalState;
 use rustc_span::Span;
 use tracing::instrument;
 
 use crate::solve::delegate::SolverDelegate;
+use crate::solve::{MaybeCause, SolverDelegateEvalExt as _, eager_resolve_vars, inspect};
 use crate::traits::ObligationCtxt;
 
 pub struct InspectConfig {
@@ -91,7 +91,7 @@ pub struct InspectCandidate<'a, 'tcx> {
     goal: &'a InspectGoal<'a, 'tcx>,
     kind: inspect::ProbeKind<TyCtxt<'tcx>>,
     steps: Vec<&'a inspect::ProbeStep<TyCtxt<'tcx>>>,
-    final_state: inspect::CanonicalState<TyCtxt<'tcx>, ()>,
+    final_state: CanonicalState<TyCtxt<'tcx>, ()>,
     result: QueryResult<'tcx>,
     shallow_certainty: Certainty,
 }
@@ -151,7 +151,13 @@ impl<'a, 'tcx> InspectCandidate<'a, 'tcx> {
             match **step {
                 inspect::ProbeStep::AddGoal(source, goal) => instantiated_goals.push((
                     source,
-                    instantiate_canonical_state(infcx, span, param_env, &mut orig_values, goal),
+                    instantiate_canonical_state_append_values(
+                        infcx,
+                        span,
+                        param_env,
+                        &mut orig_values,
+                        goal,
+                    ),
                 )),
                 inspect::ProbeStep::RecordImplArgs { .. } => {}
                 inspect::ProbeStep::MakeCanonicalResponse { .. }
@@ -159,8 +165,13 @@ impl<'a, 'tcx> InspectCandidate<'a, 'tcx> {
             }
         }
 
-        let () =
-            instantiate_canonical_state(infcx, span, param_env, &mut orig_values, self.final_state);
+        let () = instantiate_canonical_state_append_values(
+            infcx,
+            span,
+            param_env,
+            &mut orig_values,
+            self.final_state,
+        );
 
         if let Some(term_hack) = &self.goal.normalizes_to_term_hack {
             // FIXME: We ignore the expected term of `NormalizesTo` goals
@@ -191,7 +202,7 @@ impl<'a, 'tcx> InspectCandidate<'a, 'tcx> {
         for step in &self.steps {
             match **step {
                 inspect::ProbeStep::RecordImplArgs { impl_args } => {
-                    let impl_args = instantiate_canonical_state(
+                    let impl_args = instantiate_canonical_state_append_values(
                         infcx,
                         span,
                         param_env,
@@ -199,7 +210,7 @@ impl<'a, 'tcx> InspectCandidate<'a, 'tcx> {
                         impl_args,
                     );
 
-                    let () = instantiate_canonical_state(
+                    let () = instantiate_canonical_state_append_values(
                         infcx,
                         span,
                         param_env,

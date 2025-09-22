@@ -17,9 +17,9 @@ use rustc_hir_analysis::hir_ty_lowering::{
     ExplicitLateBound, FeedConstTy, GenericArgCountMismatch, GenericArgCountResult,
     GenericArgsLowerer, GenericPathSegment, HirTyLowerer, IsMethodCall, RegionInferReason,
 };
-use rustc_infer::infer::canonical::{Canonical, OriginalQueryValues, QueryResponse};
-use rustc_infer::infer::{DefineOpaqueTypes, InferResult};
+use rustc_infer::infer::DefineOpaqueTypes;
 use rustc_lint::builtin::SELF_CONSTRUCTOR_FROM_OUTER_ITEM;
+use rustc_middle::traits::solve::CanonicalState;
 use rustc_middle::ty::adjustment::{Adjust, Adjustment, AutoBorrow, AutoBorrowMutability};
 use rustc_middle::ty::{
     self, AdtKind, CanonicalUserType, GenericArgsRef, GenericParamDefKind, IsIdentity,
@@ -32,6 +32,8 @@ use rustc_span::Span;
 use rustc_span::def_id::LocalDefId;
 use rustc_span::hygiene::DesugaringKind;
 use rustc_trait_selection::error_reporting::infer::need_type_info::TypeAnnotationNeeded;
+use rustc_trait_selection::solve::InferCtxtDelegateExt as _;
+use rustc_trait_selection::solve::canonical::instantiate_canonical_state;
 use rustc_trait_selection::traits::{
     self, NormalizeExt, ObligationCauseCode, StructurallyNormalizeExt,
 };
@@ -1543,17 +1545,18 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
     /// Instantiate a QueryResponse in a probe context, without a
     /// good ObligationCause.
-    pub(crate) fn probe_instantiate_query_response(
+    pub(crate) fn probe_instantiate_query_response<T: TypeFoldable<TyCtxt<'tcx>>>(
         &self,
         span: Span,
-        original_values: &OriginalQueryValues<'tcx>,
-        query_result: &Canonical<'tcx, QueryResponse<'tcx, Ty<'tcx>>>,
-    ) -> InferResult<'tcx, Ty<'tcx>> {
-        self.instantiate_query_response_and_region_obligations(
-            &self.misc(span),
+        original_values: &[ty::GenericArg<'tcx>],
+        state: CanonicalState<'tcx, T>,
+    ) -> T {
+        instantiate_canonical_state(
+            self.as_solver_delegate(),
+            span,
             self.param_env,
             original_values,
-            query_result,
+            state,
         )
     }
 

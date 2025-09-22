@@ -1,4 +1,5 @@
-pub use rustc_next_trait_solver::solve::*;
+use rustc_middle::query::Providers;
+use rustc_middle::ty::TyCtxt;
 
 mod delegate;
 mod fulfill;
@@ -6,15 +7,16 @@ pub mod inspect;
 mod normalize;
 mod select;
 
-pub(crate) use delegate::SolverDelegate;
+pub use delegate::{InferCtxtDelegateExt, SolverDelegate};
 pub use fulfill::{FulfillmentCtxt, NextSolverError, StalledOnCoroutines};
 pub(crate) use normalize::deeply_normalize_for_diagnostics;
 pub use normalize::{
     deeply_normalize, deeply_normalize_with_skipped_universes,
     deeply_normalize_with_skipped_universes_and_ambiguous_coroutine_goals,
 };
-use rustc_middle::query::Providers;
-use rustc_middle::ty::TyCtxt;
+pub use rustc_next_trait_solver::canonical;
+pub use rustc_next_trait_solver::resolve::eager_resolve_vars;
+pub use rustc_next_trait_solver::solve::*;
 pub use select::InferCtxtSelectExt;
 
 fn evaluate_root_goal_for_proof_tree_raw<'tcx>(

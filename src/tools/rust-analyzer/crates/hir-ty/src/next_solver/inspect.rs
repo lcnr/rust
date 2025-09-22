@@ -107,7 +107,7 @@ pub struct InspectCandidate<'a, 'db> {
     goal: &'a InspectGoal<'a, 'db>,
     kind: inspect::ProbeKind<DbInterner<'db>>,
     steps: Vec<&'a inspect::ProbeStep<DbInterner<'db>>>,
-    final_state: inspect::CanonicalState<DbInterner<'db>, ()>,
+    final_state: CanonicalState<DbInterner<'db>, ()>,
     result: QueryResult<'db>,
     shallow_certainty: Certainty,
 }

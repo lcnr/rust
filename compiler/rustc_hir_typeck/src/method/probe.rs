@@ -11,15 +11,15 @@ use rustc_hir as hir;
 use rustc_hir::HirId;
 use rustc_hir::def::DefKind;
 use rustc_hir_analysis::autoderef::{self, Autoderef};
-use rustc_infer::infer::canonical::{Canonical, OriginalQueryValues, QueryResponse};
-use rustc_infer::infer::{BoundRegionConversionTime, DefineOpaqueTypes, InferOk, TyCtxtInferExt};
+use rustc_infer::infer::{BoundRegionConversionTime, DefineOpaqueTypes};
 use rustc_infer::traits::ObligationCauseCode;
+use rustc_infer::traits::solve::CanonicalState;
 use rustc_middle::middle::stability;
 use rustc_middle::ty::elaborate::supertrait_def_ids;
 use rustc_middle::ty::fast_reject::{DeepRejectCtxt, TreatParams, simplify_type};
 use rustc_middle::ty::{
-    self, AssocContainer, AssocItem, GenericArgs, GenericArgsRef, GenericParamDefKind, ParamEnvAnd,
-    Ty, TyCtxt, TypeVisitableExt, Upcast,
+    self, AssocContainer, AssocItem, GenericArgs, GenericArgsRef, GenericParamDefKind, Ty, TyCtxt,
+    TypeVisitableExt, Upcast,
 };
 use rustc_middle::{bug, span_bug};
 use rustc_session::lint;
@@ -30,7 +30,13 @@ use rustc_span::edit_distance::{
 use rustc_span::{DUMMY_SP, Ident, Span, Symbol, sym};
 use rustc_trait_selection::error_reporting::infer::need_type_info::TypeAnnotationNeeded;
 use rustc_trait_selection::infer::InferCtxtExt as _;
-use rustc_trait_selection::traits::query::CanonicalTyGoal;
+use rustc_trait_selection::solve::canonical::{
+    canonicalize_goal, instantiate_query_input, make_canonical_state,
+};
+use rustc_trait_selection::solve::{
+    Goal, InferCtxtDelegateExt as _, SolverDelegate, eager_resolve_vars,
+};
+use rustc_trait_selection::traits::query::CanonicalTyGoalNext;
 use rustc_trait_selection::traits::query::evaluate_obligation::InferCtxtExt;
 use rustc_trait_selection::traits::query::method_autoderef::{
     CandidateStep, MethodAutoderefBadTy, MethodAutoderefStepsResult,
@@ -58,7 +64,7 @@ pub(crate) struct ProbeContext<'a, 'tcx> {
 
     /// This is the OriginalQueryValues for the steps queries
     /// that are answered in steps.
-    orig_steps_var_values: &'a OriginalQueryValues<'tcx>,
+    orig_steps_var_values: &'a [ty::GenericArg<'tcx>],
     steps: &'tcx [CandidateStep<'tcx>],
 
     inherent_candidates: Vec<Candidate<'tcx>>,
@@ -388,28 +394,39 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     where
         OP: FnOnce(ProbeContext<'_, 'tcx>) -> Result<R, MethodError<'tcx>>,
     {
-        let mut orig_values = OriginalQueryValues::default();
-        let query_input = self.canonicalize_query(
-            ParamEnvAnd { param_env: self.param_env, value: self_ty },
-            &mut orig_values,
-        );
+        let opaque_types = if self.next_trait_solver() {
+            self.inner
+                .borrow_mut()
+                .opaque_types()
+                .iter_opaque_types()
+                .map(|(k, v)| (k, v.ty))
+                .collect()
+        } else {
+            vec![]
+        };
+        let delegate = self.as_solver_delegate();
+        let goal = Goal { param_env: self.param_env, predicate: self_ty };
+        let (goal, opaque_types) = eager_resolve_vars(delegate, (goal, opaque_types));
+        let (orig_values, query_input) = canonicalize_goal(delegate, goal, opaque_types);
 
         let steps = match mode {
             Mode::MethodCall => self.tcx.method_autoderef_steps(query_input),
-            Mode::Path => self.probe(|_| {
+            Mode::Path => {
                 // Mode::Path - the deref steps is "trivial". This turns
                 // our CanonicalQuery into a "trivial" QueryResponse. This
                 // is a bit inefficient, but I don't think that writing
                 // special handling for this "trivial case" is a good idea.
-
-                let infcx = &self.infcx;
-                let (ParamEnvAnd { param_env: _, value: self_ty }, var_values) =
-                    infcx.instantiate_canonical(span, &query_input.canonical);
+                let (ref delegate, var_values, goal) =
+                    instantiate_query_input::<SolverDelegate<'tcx>, _, _>(self.tcx, &query_input);
                 debug!(?self_ty, ?query_input, "probe_op: Mode::Path");
                 MethodAutoderefStepsResult {
-                    steps: infcx.tcx.arena.alloc_from_iter([CandidateStep {
-                        self_ty: self
-                            .make_query_response_ignoring_pending_obligations(var_values, self_ty),
+                    steps: delegate.tcx.arena.alloc_from_iter([CandidateStep {
+                        self_ty: make_canonical_state(
+                            delegate,
+                            &var_values.var_values,
+                            ty::UniverseIndex::ROOT,
+                            goal.predicate,
+                        ),
                         autoderefs: 0,
                         from_unsafe_deref: false,
                         unsize: false,
@@ -418,7 +435,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                     opt_bad_ty: None,
                     reached_recursion_limit: false,
                 }
-            }),
+            }
         };
 
         // If our autoderef loop had reached the recursion limit,
@@ -431,10 +448,8 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                     .last()
                     .unwrap_or_else(|| span_bug!(span, "reached the recursion limit in 0 steps?"))
                     .self_ty;
-                let ty = self
-                    .probe_instantiate_query_response(span, &orig_values, ty)
-                    .unwrap_or_else(|_| span_bug!(span, "instantiating {:?} failed?", ty));
-                autoderef::report_autoderef_recursion_limit_error(self.tcx, span, ty.value);
+                let ty = self.probe_instantiate_query_response(span, &orig_values, *ty);
+                autoderef::report_autoderef_recursion_limit_error(self.tcx, span, ty);
             });
         }
 
@@ -467,14 +482,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                     },
                 );
             } else {
-                // Ended up encountering a type variable when doing autoderef,
-                // but it may not be a type variable after processing obligations
-                // in our local `FnCtxt`, so don't call `structurally_resolve_type`.
-                let ty = &bad_ty.ty;
-                let ty = self
-                    .probe_instantiate_query_response(span, &orig_values, ty)
-                    .unwrap_or_else(|_| span_bug!(span, "instantiating {:?} failed?", ty));
-                let ty = self.resolve_vars_if_possible(ty.value);
+                let ty = self.probe_instantiate_query_response(span, &orig_values, bad_ty.ty);
                 let guar = match *ty.kind() {
                     ty::Infer(ty::TyVar(_)) => {
                         let raw_ptr_call = bad_ty.reached_raw_pointer
@@ -553,12 +561,13 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
 pub(crate) fn method_autoderef_steps<'tcx>(
     tcx: TyCtxt<'tcx>,
-    goal: CanonicalTyGoal<'tcx>,
+    goal: CanonicalTyGoalNext<'tcx>,
 ) -> MethodAutoderefStepsResult<'tcx> {
     debug!("method_autoderef_steps({:?})", goal);
 
-    let (ref infcx, goal, inference_vars) = tcx.infer_ctxt().build_with_canonical(DUMMY_SP, &goal);
-    let ParamEnvAnd { param_env, value: self_ty } = goal;
+    let (ref delegate, var_values, goal) =
+        instantiate_query_input::<SolverDelegate<'tcx>, _, _>(tcx, &goal);
+    let Goal { param_env, predicate: self_ty } = goal;
 
     // If arbitrary self types is not enabled, we follow the chain of
     // `Deref<Target=T>`. If arbitrary self types is enabled, we instead
@@ -570,7 +579,7 @@ pub(crate) fn method_autoderef_steps<'tcx>(
     // converted to, in order to find out which of those methods might actually
     // be callable.
     let mut autoderef_via_deref =
-        Autoderef::new(infcx, param_env, hir::def_id::CRATE_DEF_ID, DUMMY_SP, self_ty)
+        Autoderef::new(delegate, param_env, hir::def_id::CRATE_DEF_ID, DUMMY_SP, self_ty)
             .include_raw_pointers()
             .silence_errors();
 
@@ -582,7 +591,7 @@ pub(crate) fn method_autoderef_steps<'tcx>(
             autoderef_via_deref.by_ref().map(|_| true).chain(std::iter::repeat(false));
 
         let mut autoderef_via_receiver =
-            Autoderef::new(infcx, param_env, hir::def_id::CRATE_DEF_ID, DUMMY_SP, self_ty)
+            Autoderef::new(delegate, param_env, hir::def_id::CRATE_DEF_ID, DUMMY_SP, self_ty)
                 .include_raw_pointers()
                 .use_receiver_trait()
                 .silence_errors();
@@ -591,8 +600,12 @@ pub(crate) fn method_autoderef_steps<'tcx>(
             .zip(reachable_via_deref)
             .map(|((ty, d), reachable_via_deref)| {
                 let step = CandidateStep {
-                    self_ty: infcx
-                        .make_query_response_ignoring_pending_obligations(inference_vars, ty),
+                    self_ty: make_canonical_state(
+                        delegate,
+                        &var_values.var_values,
+                        ty::UniverseIndex::ROOT,
+                        ty,
+                    ),
                     autoderefs: d,
                     from_unsafe_deref: reached_raw_pointer,
                     unsize: false,
@@ -611,8 +624,12 @@ pub(crate) fn method_autoderef_steps<'tcx>(
             .by_ref()
             .map(|(ty, d)| {
                 let step = CandidateStep {
-                    self_ty: infcx
-                        .make_query_response_ignoring_pending_obligations(inference_vars, ty),
+                    self_ty: make_canonical_state(
+                        delegate,
+                        &var_values.var_values,
+                        ty::UniverseIndex::ROOT,
+                        ty,
+                    ),
                     autoderefs: d,
                     from_unsafe_deref: reached_raw_pointer,
                     unsize: false,
@@ -631,14 +648,21 @@ pub(crate) fn method_autoderef_steps<'tcx>(
     let opt_bad_ty = match final_ty.kind() {
         ty::Infer(ty::TyVar(_)) | ty::Error(_) => Some(MethodAutoderefBadTy {
             reached_raw_pointer,
-            ty: infcx.make_query_response_ignoring_pending_obligations(inference_vars, final_ty),
+            ty: make_canonical_state(
+                delegate,
+                &var_values.var_values,
+                ty::UniverseIndex::ROOT,
+                final_ty,
+            ),
         }),
         ty::Array(elem_ty, _) => {
             let autoderefs = steps.iter().filter(|s| s.reachable_via_deref).count() - 1;
             steps.push(CandidateStep {
-                self_ty: infcx.make_query_response_ignoring_pending_obligations(
-                    inference_vars,
-                    Ty::new_slice(infcx.tcx, *elem_ty),
+                self_ty: make_canonical_state(
+                    delegate,
+                    &var_values.var_values,
+                    ty::UniverseIndex::ROOT,
+                    Ty::new_slice(delegate.tcx, *elem_ty),
                 ),
                 autoderefs,
                 // this could be from an unsafe deref if we had
@@ -670,7 +694,7 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
         mode: Mode,
         method_name: Option<Ident>,
         return_type: Option<Ty<'tcx>>,
-        orig_steps_var_values: &'a OriginalQueryValues<'tcx>,
+        orig_steps_var_values: &'a [ty::GenericArg<'tcx>],
         steps: &'tcx [CandidateStep<'tcx>],
         scope_expr_id: HirId,
         is_suggestion: IsSuggestion,
@@ -740,17 +764,13 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
 
     fn assemble_inherent_candidates(&mut self) {
         for step in self.steps.iter() {
-            self.assemble_probe(&step.self_ty, step.autoderefs);
+            self.assemble_probe(step.self_ty, step.autoderefs);
         }
     }
 
     #[instrument(level = "debug", skip(self))]
-    fn assemble_probe(
-        &mut self,
-        self_ty: &Canonical<'tcx, QueryResponse<'tcx, Ty<'tcx>>>,
-        receiver_steps: usize,
-    ) {
-        let raw_self_ty = self_ty.value.value;
+    fn assemble_probe(&mut self, self_ty: CanonicalState<'tcx, Ty<'tcx>>, receiver_steps: usize) {
+        let raw_self_ty = self_ty.value.data;
         match *raw_self_ty.kind() {
             ty::Dynamic(data, ..) if let Some(p) = data.principal() => {
                 // Subtle: we fudge inference here as we'd otherwise commit to all
@@ -765,15 +785,12 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
                 // of the iterations in the autoderef loop, so there is no problem with it
                 // being discoverable in another one of these iterations.
                 let Ok(generalized_self_ty) = self.fudge_inference_if_ok(|| {
-                    self.probe_instantiate_query_response(
+                    Ok::<_, !>(self.probe_instantiate_query_response(
                         self.span,
                         self.orig_steps_var_values,
                         self_ty,
-                    )
-                    .map(|ok| ok.value)
-                }) else {
-                    return;
-                };
+                    ))
+                });
 
                 self.assemble_inherent_candidates_from_object(generalized_self_ty);
                 self.assemble_inherent_impl_candidates_for_type(p.def_id(), receiver_steps);
@@ -1205,16 +1222,11 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
                 !step.self_ty.value.references_error() && !step.from_unsafe_deref
             })
             .find_map(|step| {
-                let InferOk { value: self_ty, obligations: _ } = self
-                    .fcx
-                    .probe_instantiate_query_response(
-                        self.span,
-                        self.orig_steps_var_values,
-                        &step.self_ty,
-                    )
-                    .unwrap_or_else(|_| {
-                        span_bug!(self.span, "{:?} was applicable but now isn't?", step.self_ty)
-                    });
+                let self_ty = self.fcx.probe_instantiate_query_response(
+                    self.span,
+                    self.orig_steps_var_values,
+                    step.self_ty,
+                );
 
                 let by_value_pick = self.pick_by_value_method(step, self_ty, pick_diag_hints);
 
@@ -1419,7 +1431,7 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
             r.map(|mut pick| {
                 pick.autoderefs = step.autoderefs;
 
-                match *step.self_ty.value.value.kind() {
+                match *step.self_ty.value.data.kind() {
                     // Insert a `&*` or `&mut *` if this is a reference type:
                     ty::Ref(_, _, mutbl) => {
                         pick.autoderefs += 1;

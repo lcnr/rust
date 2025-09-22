@@ -9,8 +9,8 @@ use rustc_macros::{HashStable, TypeFoldable, TypeVisitable};
 use rustc_span::Span;
 
 use crate::error::DropCheckOverflow;
-use crate::infer::canonical::{Canonical, CanonicalQueryInput, QueryResponse};
-pub use crate::traits::solve::NoSolution;
+use crate::infer::canonical::CanonicalQueryInput;
+pub use crate::traits::solve::{CanonicalState, NoSolution, QueryInput};
 use crate::ty::{self, GenericArg, Ty, TyCtxt};
 
 pub mod type_op {
@@ -67,7 +67,7 @@ pub mod type_op {
 pub type CanonicalAliasGoal<'tcx> =
     CanonicalQueryInput<'tcx, ty::ParamEnvAnd<'tcx, ty::AliasTy<'tcx>>>;
 
-pub type CanonicalTyGoal<'tcx> = CanonicalQueryInput<'tcx, ty::ParamEnvAnd<'tcx, Ty<'tcx>>>;
+pub type CanonicalTyGoalNext<'tcx> = CanonicalQueryInput<'tcx, QueryInput<'tcx, Ty<'tcx>>>;
 
 pub type CanonicalPredicateGoal<'tcx> =
     CanonicalQueryInput<'tcx, ty::ParamEnvAnd<'tcx, ty::Predicate<'tcx>>>;
@@ -143,7 +143,7 @@ impl<'tcx> FromIterator<DropckConstraint<'tcx>> for DropckConstraint<'tcx> {
 
 #[derive(Debug, HashStable)]
 pub struct CandidateStep<'tcx> {
-    pub self_ty: Canonical<'tcx, QueryResponse<'tcx, Ty<'tcx>>>,
+    pub self_ty: CanonicalState<'tcx, Ty<'tcx>>,
     pub autoderefs: usize,
     /// `true` if the type results from a dereference of a raw pointer.
     /// when assembling candidates, we include these steps, but not when
@@ -178,7 +178,7 @@ pub struct MethodAutoderefStepsResult<'tcx> {
 #[derive(Debug, HashStable)]
 pub struct MethodAutoderefBadTy<'tcx> {
     pub reached_raw_pointer: bool,
-    pub ty: Canonical<'tcx, QueryResponse<'tcx, Ty<'tcx>>>,
+    pub ty: CanonicalState<'tcx, Ty<'tcx>>,
 }
 
 /// Result of the `normalize_canonicalized_{{,inherent_}projection,free}_ty` queries.

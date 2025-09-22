@@ -14,6 +14,7 @@ pub type QueryResult<'tcx> = ir::solve::QueryResult<TyCtxt<'tcx>>;
 pub type CandidateSource<'tcx> = ir::solve::CandidateSource<TyCtxt<'tcx>>;
 pub type CanonicalInput<'tcx, P = ty::Predicate<'tcx>> = ir::solve::CanonicalInput<TyCtxt<'tcx>, P>;
 pub type CanonicalResponse<'tcx> = ir::solve::CanonicalResponse<TyCtxt<'tcx>>;
+pub type CanonicalState<'tcx, T> = ir::solve::CanonicalState<TyCtxt<'tcx>, T>;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, HashStable)]
 pub struct PredefinedOpaques<'tcx>(pub(crate) Interned<'tcx, PredefinedOpaquesData<TyCtxt<'tcx>>>);
