@@ -1100,7 +1100,6 @@ impl<'tcx> InferCtxt<'tcx> {
             TypingMode::Coherence
             | TypingMode::PostBorrowckAnalysis { .. }
             | TypingMode::PostAnalysis => false,
-            TypingMode::ErasedNotCoherence(MayBeErased) => todo!(),
         }
     }
 
@@ -1431,7 +1430,7 @@ impl<'tcx> InferCtxt<'tcx> {
             mode @ (ty::TypingMode::Coherence
             | ty::TypingMode::PostBorrowckAnalysis { .. }
             | ty::TypingMode::PostAnalysis) => mode,
-            ty::TypingMode::ErasedNotCoherence(MayBeErased) => todo!(),
+            ty::TypingMode::ErasedNotCoherence(MayBeErased) => unreachable!(),
         };
         ty::TypingEnv::new(param_env, typing_mode)
     }
