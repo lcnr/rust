@@ -1048,9 +1048,17 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D, X> {
                         // need to discard the provisional cache entry in this case.
                         RebaseReason::NoCycleUsages => return false,
                         RebaseReason::Ambiguity(info) => {
-                            *result = D::propagate_ambiguity(cx, input, info);
+                            let ambig = D::propagate_ambiguity(cx, input, info);
+                            if ambig != *result {
+                                return false;
+                            }
                         }
-                        RebaseReason::Overflow => *result = D::fixpoint_overflow_result(cx, input),
+                        RebaseReason::Overflow => {
+                            let ambig = D::fixpoint_overflow_result(cx, input);
+                            if ambig != *result {
+                                return false;
+                            }
+                        }
                         RebaseReason::ReachedFixpoint(None) => {}
                         RebaseReason::ReachedFixpoint(Some(path_kind)) => {
                             if !popped_head.usages.is_single(path_kind) {
@@ -1093,24 +1101,8 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D, X> {
         for &ProvisionalCacheEntry { encountered_overflow, ref heads, path_from_head, result } in
             entries
         {
-            let head_index = heads.highest_cycle_head_index();
-            if encountered_overflow {
-                // This check is overly strict and very subtle. We need to make sure that if
-                // a global cache entry depends on some goal without adding it to its
-                // `nested_goals`, that goal must never have an applicable provisional
-                // cache entry to avoid incorrectly applying the cache entry.
-                //
-                // As we'd have to otherwise track literally all nested goals, we only
-                // apply provisional cache entries which encountered overflow once the
-                // current goal is already part of the same cycle. This check could be
-                // improved but seems to be good enough for now.
-                let last = self.stack.last().unwrap();
-                if last.heads.opt_lowest_cycle_head_index().is_none_or(|lowest| lowest > head_index)
-                {
-                    continue;
-                }
-            }
 
+            let head_index = heads.highest_cycle_head_index();
             // A provisional cache entry is only valid if the current path from its
             // highest cycle head to the goal is the same.
             if path_from_head
@@ -1173,11 +1165,6 @@ impl<D: Delegate<Cx = X>, X: Cx> SearchGraph<D, X> {
                 result: _,
             } in entries.iter()
             {
-                // We don't have to worry about provisional cache entries which encountered
-                // overflow, see the relevant comment in `lookup_provisional_cache`.
-                if encountered_overflow {
-                    continue;
-                }
 
                 // A provisional cache entry only applies if the path from its highest head
                 // matches the path when encountering the goal.
