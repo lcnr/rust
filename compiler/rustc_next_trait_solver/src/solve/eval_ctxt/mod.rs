@@ -10,7 +10,7 @@ use rustc_type_ir::relate::solver_relating::RelateExt;
 use rustc_type_ir::search_graph::{CandidateHeadUsages, PathKind};
 use rustc_type_ir::solve::{
     AccessedOpaques, FetchEligibleAssocItemResponse, MaybeInfo, OpaqueTypesJank, RerunCondition,
-    SmallCopyList,
+    RerunReason, SmallCopyList,
 };
 use rustc_type_ir::{
     self as ty, CanonicalVarValues, ClauseKind, InferCtxtLike, Interner, MayBeErased,
@@ -524,7 +524,7 @@ where
             }
 
             if skip_erased_attempt && self.typing_mode().is_erased_not_coherence() {
-                self.opaque_accesses.rerun_always("skip erased attempt");
+                self.opaque_accesses.rerun_always(RerunReason::SkipErasedAttempt);
                 return Err(NoSolution);
             }
 
@@ -1403,7 +1403,7 @@ where
         uv: ty::UnevaluatedConst<I>,
     ) -> Option<I::Const> {
         if self.typing_mode().is_erased_not_coherence() {
-            self.opaque_accesses.rerun_always("evaluate const");
+            self.opaque_accesses.rerun_always(RerunReason::EvaluateConst);
             return None;
         }
 
@@ -1433,7 +1433,7 @@ where
         symbol: I::Symbol,
     ) -> bool {
         if self.typing_mode().is_erased_not_coherence() {
-            self.opaque_accesses.rerun_always("may use unstable feature");
+            self.opaque_accesses.rerun_always(RerunReason::MayUseUnstableFeature);
             return false;
         }
 
