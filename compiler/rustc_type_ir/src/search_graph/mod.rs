@@ -280,11 +280,7 @@ impl AvailableDepth {
                 return None;
             }
 
-            Some(if last.encountered_overflow {
-                AvailableDepth(last.available_depth.0 / D::DIVIDE_AVAILABLE_DEPTH_ON_OVERFLOW)
-            } else {
-                AvailableDepth(last.available_depth.0 - 1)
-            })
+            Some(AvailableDepth(last.available_depth.0 - 1))
         } else {
             Some(root_depth)
         }
