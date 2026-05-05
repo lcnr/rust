@@ -139,6 +139,8 @@ where
 {
     /// `probe_kind` is only called when proof tree building is enabled so it can be
     /// as expensive as necessary to output the desired information.
+    ///
+    // FIXME(#155443): Not all uses of `probe` should return `NoSolution`.
     pub(in crate::solve) fn probe<F, T>(&mut self, probe_kind: F) -> ProbeCtxt<'_, 'a, D, I, F, T>
     where
         F: FnOnce(&Result<T, NoSolution>) -> inspect::ProbeKind<I>,

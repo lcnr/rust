@@ -358,11 +358,8 @@ where
     }
 
     fn opaque_type_is_rigid(&self, def_id: I::DefId) -> bool {
-        match self
-            .typing_mode()
-            // Caller should handle erased mode
-            .assert_not_erased()
-        {
+        // Caller should handle erased mode
+        match self.typing_mode().assert_not_erased() {
             // Opaques are never rigid outside of analysis mode.
             TypingMode::Coherence | TypingMode::PostAnalysis => false,
             // During analysis, opaques are rigid unless they may be defined by
