@@ -17,7 +17,6 @@ pub mod query;
 #[allow(hidden_glob_reexports)]
 mod select;
 pub mod specialize;
-mod structural_normalize;
 #[allow(hidden_glob_reexports)]
 mod util;
 pub mod vtable;
@@ -65,7 +64,6 @@ pub use self::specialize::specialization_graph::{
 pub use self::specialize::{
     OverlapError, specialization_graph, translate_args, translate_args_with_cause,
 };
-pub use self::structural_normalize::StructurallyNormalizeExt;
 pub use self::util::{
     BoundVarReplacer, PlaceholderReplacer, elaborate, expand_trait_aliases, impl_item_is_final,
     sizedness_fast_path, supertrait_def_ids, supertraits, transitive_bounds_that_define_assoc_item,

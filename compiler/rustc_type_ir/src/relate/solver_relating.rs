@@ -416,30 +416,6 @@ where
         std::assert_matches!(self.structurally_relate_aliases, StructurallyRelateAliases::No);
         self.goals.extend(obligations);
     }
-
-    fn register_alias_relate_predicate(&mut self, a: I::Ty, b: I::Ty) {
-        self.register_predicates([ty::Binder::dummy(match self.ambient_variance {
-            ty::Covariant => ty::PredicateKind::AliasRelate(
-                a.into(),
-                b.into(),
-                ty::AliasRelationDirection::Subtype,
-            ),
-            // a :> b is b <: a
-            ty::Contravariant => ty::PredicateKind::AliasRelate(
-                b.into(),
-                a.into(),
-                ty::AliasRelationDirection::Subtype,
-            ),
-            ty::Invariant => ty::PredicateKind::AliasRelate(
-                a.into(),
-                b.into(),
-                ty::AliasRelationDirection::Equate,
-            ),
-            ty::Bivariant => {
-                unreachable!("Expected bivariance to be handled in relate_with_variance")
-            }
-        })]);
-    }
 }
 
 // FIXME: this is a temporary solution for renomalizing ambiguous aliases
@@ -498,13 +474,11 @@ where
         };
 
         let original_alias = args.type_at(0);
+        let ty::Alias(alias_ty) = original_alias.kind() else { unreachable!() };
 
         let infer_ty = self.infcx.next_ty_infer();
-        let normalizes_to = ty::PredicateKind::AliasRelate(
-            original_alias.into(),
-            infer_ty.into(),
-            ty::AliasRelationDirection::Equate,
-        );
+        let normalizes_to =
+            ty::ProjectionPredicate { projection_term: alias_ty.into(), term: infer_ty.into() };
         self.goals.push(Goal::new(self.cx(), self.param_env, normalizes_to));
         infer_ty
     }

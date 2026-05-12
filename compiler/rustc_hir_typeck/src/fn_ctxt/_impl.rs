@@ -36,9 +36,7 @@ use rustc_span::Span;
 use rustc_span::def_id::LocalDefId;
 use rustc_span::hygiene::DesugaringKind;
 use rustc_trait_selection::error_reporting::infer::need_type_info::TypeAnnotationNeeded;
-use rustc_trait_selection::traits::{
-    self, NormalizeExt, ObligationCauseCode, StructurallyNormalizeExt,
-};
+use rustc_trait_selection::traits::{self, NormalizeExt, ObligationCauseCode};
 use tracing::{debug, instrument};
 
 use crate::callee::{self, DeferredCallResolution};
@@ -1458,32 +1456,10 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         }
     }
 
-    #[instrument(level = "debug", skip(self, sp), ret)]
-    pub(crate) fn try_structurally_resolve_const(
-        &self,
-        sp: Span,
-        ct: ty::Const<'tcx>,
-    ) -> ty::Const<'tcx> {
+    #[instrument(level = "debug", skip(self), ret)]
+    pub(crate) fn try_structurally_resolve_const(&self, ct: ty::Const<'tcx>) -> ty::Const<'tcx> {
         let ct = self.resolve_vars_with_obligations(ct);
-
-        if self.next_trait_solver()
-            && let ty::ConstKind::Unevaluated(..) = ct.kind()
-        {
-            // We need to use a separate variable here as otherwise the temporary for
-            // `self.fulfillment_cx.borrow_mut()` is alive in the `Err` branch, resulting
-            // in a reentrant borrow, causing an ICE.
-            let result = self.at(&self.misc(sp), self.param_env).structurally_normalize_const(
-                Unnormalized::new_wip(ct),
-                &mut **self.fulfillment_cx.borrow_mut(),
-            );
-            match result {
-                Ok(normalized_ct) => normalized_ct,
-                Err(errors) => {
-                    let guar = self.err_ctxt().report_fulfillment_errors(errors);
-                    return ty::Const::new_error(self.tcx, guar);
-                }
-            }
-        } else if self.tcx.features().generic_const_exprs() {
+        if self.tcx.features().generic_const_exprs() {
             rustc_trait_selection::traits::evaluate_const(&self.infcx, ct, self.param_env)
         } else {
             ct
@@ -1527,7 +1503,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         sp: Span,
         ct: ty::Const<'tcx>,
     ) -> ty::Const<'tcx> {
-        let ct = self.try_structurally_resolve_const(sp, ct);
+        let ct = self.try_structurally_resolve_const(ct);
 
         if !ct.is_ct_infer() {
             ct

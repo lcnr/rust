@@ -874,19 +874,26 @@ pub(in crate::solve) fn const_conditions_for_destruct<I: Interner>(
 /// additional step of eagerly folding the associated types in the where
 /// clauses of the impl. In this example, that means replacing
 /// `<Self as Foo>::Bar` with `Ty` in the first impl.
+// FIXME: The way this function handles normalization is incredibly scuffed
+// and we should change it to properly track which things are normalized and
+// what exactly each of the steps mean.
 pub(in crate::solve) fn predicates_for_object_candidate<D, I>(
     ecx: &mut EvalCtxt<'_, D>,
     param_env: I::ParamEnv,
-    trait_ref: Binder<I, ty::TraitRef<I>>,
+    trait_ref: Unnormalized<I, Binder<I, ty::TraitRef<I>>>,
     object_bounds: I::BoundExistentialPredicates,
-) -> Result<Vec<Goal<I, I::Predicate>>, Result<Ambiguous, NoSolutionOrRerunNonErased>>
+) -> Result<
+    Vec<Goal<I, ty::Unnormalized<I, I::Predicate>>>,
+    Result<Ambiguous, NoSolutionOrRerunNonErased>,
+>
 where
     D: SolverDelegate<Interner = I>,
     I: Interner,
 {
     let cx = ecx.cx();
-    let trait_ref =
-        ecx.instantiate_binder_with_infer(param_env, trait_ref).map_err(|err| Err(err))?;
+    let trait_ref = ecx
+        .instantiate_binder_with_infer(param_env, trait_ref.skip_norm_wip())
+        .map_err(|err| Err(err))?;
     let mut requirements = vec![];
     // Elaborating all supertrait outlives obligations here is not soundness critical,
     // since if we just used the unelaborated set, then the transitive supertraits would
@@ -947,6 +954,7 @@ where
             .nested
             .into_iter()
             .chain(requirements.into_iter().map(|clause| Goal::new(cx, param_env, clause)))
+            .map(|goal| goal.with(cx, Unnormalized::new_wip(goal.predicate)))
             .collect()
     })
 }

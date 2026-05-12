@@ -2066,17 +2066,11 @@ impl<'tcx> TyCtxt<'tcx> {
     pub fn mk_predicate(self, binder: Binder<'tcx, PredicateKind<'tcx>>) -> Predicate<'tcx> {
         // TODO
         match binder.skip_binder() {
-            ty::PredicateKind::AliasRelate(lhs, rhs, ..) => {
-                assert!(
-                    lhs.to_alias_term(self)
-                        .filter(|a| !matches!(a.kind, ty::AliasTermKind::AmbiguousTy))
-                        .is_some()
-                        || rhs
-                            .to_alias_term(self)
-                            .filter(|a| !matches!(a.kind, ty::AliasTermKind::AmbiguousTy))
-                            .is_some(),
-                    "{binder:?}"
-                )
+            ty::PredicateKind::Clause(ty::ClauseKind::Projection(rarw)) => {
+                match rarw.projection_term.kind {
+                    ty::AliasTermKind::AmbiguousTy => unreachable!(),
+                    _ => {}
+                }
             }
             _ => {}
         }

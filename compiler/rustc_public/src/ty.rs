@@ -1530,7 +1530,6 @@ pub enum PredicateKind {
     Coerce(CoercePredicate),
     ConstEquate(TyConst, TyConst),
     Ambiguous,
-    AliasRelate(TermKind, TermKind, AliasRelationDirection),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -1561,12 +1560,6 @@ pub struct SubtypePredicate {
 pub struct CoercePredicate {
     pub a: Ty,
     pub b: Ty,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub enum AliasRelationDirection {
-    Equate,
-    Subtype,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]

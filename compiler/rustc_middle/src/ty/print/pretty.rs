@@ -3252,11 +3252,6 @@ define_print! {
             }
             ty::PredicateKind::Ambiguous => write!(p, "ambiguous")?,
             ty::PredicateKind::NormalizesTo(data) => data.print(p)?,
-            ty::PredicateKind::AliasRelate(t1, t2, dir) => {
-                t1.print(p)?;
-                write!(p, " {dir} ")?;
-                t2.print(p)?;
-            }
         }
     }
 

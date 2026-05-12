@@ -1722,13 +1722,12 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     ) -> Ty<'tcx> {
         let tcx = self.tcx;
         let count_span = count.span;
-        let count = self.try_structurally_resolve_const(
+        // FIXME(-Znext-solver=no): This is very odd. We shouldn't have to structurally resolve
+        // after normalization.
+        let count = self.try_structurally_resolve_const(self.normalize(
             count_span,
-            self.normalize(
-                count_span,
-                Unnormalized::new_wip(self.lower_const_arg(count, tcx.types.usize)),
-            ),
-        );
+            Unnormalized::new_wip(self.lower_const_arg(count, tcx.types.usize)),
+        ));
 
         if let Some(count) = count.try_to_target_usize(tcx) {
             self.suggest_array_len(expr, count);
@@ -3137,7 +3136,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     ) {
         err.span_label(field.span, "unknown field");
         if let (Some(len), Ok(user_index)) = (
-            self.try_structurally_resolve_const(base.span, len).try_to_target_usize(self.tcx),
+            self.try_structurally_resolve_const(len).try_to_target_usize(self.tcx),
             field.as_str().parse::<u64>(),
         ) {
             let help = "instead of using tuple indexing, use array indexing";

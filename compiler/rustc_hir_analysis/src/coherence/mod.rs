@@ -27,7 +27,7 @@ mod unsafety;
 fn check_impl<'tcx>(
     tcx: TyCtxt<'tcx>,
     impl_def_id: LocalDefId,
-    trait_ref: ty::TraitRef<'tcx>,
+    trait_ref: ty::Unnormalized<'tcx, ty::TraitRef<'tcx>>,
     trait_def: &'tcx ty::TraitDef,
     polarity: ty::ImplPolarity,
 ) -> Result<(), ErrorGuaranteed> {
@@ -41,8 +41,8 @@ fn check_impl<'tcx>(
     // This occurs with e.g., resolve failures (#30589).
     trait_ref.error_reported()?;
 
-    enforce_trait_manually_implementable(tcx, impl_def_id, trait_ref.def_id, trait_def)
-        .and(enforce_empty_impls_for_marker_traits(tcx, impl_def_id, trait_ref.def_id, trait_def))
+    enforce_trait_manually_implementable(tcx, impl_def_id, trait_ref.def_id(), trait_def)
+        .and(enforce_empty_impls_for_marker_traits(tcx, impl_def_id, trait_ref.def_id(), trait_def))
         .and(always_applicable::check_negative_auto_trait_impl(
             tcx,
             impl_def_id,
@@ -172,8 +172,8 @@ fn coherent_trait(tcx: TyCtxt<'_>, def_id: DefId) -> Result<(), ErrorGuaranteed>
 
     for &impl_def_id in impls {
         let impl_header = tcx.impl_trait_header(impl_def_id);
-        let trait_ref = impl_header.trait_ref.instantiate_identity().skip_norm_wip();
-        let trait_def = tcx.trait_def(trait_ref.def_id);
+        let trait_ref = impl_header.trait_ref.instantiate_identity();
+        let trait_def = tcx.trait_def(trait_ref.def_id());
 
         res = res
             .and(check_impl(tcx, impl_def_id, trait_ref, trait_def, impl_header.polarity))
@@ -190,9 +190,9 @@ fn coherent_trait(tcx: TyCtxt<'_>, def_id: DefId) -> Result<(), ErrorGuaranteed>
 fn check_object_overlap<'tcx>(
     tcx: TyCtxt<'tcx>,
     impl_def_id: LocalDefId,
-    trait_ref: ty::TraitRef<'tcx>,
+    trait_ref: ty::Unnormalized<'tcx, ty::TraitRef<'tcx>>,
 ) -> Result<(), ErrorGuaranteed> {
-    let trait_def_id = trait_ref.def_id;
+    let trait_def_id = trait_ref.def_id();
 
     if let Err(guar) = trait_ref.error_reported() {
         debug!("coherence: skipping impl {:?} with error {:?}", impl_def_id, trait_ref);
@@ -200,7 +200,7 @@ fn check_object_overlap<'tcx>(
     }
 
     // check for overlap with the automatic `impl Trait for dyn Trait`
-    if let ty::Dynamic(data, ..) = trait_ref.self_ty().kind() {
+    if let ty::Dynamic(data, ..) = trait_ref.skip_norm_wip().self_ty().kind() {
         // This is something like `impl Trait1 for Trait2`. Illegal if
         // Trait1 is a supertrait of Trait2 or Trait2 is not dyn compatible.
 
@@ -226,14 +226,14 @@ fn check_object_overlap<'tcx>(
                         span,
                         E0371,
                         "the object type `{}` automatically implements the trait `{}`",
-                        trait_ref.self_ty(),
+                        trait_ref.skip_norm_wip().self_ty(),
                         tcx.def_path_str(trait_def_id)
                     )
                     .with_span_label(
                         span,
                         format!(
                             "`{}` automatically implements trait `{}`",
-                            trait_ref.self_ty(),
+                            trait_ref.skip_norm_wip().self_ty(),
                             tcx.def_path_str(trait_def_id)
                         ),
                     )

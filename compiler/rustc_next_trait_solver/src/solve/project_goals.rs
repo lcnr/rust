@@ -16,14 +16,12 @@ where
         goal: Goal<I, ProjectionPredicate<I>>,
     ) -> QueryResultOrRerunNonErased<I> {
         let cx = self.cx();
-        let projection_term = goal.predicate.projection_term.to_term(cx);
         let goal = goal.with(
             cx,
-            ty::PredicateKind::AliasRelate(
-                projection_term,
-                goal.predicate.term,
-                ty::AliasRelationDirection::Equate,
-            ),
+            ty::PredicateKind::NormalizesTo(ty::NormalizesTo {
+                alias: goal.predicate.projection_term,
+                term: goal.predicate.term,
+            }),
         );
         // A projection goal holds if the alias is equal to the expected term.
         self.add_goal(GoalSource::TypeRelating, goal);

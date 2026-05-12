@@ -975,9 +975,6 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 ty::PredicateKind::NormalizesTo(..) => {
                     bug!("NormalizesTo is only used by the new solver")
                 }
-                ty::PredicateKind::AliasRelate(..) => {
-                    bug!("AliasRelate is only used by the new solver")
-                }
                 ty::PredicateKind::Ambiguous => Ok(EvaluatedToAmbig),
                 ty::PredicateKind::Clause(ty::ClauseKind::ConstArgHasType(ct, ty)) => {
                     let ct = self.infcx.shallow_resolve_const(ct);
@@ -1500,7 +1497,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         // bound regions.
         let trait_ref = predicate.skip_binder().trait_ref;
 
-        coherence::trait_ref_is_knowable(self.infcx, trait_ref, |ty| Ok::<_, !>(ty)).into_ok()
+        coherence::trait_ref_is_knowable(self.infcx, trait_ref)
     }
 
     /// Returns `true` if the global caches can be used.

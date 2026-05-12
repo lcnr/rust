@@ -88,14 +88,14 @@ pub(crate) fn check_drop_impl(
 pub(crate) fn check_negative_auto_trait_impl<'tcx>(
     tcx: TyCtxt<'tcx>,
     impl_def_id: LocalDefId,
-    impl_trait_ref: ty::TraitRef<'tcx>,
+    impl_trait_ref: ty::Unnormalized<'tcx, ty::TraitRef<'tcx>>,
     polarity: ty::ImplPolarity,
 ) -> Result<(), ErrorGuaranteed> {
     let ty::ImplPolarity::Negative = polarity else {
         return Ok(());
     };
 
-    if !tcx.trait_is_auto(impl_trait_ref.def_id) {
+    if !tcx.trait_is_auto(impl_trait_ref.def_id()) {
         return Ok(());
     }
 
@@ -105,7 +105,7 @@ pub(crate) fn check_negative_auto_trait_impl<'tcx>(
 
     tcx.ensure_result().orphan_check_impl(impl_def_id)?;
 
-    match impl_trait_ref.self_ty().kind() {
+    match impl_trait_ref.skip_norm_wip().self_ty().kind() {
         ty::Adt(adt_def, adt_to_impl_args) => {
             ensure_impl_params_and_item_params_correspond(
                 tcx,

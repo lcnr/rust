@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::fmt::Debug;
 use std::ops::ControlFlow;
 
@@ -43,23 +44,23 @@ pub enum Conflict {
 /// This both checks whether any downstream or sibling crates could
 /// implement it and whether an upstream crate can add this impl
 /// without breaking backwards compatibility.
-#[instrument(level = "debug", skip(infcx, lazily_normalize_ty), ret)]
-pub fn trait_ref_is_knowable<Infcx, I, E>(
+#[instrument(level = "debug", skip(infcx), ret)]
+pub fn trait_ref_is_knowable<Infcx, I>(
     infcx: &Infcx,
     trait_ref: ty::TraitRef<I>,
-    mut lazily_normalize_ty: impl FnMut(I::Ty) -> Result<I::Ty, E>,
-) -> Result<Result<(), Conflict>, E>
+) -> Result<(), Conflict>
 where
     Infcx: InferCtxtLike<Interner = I>,
     I: Interner,
-    E: Debug,
 {
-    if orphan_check_trait_ref(infcx, trait_ref, InCrate::Remote, &mut lazily_normalize_ty)?.is_ok()
-    {
+    match orphan_check_trait_ref(infcx, trait_ref, InCrate::Remote, &mut |ty| {
+        Ok::<_, Infallible>(ty)
+    }) {
         // A downstream or cousin crate is allowed to implement some
         // generic parameters of this trait-ref.
-        return Ok(Err(Conflict::Downstream));
-    }
+        Ok(Ok(())) => return Err(Conflict::Downstream),
+        Ok(Err(_)) => {}
+    };
 
     if trait_ref_is_local_or_fundamental(infcx.cx(), trait_ref) {
         // This is a local or fundamental trait, so future-compatibility
@@ -67,7 +68,7 @@ where
         // allowed to implement a generic parameter of this trait ref,
         // which means impls could only come from dependencies of this
         // crate, which we already know about.
-        return Ok(Ok(()));
+        return Ok(());
     }
 
     // This is a remote non-fundamental trait, so if another crate
@@ -78,17 +79,14 @@ where
     // and if we are an intermediate owner, then we don't care
     // about future-compatibility, which means that we're OK if
     // we are an owner.
-    if orphan_check_trait_ref(
+    match orphan_check_trait_ref(
         infcx,
         trait_ref,
         InCrate::Local { mode: OrphanCheckMode::Proper },
-        &mut lazily_normalize_ty,
-    )?
-    .is_ok()
-    {
-        Ok(Ok(()))
-    } else {
-        Ok(Err(Conflict::Upstream))
+        &mut |ty| Ok::<_, Infallible>(ty),
+    ) {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(_)) => Err(Conflict::Upstream),
     }
 }
 

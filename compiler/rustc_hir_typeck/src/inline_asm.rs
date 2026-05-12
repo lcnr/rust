@@ -117,7 +117,7 @@ impl<'a, 'tcx> InlineAsmCtxt<'a, 'tcx> {
                         // FIXME: `try_structurally_resolve_const` doesn't eval consts
                         // in the old solver.
                         let len = if self.fcx.next_trait_solver() {
-                            self.fcx.try_structurally_resolve_const(span, len)
+                            self.fcx.try_structurally_resolve_const(len)
                         } else {
                             self.fcx.tcx.normalize_erasing_regions(
                                 self.fcx.typing_env(self.fcx.param_env),

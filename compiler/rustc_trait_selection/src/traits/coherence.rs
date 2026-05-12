@@ -801,31 +801,13 @@ impl<'a, 'tcx> ProofTreeVisitor<'tcx> for AmbiguityCausesVisitor<'a, 'tcx> {
             return;
         };
 
-        let lazily_normalize_ty = |mut ty: Ty<'tcx>| {
-            if matches!(ty.kind(), ty::Alias(..)) {
-                let ocx = ObligationCtxt::new(infcx);
-                ty = ocx
-                    .structurally_normalize_ty(
-                        &ObligationCause::dummy(),
-                        param_env,
-                        Unnormalized::new_wip(ty),
-                    )
-                    .map_err(|_| ())?;
-                if !ocx.try_evaluate_obligations().is_empty() {
-                    return Err(());
-                }
-            }
-            Ok(ty)
-        };
-
         infcx.probe(|_| {
-            let conflict = match trait_ref_is_knowable(infcx, trait_ref, lazily_normalize_ty) {
-                Err(()) => return,
-                Ok(Ok(())) => {
+            let conflict = match trait_ref_is_knowable(infcx, trait_ref) {
+                Ok(()) => {
                     warn!("expected an unknowable trait ref: {trait_ref:?}");
                     return;
                 }
-                Ok(Err(conflict)) => conflict,
+                Err(conflict) => conflict,
             };
 
             // It is only relevant that a goal is unknowable if it would have otherwise

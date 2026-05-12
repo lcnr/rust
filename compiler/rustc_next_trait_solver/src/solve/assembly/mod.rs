@@ -53,26 +53,30 @@ where
 
     fn trait_ref(self, cx: I) -> ty::TraitRef<I>;
 
-    fn with_replaced_self_ty(self, cx: I, self_ty: I::Ty) -> Self;
-
     fn trait_def_id(self, cx: I) -> I::TraitId;
 
     /// Consider a clause, which consists of a "assumption" and some "requirements",
     /// to satisfy a goal. If the requirements hold, then attempt to satisfy our
     /// goal by equating it with the assumption.
-    fn probe_and_consider_implied_clause(
+    fn probe_and_consider_unnormalized_implied_clause(
         ecx: &mut EvalCtxt<'_, D>,
         parent_source: CandidateSource<I>,
         goal: Goal<I, Self>,
-        assumption: I::Clause,
+        assumption: Unnormalized<I, I::Clause>,
         requirements: impl IntoIterator<Item = (GoalSource, Goal<I, I::Predicate>)>,
     ) -> Result<Candidate<I>, NoSolutionOrRerunNonErased> {
-        Self::probe_and_match_goal_against_assumption(ecx, parent_source, goal, assumption, |ecx| {
-            for (nested_source, goal) in requirements {
-                ecx.add_goal(nested_source, goal);
-            }
-            ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
-        })
+        Self::probe_and_match_goal_against_unnormalized_assumption(
+            ecx,
+            parent_source,
+            goal,
+            assumption,
+            |ecx| {
+                for (nested_source, goal) in requirements {
+                    ecx.add_goal(nested_source, goal);
+                }
+                ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
+            },
+        )
     }
 
     /// Consider a clause specifically for a `dyn Trait` self type. This requires
@@ -84,45 +88,55 @@ where
         ecx: &mut EvalCtxt<'_, D>,
         source: CandidateSource<I>,
         goal: Goal<I, Self>,
-        assumption: I::Clause,
+        assumption: Unnormalized<I, I::Clause>,
     ) -> Result<Candidate<I>, NoSolutionOrRerunNonErased> {
-        Self::probe_and_match_goal_against_assumption(ecx, source, goal, assumption, |ecx| {
-            let cx = ecx.cx();
-            let ty::Dynamic(bounds, _) = goal.predicate.self_ty().kind() else {
-                panic!("expected object type in `probe_and_consider_object_bound_candidate`");
-            };
+        Self::probe_and_match_goal_against_unnormalized_assumption(
+            ecx,
+            source,
+            goal,
+            assumption,
+            |ecx| {
+                let cx = ecx.cx();
+                let ty::Dynamic(bounds, _) = goal.predicate.self_ty().kind() else {
+                    panic!("expected object type in `probe_and_consider_object_bound_candidate`");
+                };
 
-            let trait_ref = assumption.kind().map_bound(|clause| match clause {
-                ty::ClauseKind::Trait(pred) => pred.trait_ref,
-                ty::ClauseKind::Projection(proj) => proj.projection_term.trait_ref(cx),
+                let trait_ref = assumption.kind().map_bound(|clause| match clause {
+                    ty::ClauseKind::Trait(pred) => pred.trait_ref,
+                    ty::ClauseKind::Projection(proj) => proj.projection_term.trait_ref(cx),
 
-                ty::ClauseKind::RegionOutlives(..)
-                | ty::ClauseKind::TypeOutlives(..)
-                | ty::ClauseKind::ConstArgHasType(..)
-                | ty::ClauseKind::WellFormed(..)
-                | ty::ClauseKind::ConstEvaluatable(..)
-                | ty::ClauseKind::HostEffect(..)
-                | ty::ClauseKind::UnstableFeature(..) => {
-                    unreachable!("expected trait or projection predicate as an assumption")
-                }
-            });
+                    ty::ClauseKind::RegionOutlives(..)
+                    | ty::ClauseKind::TypeOutlives(..)
+                    | ty::ClauseKind::ConstArgHasType(..)
+                    | ty::ClauseKind::WellFormed(..)
+                    | ty::ClauseKind::ConstEvaluatable(..)
+                    | ty::ClauseKind::HostEffect(..)
+                    | ty::ClauseKind::UnstableFeature(..) => {
+                        unreachable!("expected trait or projection predicate as an assumption")
+                    }
+                });
 
-            match structural_traits::predicates_for_object_candidate(
-                ecx,
-                goal.param_env,
-                trait_ref,
-                bounds,
-            ) {
-                Ok(requirements) => {
-                    ecx.add_goals(GoalSource::ImplWhereBound, requirements);
-                    ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
+                match structural_traits::predicates_for_object_candidate(
+                    ecx,
+                    goal.param_env,
+                    trait_ref,
+                    bounds,
+                ) {
+                    Ok(requirements) => {
+                        for goal in requirements.iter() {
+                            let normalized = ecx.normalize(goal.param_env, goal.predicate)?;
+                            ecx.add_goal(GoalSource::ImplWhereBound, goal.with(cx, normalized));
+                        }
+                        ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
+                    }
+
+                    Err(Ok(Ambiguous)) => {
+                        ecx.evaluate_added_goals_and_make_canonical_response(Certainty::AMBIGUOUS)
+                    }
+                    Err(Err(err)) => return Err(err),
                 }
-                Err(Ok(Ambiguous)) => {
-                    ecx.evaluate_added_goals_and_make_canonical_response(Certainty::AMBIGUOUS)
-                }
-                Err(Err(err)) => return Err(err),
-            }
-        })
+            },
+        )
     }
 
     /// Assemble additional assumptions for an alias that are not included
@@ -139,7 +153,7 @@ where
         goal: Goal<I, Self>,
         assumption: I::Clause,
     ) -> Result<Result<Candidate<I>, CandidateHeadUsages>, RerunNonErased> {
-        match Self::fast_reject_assumption(ecx, goal, assumption) {
+        match Self::fast_reject_assumption(ecx, goal, Unnormalized::new_wip(assumption)) {
             Ok(()) => {}
             Err(NoSolution) => return Ok(Err(CandidateHeadUsages::default())),
         }
@@ -150,10 +164,10 @@ where
         // We need to write into `source` inside of `match_assumption`, but need to access it
         // in `probe` even if the candidate does not apply before we get there. We handle this
         // by using a `Cell` here. We only ever write into it inside of `match_assumption`.
-        let source = Cell::new(CandidateSource::ParamEnv(ParamEnvSource::Global));
+        let source = Cell::new(ParamEnvSource::Global);
         let (result, head_usages) = ecx
             .probe(|result: &QueryResult<I>| inspect::ProbeKind::TraitCandidate {
-                source: source.get(),
+                source: CandidateSource::ParamEnv(source.get()),
                 result: *result,
             })
             .enter_single_candidate(|ecx| {
@@ -163,18 +177,35 @@ where
                     assumption,
                     |ecx| -> Result<_, NoSolutionOrRerunNonErased> {
                         ecx.try_evaluate_added_goals()?;
-                        let (src, certainty) =
-                            ecx.characterize_param_env_assumption(goal.param_env, assumption)?;
-                        source.set(src);
-                        ecx.evaluate_added_goals_and_make_canonical_response(certainty)
+                        source.set(ecx.characterize_param_env_assumption(assumption));
+                        ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
                     },
                 )
                 .map_err(Into::into)
             });
 
         Ok(match result.map_err_to_rerun()? {
-            Ok(result) => Ok(Candidate { source: source.get(), result, head_usages }),
+            Ok(result) => Ok(Candidate {
+                source: CandidateSource::ParamEnv(source.get()),
+                result,
+                head_usages,
+            }),
             Err(NoSolution) => Err(head_usages),
+        })
+    }
+
+    fn probe_and_match_goal_against_unnormalized_assumption(
+        ecx: &mut EvalCtxt<'_, D>,
+        source: CandidateSource<I>,
+        goal: Goal<I, Self>,
+        assumption: Unnormalized<I, I::Clause>,
+        then: impl FnOnce(&mut EvalCtxt<'_, D>) -> QueryResultOrRerunNonErased<I>,
+    ) -> Result<Candidate<I>, NoSolutionOrRerunNonErased> {
+        Self::fast_reject_assumption(ecx, goal, assumption)?;
+
+        ecx.probe_trait_candidate(source).enter(|ecx| {
+            let assumption = ecx.normalize(goal.param_env, assumption)?;
+            Self::match_assumption(ecx, goal, assumption, then)
         })
     }
 
@@ -182,14 +213,14 @@ where
     /// holds, then execute the `then` callback, which should do any additional
     /// work, then produce a response (typically by executing
     /// [`EvalCtxt::evaluate_added_goals_and_make_canonical_response`]).
-    fn probe_and_match_goal_against_assumption(
+    fn probe_and_match_goal_against_normalized_assumption(
         ecx: &mut EvalCtxt<'_, D>,
         source: CandidateSource<I>,
         goal: Goal<I, Self>,
         assumption: I::Clause,
         then: impl FnOnce(&mut EvalCtxt<'_, D>) -> QueryResultOrRerunNonErased<I>,
     ) -> Result<Candidate<I>, NoSolutionOrRerunNonErased> {
-        Self::fast_reject_assumption(ecx, goal, assumption)?;
+        Self::fast_reject_assumption(ecx, goal, Unnormalized::new_wip(assumption))?;
 
         ecx.probe_trait_candidate(source)
             .enter(|ecx| Self::match_assumption(ecx, goal, assumption, then))
@@ -200,7 +231,7 @@ where
     fn fast_reject_assumption(
         ecx: &mut EvalCtxt<'_, D>,
         goal: Goal<I, Self>,
-        assumption: I::Clause,
+        assumption: Unnormalized<I, I::Clause>,
     ) -> Result<(), NoSolution>;
 
     /// Relate the goal and assumption.
@@ -437,16 +468,9 @@ where
         let mut candidates = vec![];
         let mut failed_candidate_info =
             FailedCandidateInfo { param_env_head_usages: CandidateHeadUsages::default() };
-        let Ok(normalized_self_ty) =
-            self.structurally_normalize_ty(goal.param_env, goal.predicate.self_ty())
-        else {
-            return Ok((candidates, failed_candidate_info));
-        };
 
-        let goal: Goal<I, G> = goal
-            .with(self.cx(), goal.predicate.with_replaced_self_ty(self.cx(), normalized_self_ty));
-
-        if normalized_self_ty.is_ty_var() {
+        let self_ty = goal.predicate.self_ty();
+        if self_ty.is_ty_var() {
             debug!("self type has been normalized to infer");
             self.try_assemble_bounds_via_registered_opaques(goal, assemble_from, &mut candidates)?;
             return Ok((candidates, failed_candidate_info));
@@ -503,7 +527,7 @@ where
                 // This is somewhat inconsistent and may make #57893 slightly easier to exploit.
                 // However, it matches the behavior of the old solver. See
                 // `tests/ui/traits/next-solver/normalization-shadowing/use_object_if_empty_env.rs`.
-                if matches!(normalized_self_ty.kind(), ty::Dynamic(..))
+                if matches!(self_ty.kind(), ty::Dynamic(..))
                     && !candidates.iter().any(|c| matches!(c.source, CandidateSource::ParamEnv(_)))
                 {
                     self.assemble_object_bound_candidates(goal, &mut candidates);
@@ -806,9 +830,8 @@ where
                     .cx()
                     .item_self_bounds(alias_ty.kind.def_id())
                     .iter_instantiated(self.cx(), alias_ty.args)
-                    .map(Unnormalized::skip_norm_wip)
                 {
-                    candidates.extend(G::probe_and_consider_implied_clause(
+                    candidates.extend(G::probe_and_consider_unnormalized_implied_clause(
                         self,
                         CandidateSource::AliasBound(consider_self_bounds),
                         goal,
@@ -822,9 +845,8 @@ where
                     .cx()
                     .item_non_self_bounds(alias_ty.kind.def_id())
                     .iter_instantiated(self.cx(), alias_ty.args)
-                    .map(Unnormalized::skip_norm_wip)
                 {
-                    candidates.extend(G::probe_and_consider_implied_clause(
+                    candidates.extend(G::probe_and_consider_unnormalized_implied_clause(
                         self,
                         CandidateSource::AliasBound(consider_self_bounds),
                         goal,
@@ -841,17 +863,12 @@ where
             return Ok(());
         }
 
-        // Recurse on the self type of the projection.
-        match self.structurally_normalize_ty(goal.param_env, alias_ty.self_ty()) {
-            Ok(next_self_ty) => self.assemble_alias_bound_candidates_recur(
-                next_self_ty,
-                goal,
-                candidates,
-                AliasBoundKind::NonSelfBounds,
-            ),
-            Err(NoSolutionOrRerunNonErased::NoSolution(NoSolution)) => Ok(()),
-            Err(NoSolutionOrRerunNonErased::RerunNonErased(e)) => Err(e),
-        }
+        self.assemble_alias_bound_candidates_recur(
+            alias_ty.self_ty(),
+            goal,
+            candidates,
+            AliasBoundKind::NonSelfBounds,
+        )
     }
 
     #[instrument(level = "trace", skip_all)]
@@ -920,7 +937,7 @@ where
                         self,
                         CandidateSource::BuiltinImpl(BuiltinImplSource::Misc),
                         goal,
-                        bound.with_self_ty(cx, self_ty),
+                        Unnormalized::new_wip(bound.with_self_ty(cx, self_ty)),
                     ));
                 }
             }
@@ -936,7 +953,7 @@ where
                     self,
                     CandidateSource::BuiltinImpl(BuiltinImplSource::Object(idx)),
                     goal,
-                    assumption.upcast(cx),
+                    Unnormalized::new_wip(assumption.upcast(cx)),
                 ));
             }
         }
@@ -956,7 +973,7 @@ where
         self.probe_trait_candidate(CandidateSource::CoherenceUnknowable).enter(|ecx| {
             let cx = ecx.cx();
             let trait_ref = goal.predicate.trait_ref(cx);
-            if ecx.trait_ref_is_knowable(goal.param_env, trait_ref)? {
+            if ecx.trait_ref_is_knowable(trait_ref) {
                 Err(NoSolution.into())
             } else {
                 // While the trait bound itself may be unknowable, we may be able to
@@ -1106,11 +1123,11 @@ where
                 .cx()
                 .item_self_bounds(alias_ty.kind.def_id())
                 .iter_instantiated(self.cx(), alias_ty.args)
-                .map(Unnormalized::skip_norm_wip)
             {
-                let assumption =
-                    item_bound.fold_with(&mut ReplaceOpaque { cx: self.cx(), alias_ty, self_ty });
-                candidates.extend(G::probe_and_match_goal_against_assumption(
+                let assumption = item_bound.map(|item_bound| {
+                    item_bound.fold_with(&mut ReplaceOpaque { cx: self.cx(), alias_ty, self_ty })
+                });
+                candidates.extend(G::probe_and_match_goal_against_unnormalized_assumption(
                     self,
                     CandidateSource::AliasBound(AliasBoundKind::SelfBounds),
                     goal,
@@ -1306,39 +1323,22 @@ where
     /// The `i32: From<T::Assoc>` bound is non-global before normalization, but is global after.
     /// Since the old trait solver normalized param-envs eagerly, we want to emulate this
     /// behavior lazily.
-    fn characterize_param_env_assumption(
-        &mut self,
-        param_env: I::ParamEnv,
-        assumption: I::Clause,
-    ) -> Result<(CandidateSource<I>, Certainty), NoSolution> {
+    fn characterize_param_env_assumption(&mut self, assumption: I::Clause) -> ParamEnvSource {
         // FIXME: This should be fixed, but it also requires changing the behavior
         // in the old solver which is currently relied on.
         if assumption.has_bound_vars() {
-            return Ok((CandidateSource::ParamEnv(ParamEnvSource::NonGlobal), Certainty::Yes));
+            return ParamEnvSource::NonGlobal;
         }
 
-        match assumption.visit_with(&mut FindParamInClause {
-            ecx: self,
-            param_env,
-            universes: vec![],
-            recursion_depth: 0,
-        }) {
-            ControlFlow::Break(Err(NoSolution)) => Err(NoSolution),
-            ControlFlow::Break(Ok(certainty)) => {
-                Ok((CandidateSource::ParamEnv(ParamEnvSource::NonGlobal), certainty))
-            }
-            ControlFlow::Continue(()) => {
-                Ok((CandidateSource::ParamEnv(ParamEnvSource::Global), Certainty::Yes))
-            }
+        match assumption.visit_with(&mut FindParamInClause { ecx: self }) {
+            ControlFlow::Break(()) => ParamEnvSource::NonGlobal,
+            ControlFlow::Continue(()) => ParamEnvSource::Global,
         }
     }
 }
 
 struct FindParamInClause<'a, 'b, D: SolverDelegate<Interner = I>, I: Interner> {
     ecx: &'a mut EvalCtxt<'b, D>,
-    param_env: I::ParamEnv,
-    universes: Vec<Option<ty::UniverseIndex>>,
-    recursion_depth: usize,
 }
 
 impl<D, I> TypeVisitor<I> for FindParamInClause<'_, '_, D, I>
@@ -1346,77 +1346,36 @@ where
     D: SolverDelegate<Interner = I>,
     I: Interner,
 {
-    // - `Continue(())`: no generic parameter was found, the type is global
-    // - `Break(Ok(Certainty::Yes))`: a generic parameter was found, the type is non-global
-    // - `Break(Ok(Certainty::Maybe(_)))`: the recursion limit reached, assume that the type is non-global
-    // - `Break(Err(NoSolution))`: normalization failed
-    type Result = ControlFlow<Result<Certainty, NoSolution>>;
-
-    fn visit_binder<T: TypeVisitable<I>>(&mut self, t: &ty::Binder<I, T>) -> Self::Result {
-        self.universes.push(None);
-        t.super_visit_with(self)?;
-        self.universes.pop();
-        ControlFlow::Continue(())
-    }
+    type Result = ControlFlow<()>;
 
     fn visit_ty(&mut self, ty: I::Ty) -> Self::Result {
-        let ty = self.ecx.replace_bound_vars(ty, &mut self.universes);
-        let Ok(ty) = self.ecx.structurally_normalize_ty(self.param_env, ty) else {
-            return ControlFlow::Break(Err(NoSolution));
-        };
-
         match ty.kind() {
             ty::Placeholder(p) => {
                 if p.universe() == ty::UniverseIndex::ROOT {
-                    ControlFlow::Break(Ok(Certainty::Yes))
+                    ControlFlow::Break(())
                 } else {
                     ControlFlow::Continue(())
                 }
             }
-            ty::Infer(_) => ControlFlow::Break(Ok(Certainty::AMBIGUOUS)),
-            _ if ty.has_type_flags(
-                TypeFlags::HAS_PLACEHOLDER | TypeFlags::HAS_INFER | TypeFlags::HAS_ALIAS,
-            ) =>
-            {
-                self.recursion_depth += 1;
-                if self.recursion_depth > self.ecx.cx().recursion_limit() {
-                    return ControlFlow::Break(Ok(Certainty::Maybe(MaybeInfo {
-                        cause: MaybeCause::Overflow {
-                            suggest_increasing_limit: true,
-                            keep_constraints: false,
-                        },
-                        opaque_types_jank: OpaqueTypesJank::AllGood,
-                        stalled_on_coroutines: StalledOnCoroutines::No,
-                    })));
-                }
-                let result = ty.super_visit_with(self);
-                self.recursion_depth -= 1;
-                result
+            ty::Infer(_) => ControlFlow::Break(()),
+            _ if ty.has_type_flags(TypeFlags::HAS_PLACEHOLDER | TypeFlags::HAS_INFER) => {
+                ty.super_visit_with(self)
             }
             _ => ControlFlow::Continue(()),
         }
     }
 
     fn visit_const(&mut self, ct: I::Const) -> Self::Result {
-        let ct = self.ecx.replace_bound_vars(ct, &mut self.universes);
-        let Ok(ct) = self.ecx.structurally_normalize_const(self.param_env, ct) else {
-            return ControlFlow::Break(Err(NoSolution));
-        };
-
         match ct.kind() {
             ty::ConstKind::Placeholder(p) => {
                 if p.universe() == ty::UniverseIndex::ROOT {
-                    ControlFlow::Break(Ok(Certainty::Yes))
+                    ControlFlow::Break(())
                 } else {
                     ControlFlow::Continue(())
                 }
             }
-            ty::ConstKind::Infer(_) => ControlFlow::Break(Ok(Certainty::AMBIGUOUS)),
-            _ if ct.has_type_flags(
-                TypeFlags::HAS_PLACEHOLDER | TypeFlags::HAS_INFER | TypeFlags::HAS_ALIAS,
-            ) =>
-            {
-                // FIXME(mgca): we should also check the recursion limit here
+            ty::ConstKind::Infer(_) => ControlFlow::Break(()),
+            _ if ct.has_type_flags(TypeFlags::HAS_PLACEHOLDER | TypeFlags::HAS_INFER) => {
                 ct.super_visit_with(self)
             }
             _ => ControlFlow::Continue(()),
@@ -1428,12 +1387,12 @@ where
             ty::ReStatic | ty::ReError(_) | ty::ReBound(..) => ControlFlow::Continue(()),
             ty::RePlaceholder(p) => {
                 if p.universe() == ty::UniverseIndex::ROOT {
-                    ControlFlow::Break(Ok(Certainty::Yes))
+                    ControlFlow::Break(())
                 } else {
                     ControlFlow::Continue(())
                 }
             }
-            ty::ReVar(_) => ControlFlow::Break(Ok(Certainty::Yes)),
+            ty::ReVar(_) => ControlFlow::Break(()),
             ty::ReErased | ty::ReEarlyParam(_) | ty::ReLateParam(_) => {
                 unreachable!("unexpected region in param-env clause")
             }

@@ -35,7 +35,7 @@ where
                 );
                 // Trying to normalize an opaque type during coherence is always ambiguous.
                 // We add a nested ambiguous goal here instead of using `Certainty::AMBIGUOUS`.
-                // This allows us to return the nested goals to the parent `AliasRelate` goal.
+                // This allows us to return the nested goals to the parent `Projection` goal.
                 // This can then allow nested goals to fail after we've constrained the `term`.
                 self.add_goal(GoalSource::Misc, goal.with(cx, ty::PredicateKind::Ambiguous));
                 self.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
@@ -50,34 +50,13 @@ where
                     .filter(|&def_id| defining_opaque_types.contains(&def_id.into()))
                 else {
                     // If we're not in the defining scope, treat the alias as rigid.
-                    self.structurally_instantiate_normalizes_to_term(goal, goal.predicate.alias);
+                    self.instantiate_normalizes_to_term(goal, goal.predicate.alias.to_term(cx));
                     return self
                         .evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
                         .map_err(Into::into);
                 };
 
-                // We structurally normalize the args so that we're able to detect defining uses
-                // later on.
-                //
-                // This reduces the amount of duplicate definitions in the `opaque_type_storage` and
-                // strengthens inference. This causes us to subtly depend on the normalization behavior
-                // when inferring the hidden type of opaques.
-                //
-                // E.g. it's observable that we don't normalize nested aliases with bound vars in
-                // `structurally_normalize` and because we use structural lookup, we also don't
-                // reuse an entry for `Tait<for<'a> fn(&'a ())>` for `Tait<for<'b> fn(&'b ())>`.
-                let normalized_args =
-                    cx.mk_args_from_iter(opaque_ty.args.iter().map(|arg| match arg.kind() {
-                        ty::GenericArgKind::Lifetime(lt) => Ok(lt.into()),
-                        ty::GenericArgKind::Type(ty) => {
-                            self.structurally_normalize_ty(goal.param_env, ty).map(Into::into)
-                        }
-                        ty::GenericArgKind::Const(ct) => {
-                            self.structurally_normalize_const(goal.param_env, ct).map(Into::into)
-                        }
-                    }))?;
-
-                let opaque_type_key = ty::OpaqueTypeKey { def_id, args: normalized_args };
+                let opaque_type_key = ty::OpaqueTypeKey { def_id, args: opaque_ty.args };
                 if let Some(prev) = self.register_hidden_type_in_storage(opaque_type_key, expected)
                 {
                     self.eq(goal.param_env, expected, prev)?;
@@ -91,11 +70,13 @@ where
                             let actual = cx
                                 .type_of_opaque_hir_typeck(def_id)
                                 .instantiate(cx, opaque_ty.args)
-                                .skip_norm_wip();
-                            let actual = fold_regions(cx, actual, |re, _dbi| match re.kind() {
-                                ty::ReErased => self.next_region_var(),
-                                _ => re,
-                            });
+                                .map(|ty| {
+                                    fold_regions(cx, ty, |re, _dbi| match re.kind() {
+                                        ty::ReErased => self.next_region_var(),
+                                        _ => re,
+                                    })
+                                });
+                            let actual = self.normalize(goal.param_env, actual)?;
                             self.eq(goal.param_env, expected, actual)?;
                         }
                         TypingMode::Coherence
@@ -106,7 +87,7 @@ where
 
                 self.add_item_bounds_for_hidden_type(
                     def_id.into(),
-                    normalized_args,
+                    opaque_ty.args,
                     goal.param_env,
                     expected,
                 );
@@ -119,29 +100,30 @@ where
                     .as_local()
                     .filter(|&def_id| defined_opaque_types.contains(&def_id))
                 else {
-                    self.structurally_instantiate_normalizes_to_term(goal, goal.predicate.alias);
+                    self.instantiate_normalizes_to_term(goal, goal.predicate.alias.to_term(cx));
                     return self
                         .evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
                         .map_err(Into::into);
                 };
 
-                let actual =
-                    cx.type_of(def_id.into()).instantiate(cx, opaque_ty.args).skip_norm_wip();
                 // FIXME: Actually use a proper binder here instead of relying on `ReErased`.
                 //
                 // This is also probably unsound or sth :shrug:
-                let actual = fold_regions(cx, actual, |re, _dbi| match re.kind() {
-                    ty::ReErased => self.next_region_var(),
-                    _ => re,
+                let actual = cx.type_of(def_id.into()).instantiate(cx, opaque_ty.args).map(|ty| {
+                    fold_regions(cx, ty, |re, _dbi| match re.kind() {
+                        ty::ReErased => self.next_region_var(),
+                        _ => re,
+                    })
                 });
+                let actual = self.normalize(goal.param_env, actual)?;
                 self.eq(goal.param_env, expected, actual)?;
                 self.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
                     .map_err(Into::into)
             }
             TypingMode::PostAnalysis => {
                 // FIXME: Add an assertion that opaque type storage is empty.
-                let actual =
-                    cx.type_of(def_id.into()).instantiate(cx, opaque_ty.args).skip_norm_wip();
+                let actual = cx.type_of(def_id.into()).instantiate(cx, opaque_ty.args);
+                let actual = self.normalize(goal.param_env, actual)?;
                 self.eq(goal.param_env, expected, actual)?;
                 self.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
                     .map_err(Into::into)
@@ -166,7 +148,7 @@ where
                 }
 
                 // Always treat the opaque type as rigid.
-                self.structurally_instantiate_normalizes_to_term(goal, goal.predicate.alias);
+                self.instantiate_normalizes_to_term(goal, goal.predicate.alias.to_term(cx));
                 self.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
                     .map_err(Into::into)
             }

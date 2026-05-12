@@ -9,7 +9,7 @@ use rustc_infer::traits::{
 };
 use rustc_middle::traits::query::NoSolution;
 use rustc_middle::ty::error::{ExpectedFound, TypeError};
-use rustc_middle::ty::{self, Ty, TyCtxt, TypeVisitableExt};
+use rustc_middle::ty::{self, TyCtxt, TypeVisitableExt};
 use rustc_middle::{bug, span_bug};
 use rustc_next_trait_solver::solve::{GoalEvaluation, MaybeInfo, SolverDelegateEvalExt as _};
 use tracing::{instrument, trace};
@@ -53,9 +53,6 @@ pub(super) fn fulfillment_error_for_no_solution<'tcx>(
             })
         }
         ty::PredicateKind::NormalizesTo(..) => {
-            FulfillmentErrorCode::Project(MismatchedProjectionTypes { err: TypeError::Mismatch })
-        }
-        ty::PredicateKind::AliasRelate(_, _, _) => {
             FulfillmentErrorCode::Project(MismatchedProjectionTypes { err: TypeError::Mismatch })
         }
         ty::PredicateKind::Subtype(ty::SubtypePredicate { a, b, a_is_expected: _ }) => {
@@ -291,37 +288,6 @@ impl<'tcx> BestObligation<'tcx> {
         ControlFlow::Break(self.obligation.clone())
     }
 
-    /// If a normalization of an associated item or a trait goal fails without trying any
-    /// candidates it's likely that normalizing its self type failed. We manually detect
-    /// such cases here.
-    fn detect_error_in_self_ty_normalization(
-        &mut self,
-        goal: &inspect::InspectGoal<'_, 'tcx>,
-        self_ty: Ty<'tcx>,
-    ) -> ControlFlow<PredicateObligation<'tcx>> {
-        assert!(!self.consider_ambiguities);
-        let tcx = goal.infcx().tcx;
-        if let ty::Alias(..) = self_ty.kind() {
-            let infer_term = goal.infcx().next_ty_var(self.obligation.cause.span);
-            let pred = ty::PredicateKind::AliasRelate(
-                self_ty.into(),
-                infer_term.into(),
-                ty::AliasRelationDirection::Equate,
-            );
-            let obligation =
-                Obligation::new(tcx, self.obligation.cause.clone(), goal.goal().param_env, pred);
-            self.with_derived_obligation(obligation, |this| {
-                goal.infcx().visit_proof_tree_at_depth(
-                    goal.goal().with(tcx, pred),
-                    goal.depth() + 1,
-                    this,
-                )
-            })
-        } else {
-            ControlFlow::Continue(())
-        }
-    }
-
     /// When a higher-ranked projection goal fails, check that the corresponding
     /// higher-ranked trait goal holds or not. This is because the process of
     /// instantiating and then re-canonicalizing the binder of the projection goal
@@ -392,14 +358,10 @@ impl<'tcx> BestObligation<'tcx> {
         let pred_kind = goal.goal().predicate.kind();
 
         match pred_kind.no_bound_vars() {
-            Some(ty::PredicateKind::Clause(ty::ClauseKind::Trait(pred))) => {
-                self.detect_error_in_self_ty_normalization(goal, pred.self_ty())?;
-            }
             Some(ty::PredicateKind::NormalizesTo(pred))
                 if let ty::AliasTermKind::ProjectionTy { .. }
                 | ty::AliasTermKind::ProjectionConst { .. } = pred.alias.kind =>
             {
-                self.detect_error_in_self_ty_normalization(goal, pred.alias.self_ty())?;
                 self.detect_non_well_formed_assoc_item(goal, pred.alias)?;
             }
             Some(_) | None => {}
@@ -549,21 +511,6 @@ impl<'tcx> ProofTreeVisitor<'tcx> for BestObligation<'tcx> {
             }
 
             self.with_derived_obligation(obligation, |this| nested_goal.visit_with(this))?;
-        }
-
-        // alias-relate may fail because the lhs or rhs can't be normalized,
-        // and therefore is treated as rigid.
-        if let Some(ty::PredicateKind::AliasRelate(lhs, rhs, _)) = pred.kind().no_bound_vars() {
-            goal.infcx().visit_proof_tree_at_depth(
-                goal.goal().with(tcx, ty::ClauseKind::WellFormed(lhs.into())),
-                goal.depth() + 1,
-                self,
-            )?;
-            goal.infcx().visit_proof_tree_at_depth(
-                goal.goal().with(tcx, ty::ClauseKind::WellFormed(rhs.into())),
-                goal.depth() + 1,
-                self,
-            )?;
         }
 
         self.detect_trait_error_in_higher_ranked_projection(goal)?;

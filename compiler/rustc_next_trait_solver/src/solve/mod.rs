@@ -11,7 +11,6 @@
 //! For a high-level overview of how this solver works, check out the relevant
 //! section of the rustc-dev-guide.
 
-mod alias_relate;
 mod assembly;
 mod effect_goals;
 mod eval_ctxt;
@@ -233,8 +232,6 @@ where
         goal: Goal<I, (I::Const, I::Ty)>,
     ) -> QueryResultOrRerunNonErased<I> {
         let (ct, ty) = goal.predicate;
-        let ct = self.structurally_normalize_const(goal.param_env, ct)?;
-
         let ct_ty = match ct.kind() {
             ty::ConstKind::Infer(_) => {
                 return self
@@ -327,65 +324,6 @@ where
             return Err(NoSolution);
         } else {
             Ok(self.bail_with_ambiguity(candidates))
-        }
-    }
-
-    /// Normalize a type for when it is structurally matched on.
-    ///
-    /// This function is necessary in nearly all cases before matching on a type.
-    /// Not doing so is likely to be incomplete and therefore unsound during
-    /// coherence.
-    #[instrument(level = "trace", skip(self, param_env), ret)]
-    fn structurally_normalize_ty(
-        &mut self,
-        param_env: I::ParamEnv,
-        ty: I::Ty,
-    ) -> Result<I::Ty, NoSolutionOrRerunNonErased> {
-        self.structurally_normalize_term(param_env, ty.into()).map(|term| term.expect_ty())
-    }
-
-    /// Normalize a const for when it is structurally matched on, or more likely
-    /// when it needs `.try_to_*` called on it (e.g. to turn it into a usize).
-    ///
-    /// This function is necessary in nearly all cases before matching on a const.
-    /// Not doing so is likely to be incomplete and therefore unsound during
-    /// coherence.
-    #[instrument(level = "trace", skip(self, param_env), ret)]
-    fn structurally_normalize_const(
-        &mut self,
-        param_env: I::ParamEnv,
-        ct: I::Const,
-    ) -> Result<I::Const, NoSolutionOrRerunNonErased> {
-        self.structurally_normalize_term(param_env, ct.into()).map(|term| term.expect_const())
-    }
-
-    /// Normalize a term for when it is structurally matched on.
-    ///
-    /// This function is necessary in nearly all cases before matching on a ty/const.
-    /// Not doing so is likely to be incomplete and therefore unsound during coherence.
-    fn structurally_normalize_term(
-        &mut self,
-        param_env: I::ParamEnv,
-        term: I::Term,
-    ) -> Result<I::Term, NoSolutionOrRerunNonErased> {
-        if let Some(_) = term.to_alias_term(self.cx()) {
-            let normalized_term = self.next_term_infer_of_kind(term);
-            let alias_relate_goal = Goal::new(
-                self.cx(),
-                param_env,
-                ty::PredicateKind::AliasRelate(
-                    term,
-                    normalized_term,
-                    ty::AliasRelationDirection::Equate,
-                ),
-            );
-            // We normalize the self type to be able to relate it with
-            // types from candidates.
-            self.add_goal(GoalSource::TypeRelating, alias_relate_goal);
-            self.try_evaluate_added_goals()?;
-            Ok(self.resolve_vars_if_possible(normalized_term))
-        } else {
-            Ok(term)
         }
     }
 

@@ -40,10 +40,6 @@ where
         self.trait_ref
     }
 
-    fn with_replaced_self_ty(self, cx: I, self_ty: I::Ty) -> Self {
-        self.with_replaced_self_ty(cx, self_ty)
-    }
-
     fn trait_def_id(self, _: I) -> I::TraitId {
         self.def_id()
     }
@@ -98,26 +94,26 @@ where
         ecx.probe_trait_candidate(CandidateSource::Impl(impl_def_id)).enter(|ecx| {
             let impl_args = ecx.fresh_args_for_item(impl_def_id.into());
             ecx.record_impl_args(impl_args);
-            let impl_trait_ref = impl_trait_ref.instantiate(cx, impl_args).skip_norm_wip();
-
+            let impl_trait_ref = impl_trait_ref.instantiate(cx, impl_args);
+            let impl_trait_ref = ecx.normalize(goal.param_env, impl_trait_ref)?;
             ecx.eq(goal.param_env, goal.predicate.trait_ref, impl_trait_ref)?;
-            let where_clause_bounds = cx
-                .predicates_of(impl_def_id.into())
-                .iter_instantiated(cx, impl_args)
-                .map(Unnormalized::skip_norm_wip)
-                .map(|pred| goal.with(cx, pred));
-            ecx.add_goals(GoalSource::ImplWhereBound, where_clause_bounds);
+
+            for where_clause in
+                cx.predicates_of(impl_def_id.into()).iter_instantiated(cx, impl_args)
+            {
+                let normalized = ecx.normalize(goal.param_env, where_clause)?;
+                ecx.add_goal(GoalSource::ImplWhereBound, goal.with(cx, normalized));
+            }
 
             // We currently elaborate all supertrait outlives obligations from impls.
             // This can be removed when we actually do coinduction correctly, and prove
             // all supertrait obligations unconditionally.
-            ecx.add_goals(
-                GoalSource::Misc,
-                cx.impl_super_outlives(impl_def_id)
-                    .iter_instantiated(cx, impl_args)
-                    .map(Unnormalized::skip_norm_wip)
-                    .map(|pred| goal.with(cx, pred)),
-            );
+            for super_outlives in
+                cx.impl_super_outlives(impl_def_id).iter_instantiated(cx, impl_args)
+            {
+                let normalized = ecx.normalize(goal.param_env, super_outlives)?;
+                ecx.add_goal(GoalSource::Misc, goal.with(cx, normalized));
+            }
 
             then(ecx, maximal_certainty).map_err(Into::into)
         })
@@ -134,7 +130,7 @@ where
     fn fast_reject_assumption(
         ecx: &mut EvalCtxt<'_, D>,
         goal: Goal<I, Self>,
-        assumption: I::Clause,
+        assumption: Unnormalized<I, I::Clause>,
     ) -> Result<(), NoSolution> {
         fn trait_def_id_matches<I: Interner>(
             cx: I,
@@ -393,7 +389,7 @@ where
         let pred =
             ty::TraitRef::new(cx, goal.predicate.def_id(), [goal.predicate.self_ty(), inputs])
                 .upcast(cx);
-        Self::probe_and_consider_implied_clause(
+        Self::probe_and_consider_normalized_implied_clause(
             ecx,
             CandidateSource::BuiltinImpl(BuiltinImplSource::Misc),
             goal,
@@ -444,7 +440,8 @@ where
             [goal.predicate.self_ty(), tupled_inputs_ty],
         )
         .upcast(cx);
-        Self::probe_and_consider_implied_clause(
+    
+        Self::probe_and_consider_normalized_implied_clause(
             ecx,
             CandidateSource::BuiltinImpl(BuiltinImplSource::Misc),
             goal,
@@ -630,15 +627,15 @@ where
         }
 
         let coroutine = args.as_coroutine();
-        Self::probe_and_consider_implied_clause(
+        Self::probe_and_match_goal_against_normalized_assumption(
             ecx,
             CandidateSource::BuiltinImpl(BuiltinImplSource::Misc),
             goal,
             ty::TraitRef::new(cx, goal.predicate.def_id(), [self_ty, coroutine.resume_ty()])
                 .upcast(cx),
-            // Technically, we need to check that the coroutine types are Sized,
-            // but that's already proven by the coroutine being WF.
-            [],
+            |ecx| {
+                ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
+            },
         )
     }
 
@@ -690,15 +687,10 @@ where
 
         ecx.probe_builtin_trait_candidate(BuiltinImplSource::Misc).enter(
             |ecx| -> Result<_, NoSolutionOrRerunNonErased> {
-                let assume = ecx.structurally_normalize_const(
-                    goal.param_env,
-                    goal.predicate.trait_ref.args.const_at(2),
-                )?;
-
                 let certainty = ecx.is_transmutable(
                     goal.predicate.trait_ref.args.type_at(0),
                     goal.predicate.trait_ref.args.type_at(1),
-                    assume,
+                    goal.predicate.trait_ref.args.const_at(2),
                 )?;
                 ecx.evaluate_added_goals_and_make_canonical_response(certainty).map_err(Into::into)
             },
@@ -821,13 +813,7 @@ where
         let result = ecx.probe(|_| ProbeKind::UnsizeAssembly).enter(
             |ecx| -> Result<Vec<Candidate<I>>, NoSolutionOrRerunNonErased> {
                 let a_ty = goal.predicate.self_ty();
-                // We need to normalize the b_ty since it's matched structurally
-                // in the other functions below.
-                let b_ty = ecx.structurally_normalize_ty(
-                    goal.param_env,
-                    goal.predicate.trait_ref.args.type_at(1),
-                )?;
-
+                let b_ty = goal.predicate.trait_ref.args.type_at(1);
                 let goal = goal.with(ecx.cx(), (a_ty, b_ty));
                 match (a_ty.kind(), b_ty.kind()) {
                     (ty::Infer(ty::TyVar(..)), ..) => panic!("unexpected infer {a_ty:?} {b_ty:?}"),
@@ -1215,8 +1201,10 @@ where
 
         let tail_field_ty = def.struct_tail_ty(cx).unwrap();
 
-        let a_tail_ty = tail_field_ty.instantiate(cx, a_args).skip_norm_wip();
-        let b_tail_ty = tail_field_ty.instantiate(cx, b_args).skip_norm_wip();
+        let a_tail_ty = tail_field_ty.instantiate(cx, a_args);
+        let a_tail_ty = self.normalize(goal.param_env, a_tail_ty)?;
+        let b_tail_ty = tail_field_ty.instantiate(cx, b_args);
+        let b_tail_ty = self.normalize(goal.param_env, b_tail_ty)?;
 
         // Instantiate just the unsizing params from B into A. The type after
         // this instantiation must be equal to B. This is so we don't unsize

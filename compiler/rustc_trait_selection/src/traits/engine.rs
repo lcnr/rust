@@ -27,7 +27,6 @@ use crate::solve::{FulfillmentCtxt as NextFulfillmentCtxt, NextSolverError};
 use crate::traits::fulfill::OldSolverError;
 use crate::traits::{
     FulfillmentError, NormalizeExt, Obligation, ObligationCause, PredicateObligation,
-    StructurallyNormalizeExt,
 };
 
 #[extension(pub trait TraitEngineExt<'tcx, E>)]
@@ -401,38 +400,5 @@ where
     {
         let value = self.infcx.instantiate_binder_with_fresh_vars(cause.span, lbrct, value);
         self.renormalize_ambiguous_aliases(cause, param_env, value)
-    }
-
-    pub fn structurally_normalize_ty(
-        &self,
-        cause: &ObligationCause<'tcx>,
-        param_env: ty::ParamEnv<'tcx>,
-        value: Unnormalized<'tcx, Ty<'tcx>>,
-    ) -> Result<Ty<'tcx>, Vec<E>> {
-        self.infcx
-            .at(cause, param_env)
-            .structurally_normalize_ty(value, &mut **self.engine.borrow_mut())
-    }
-
-    pub fn structurally_normalize_const(
-        &self,
-        cause: &ObligationCause<'tcx>,
-        param_env: ty::ParamEnv<'tcx>,
-        value: Unnormalized<'tcx, ty::Const<'tcx>>,
-    ) -> Result<ty::Const<'tcx>, Vec<E>> {
-        self.infcx
-            .at(cause, param_env)
-            .structurally_normalize_const(value, &mut **self.engine.borrow_mut())
-    }
-
-    pub fn structurally_normalize_term(
-        &self,
-        cause: &ObligationCause<'tcx>,
-        param_env: ty::ParamEnv<'tcx>,
-        value: Unnormalized<'tcx, ty::Term<'tcx>>,
-    ) -> Result<ty::Term<'tcx>, Vec<E>> {
-        self.infcx
-            .at(cause, param_env)
-            .structurally_normalize_term(value, &mut **self.engine.borrow_mut())
     }
 }

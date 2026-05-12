@@ -6,8 +6,8 @@ use rustc_hir::def_id::DefId;
 use rustc_middle::bug;
 use rustc_middle::ty::error::TypeError;
 use rustc_middle::ty::{
-    self, AliasRelationDirection, InferConst, Term, Ty, TyCtxt, TypeSuperVisitable, TypeVisitable,
-    TypeVisitableExt, TypeVisitor,
+    self, InferConst, Term, Ty, TyCtxt, TypeSuperVisitable, TypeVisitable, TypeVisitableExt,
+    TypeVisitor,
 };
 use rustc_span::Span;
 use tracing::{debug, instrument, warn};
@@ -168,25 +168,18 @@ impl<'tcx> InferCtxt<'tcx> {
             // cyclic type. We instead delay the unification in case
             // the alias can be normalized to something which does not
             // mention `?0`.
-            if self.next_trait_solver() {
-                let (lhs, rhs, direction) = match instantiation_variance {
-                    ty::Invariant => {
-                        (generalized_term, source_term, AliasRelationDirection::Equate)
-                    }
-                    ty::Covariant => {
-                        (generalized_term, source_term, AliasRelationDirection::Subtype)
-                    }
-                    ty::Contravariant => {
-                        (source_term, generalized_term, AliasRelationDirection::Subtype)
-                    }
-                    ty::Bivariant => unreachable!("bivariant generalization"),
-                };
+            let Some(source_alias) = source_term.to_alias_term(self.tcx) else {
+                bug!("generalized `{source_term:?} to infer, not an alias");
+            };
 
-                relation.register_predicates([ty::PredicateKind::AliasRelate(lhs, rhs, direction)]);
+            if self.next_trait_solver() {
+                // FIXME(-Znext-solver): This should be unreachable as we know the outermost alias
+                // to always be rigid, so generalization should keep it as rigid.
+                relation.register_predicates([ty::ProjectionPredicate {
+                    projection_term: source_alias,
+                    term: generalized_term,
+                }]);
             } else {
-                let Some(source_alias) = source_term.to_alias_term(self.tcx) else {
-                    bug!("generalized `{source_term:?} to infer, not an alias");
-                };
                 match source_alias.kind(self.tcx) {
                     ty::AliasTermKind::ProjectionTy { .. }
                     | ty::AliasTermKind::ProjectionConst { .. } => {
@@ -458,16 +451,6 @@ impl<'tcx> Generalizer<'_, 'tcx> {
         &mut self,
         alias: ty::AliasTerm<'tcx>,
     ) -> Result<Term<'tcx>, TypeError<'tcx>> {
-        // We do not eagerly replace aliases with inference variables if they have
-        // escaping bound vars, see the method comment for details. However, when we
-        // are inside of an alias with escaping bound vars replacing nested aliases
-        // with inference variables can cause incorrect ambiguity.
-        //
-        // cc trait-system-refactor-initiative#110
-        if self.infcx.next_trait_solver() && !alias.has_escaping_bound_vars() && !self.in_alias {
-            return Ok(self.next_var_for_alias_of_kind(alias));
-        }
-
         let is_nested_alias = mem::replace(&mut self.in_alias, true);
         let result = match self.relate(alias, alias) {
             Ok(alias) => Ok(alias.to_term(self.cx())),
@@ -603,7 +586,8 @@ impl<'tcx> TypeRelation<TyCtxt<'tcx>> for Generalizer<'_, 'tcx> {
                             //
                             // We only need to do so for type and const variables, as
                             // region variables do not impact normalization, and will get
-                            // correctly constrained by `AliasRelate` later on.
+                            // correctly constrained when trying to normalize the alias
+                            // later on.
                             //
                             // cc trait-system-refactor-initiative#108
                             if self.infcx.next_trait_solver()

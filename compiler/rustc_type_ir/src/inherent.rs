@@ -478,6 +478,7 @@ pub trait Predicate<I: Interner<Predicate = Self>>:
     + UpcastFrom<I, ty::TraitRef<I>>
     + UpcastFrom<I, ty::Binder<I, ty::TraitRef<I>>>
     + UpcastFrom<I, ty::TraitPredicate<I>>
+    + UpcastFrom<I, ty::ProjectionPredicate<I>>
     + UpcastFrom<I, ty::OutlivesPredicate<I, I::Ty>>
     + UpcastFrom<I, ty::OutlivesPredicate<I, I::Region>>
     + IntoKind<Kind = ty::Binder<I, ty::PredicateKind<I>>>
@@ -495,9 +496,7 @@ pub trait Predicate<I: Interner<Predicate = Self>>:
 
     fn allow_normalization(self) -> bool {
         match self.kind().skip_binder() {
-            PredicateKind::Clause(ClauseKind::WellFormed(_)) | PredicateKind::AliasRelate(..) => {
-                false
-            }
+            PredicateKind::Clause(ClauseKind::WellFormed(_)) => false,
             PredicateKind::Clause(ClauseKind::Trait(_))
             | PredicateKind::Clause(ClauseKind::HostEffect(..))
             | PredicateKind::Clause(ClauseKind::RegionOutlives(_))

@@ -31,10 +31,6 @@ where
         self.trait_ref
     }
 
-    fn with_replaced_self_ty(self, cx: I, self_ty: I::Ty) -> Self {
-        self.with_replaced_self_ty(cx, self_ty)
-    }
-
     fn trait_def_id(self, _: I) -> I::TraitId {
         self.def_id()
     }
@@ -42,7 +38,7 @@ where
     fn fast_reject_assumption(
         ecx: &mut EvalCtxt<'_, D>,
         goal: Goal<I, Self>,
-        assumption: I::Clause,
+        assumption: Unnormalized<I, I::Clause>,
     ) -> Result<(), NoSolution> {
         if let Some(host_clause) = assumption.as_host_effect_clause()
             && host_clause.def_id() == goal.predicate.def_id()
@@ -99,26 +95,26 @@ where
                     trait_ref.to_host_effect_clause(cx, goal.predicate.constness).skip_norm_wip()
                 }),
         ) {
-            candidates.extend(Self::probe_and_match_goal_against_assumption(
+            candidates.extend(Self::probe_and_match_goal_against_unnormalized_assumption(
                 ecx,
                 CandidateSource::AliasBound(AliasBoundKind::SelfBounds),
                 goal,
-                clause,
+                Unnormalized::new_wip(clause),
                 |ecx| {
                     // Const conditions must hold for the implied const bound to hold.
-                    ecx.add_goals(
-                        GoalSource::AliasBoundConstCondition,
-                        cx.const_conditions(alias_ty.kind.def_id())
-                            .iter_instantiated(cx, alias_ty.args)
-                            .map(|trait_ref| {
-                                goal.with(
-                                    cx,
-                                    trait_ref
-                                        .to_host_effect_clause(cx, goal.predicate.constness)
-                                        .skip_norm_wip(),
-                                )
-                            }),
-                    );
+                    for trait_ref in cx
+                        .const_conditions(alias_ty.kind.def_id())
+                        .iter_instantiated(cx, alias_ty.args)
+                    {
+                        let trait_ref = ecx.normalize(goal.param_env, trait_ref)?;
+                        ecx.add_goal(
+                            GoalSource::AliasBoundConstCondition,
+                            goal.with(
+                                cx,
+                                trait_ref.to_host_effect_clause(cx, goal.predicate.constness),
+                            ),
+                        )
+                    }
                     ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
                 },
             ));
@@ -162,29 +158,27 @@ where
         ecx.probe_trait_candidate(CandidateSource::Impl(impl_def_id)).enter(|ecx| {
             let impl_args = ecx.fresh_args_for_item(impl_def_id.into());
             ecx.record_impl_args(impl_args);
-            let impl_trait_ref = impl_trait_ref.instantiate(cx, impl_args).skip_norm_wip();
+            let impl_trait_ref = impl_trait_ref.instantiate(cx, impl_args);
+            let impl_trait_ref = ecx.normalize(goal.param_env, impl_trait_ref)?;
 
             ecx.eq(goal.param_env, goal.predicate.trait_ref, impl_trait_ref)?;
-            let where_clause_bounds = cx
-                .predicates_of(impl_def_id.into())
-                .iter_instantiated(cx, impl_args)
-                .map(Unnormalized::skip_norm_wip)
-                .map(|pred| goal.with(cx, pred));
-            ecx.add_goals(GoalSource::ImplWhereBound, where_clause_bounds);
+            for where_clause in
+                cx.predicates_of(impl_def_id.into()).iter_instantiated(cx, impl_args)
+            {
+                let normalized = ecx.normalize(goal.param_env, where_clause)?;
+                ecx.add_goal(GoalSource::ImplWhereBound, goal.with(cx, normalized));
+            }
 
             // For this impl to be `const`, we need to check its `[const]` bounds too.
-            let const_conditions = cx
-                .const_conditions(impl_def_id.into())
-                .iter_instantiated(cx, impl_args)
-                .map(|bound_trait_ref| {
-                    goal.with(
-                        cx,
-                        bound_trait_ref
-                            .to_host_effect_clause(cx, goal.predicate.constness)
-                            .skip_norm_wip(),
-                    )
-                });
-            ecx.add_goals(GoalSource::ImplWhereBound, const_conditions);
+            for const_condition in
+                cx.const_conditions(impl_def_id.into()).iter_instantiated(cx, impl_args)
+            {
+                let normalized = ecx.normalize(goal.param_env, const_condition)?;
+                ecx.add_goal(
+                    GoalSource::ImplWhereBound,
+                    goal.with(cx, normalized.to_host_effect_clause(cx, goal.predicate.constness)),
+                );
+            }
 
             then(ecx, certainty)
         })
@@ -213,30 +207,30 @@ where
         let cx = ecx.cx();
 
         ecx.probe_builtin_trait_candidate(BuiltinImplSource::Misc).enter(|ecx| {
-            let where_clause_bounds = cx
-                .predicates_of(goal.predicate.def_id().into())
-                .iter_instantiated(cx, goal.predicate.trait_ref.args)
-                .map(Unnormalized::skip_norm_wip)
-                .map(|p| goal.with(cx, p));
-
-            let const_conditions = cx
-                .const_conditions(goal.predicate.def_id().into())
-                .iter_instantiated(cx, goal.predicate.trait_ref.args)
-                .map(|bound_trait_ref| {
-                    goal.with(
-                        cx,
-                        bound_trait_ref
-                            .to_host_effect_clause(cx, goal.predicate.constness)
-                            .skip_norm_wip(),
-                    )
-                });
             // While you could think of trait aliases to have a single builtin impl
             // which uses its implied trait bounds as where-clauses, using
             // `GoalSource::ImplWhereClause` here would be incorrect, as we also
             // impl them, which means we're "stepping out of the impl constructor"
             // again. To handle this, we treat these cycles as ambiguous for now.
-            ecx.add_goals(GoalSource::Misc, where_clause_bounds);
-            ecx.add_goals(GoalSource::Misc, const_conditions);
+
+            for where_clause in
+                cx.predicates_of(goal.predicate.def_id().into()).iter_instantiated(cx, impl_args)
+            {
+                let normalized = ecx.normalize(goal.param_env, where_clause)?;
+                ecx.add_goal(GoalSource::ImplWhereBound, goal.with(cx, normalized));
+            }
+
+            for const_condition in cx
+                .const_conditions(goal.predicate.def_id().into())
+                .iter_instantiated(cx, goal.predicate.trait_ref.args)
+            {
+                let normalized = ecx.normalize(goal.param_env, const_condition)?;
+                ecx.add_goal(
+                    GoalSource::ImplWhereBound,
+                    goal.with(cx, normalized.to_host_effect_clause(cx, goal.predicate.constness)),
+                );
+            }
+
             ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
         })
     }
@@ -304,6 +298,7 @@ where
         // (FIXME: technically we only need to check this if the type is a fn ptr...)
         let output_is_sized_pred =
             ty::TraitRef::new(cx, cx.require_trait_lang_item(SolverTraitLangItem::Sized), [output]);
+        for requirement in cx.const_conditions(def_id).iter_instantiated(cx, args) {}
         let requirements = cx
             .const_conditions(def_id)
             .iter_instantiated(cx, args)
@@ -327,7 +322,7 @@ where
         ))
         .to_host_effect_clause(cx, goal.predicate.constness);
 
-        Self::probe_and_consider_implied_clause(
+        Self::probe_and_consider_normalized_implied_clause(
             ecx,
             CandidateSource::BuiltinImpl(BuiltinImplSource::Misc),
             goal,

@@ -37,9 +37,6 @@ where
         &mut self,
         obligations: impl IntoIterator<Item: Upcast<I, I::Predicate>>,
     );
-
-    /// Register `AliasRelate` obligation(s) that both types must be related to each other.
-    fn register_alias_relate_predicate(&mut self, a: I::Ty, b: I::Ty);
 }
 
 pub fn super_combine_tys<Infcx, I, R>(
@@ -115,22 +112,13 @@ where
             panic!("We do not expect to encounter `Fresh` variables in the new solver")
         }
 
-        (_, ty::Alias(..)) | (ty::Alias(..), _) if infcx.next_trait_solver() => {
-            match relation.structurally_relate_aliases() {
-                StructurallyRelateAliases::Yes => structurally_relate_tys(relation, a, b),
-                StructurallyRelateAliases::No => {
-                    relation.register_alias_relate_predicate(a, b);
-                    Ok(a)
-                }
-            }
-        }
-
         // All other cases of inference are errors
         (ty::Infer(_), _) | (_, ty::Infer(_)) => Err(TypeError::Sorts(ExpectedFound::new(a, b))),
 
         (ty::Alias(ty::AliasTy { kind: ty::Opaque { .. }, .. }), _)
-        | (_, ty::Alias(ty::AliasTy { kind: ty::Opaque { .. }, .. })) => {
-            assert!(!infcx.next_trait_solver());
+        | (_, ty::Alias(ty::AliasTy { kind: ty::Opaque { .. }, .. }))
+            if !infcx.next_trait_solver() =>
+        {
             match infcx.typing_mode_raw().assert_not_erased() {
                 // During coherence, opaque types should be treated as *possibly*
                 // equal to any other type. This is an
@@ -201,20 +189,11 @@ where
         }
 
         (ty::ConstKind::Unevaluated(..), _) | (_, ty::ConstKind::Unevaluated(..))
-            if infcx.cx().features().generic_const_exprs() || infcx.next_trait_solver() =>
+            if infcx.cx().features().generic_const_exprs() =>
         {
             match relation.structurally_relate_aliases() {
                 StructurallyRelateAliases::No => {
-                    relation.register_predicates([if infcx.next_trait_solver() {
-                        ty::PredicateKind::AliasRelate(
-                            a.into(),
-                            b.into(),
-                            ty::AliasRelationDirection::Equate,
-                        )
-                    } else {
-                        ty::PredicateKind::ConstEquate(a, b)
-                    }]);
-
+                    relation.register_predicates([ty::PredicateKind::ConstEquate(a, b)]);
                     Ok(b)
                 }
                 StructurallyRelateAliases::Yes => structurally_relate_consts(relation, a, b),

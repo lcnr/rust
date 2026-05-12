@@ -477,7 +477,7 @@ fn structurally_normalize_ty<'tcx>(
     ty: Unnormalized<'tcx, Ty<'tcx>>,
 ) -> Option<(Ty<'tcx>, PredicateObligations<'tcx>)> {
     let ocx = ObligationCtxt::new(infcx);
-    let Ok(normalized_ty) = ocx.structurally_normalize_ty(
+    let Ok(normalized_ty) = ocx.deeply_normalize(
         &traits::ObligationCause::misc(span, impl_did),
         tcx.param_env(impl_did),
         ty,

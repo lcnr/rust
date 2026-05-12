@@ -7,7 +7,7 @@ use crate::inherent::*;
 use crate::upcast::Upcast;
 use crate::{
     Binder, BoundConstness, ClauseKind, HostEffectPredicate, Interner, PredicatePolarity,
-    TraitPredicate, TraitRef, TypeVisitable, TypeVisitableExt,
+    ProjectionPredicate, TraitPredicate, TraitRef, TypeVisitable, TypeVisitableExt,
 };
 
 /// A wrapper for values that need normalization.
@@ -93,6 +93,12 @@ impl<I: Interner, T, U> Unnormalized<I, (T, U)> {
     }
 }
 
+impl<I: Interner> Unnormalized<I, TraitRef<I>> {
+    pub fn def_id(self) -> I::TraitId {
+        self.value.def_id
+    }
+}
+
 impl<I: Interner, T> Unnormalized<I, Binder<I, T>> {
     pub fn skip_binder(self) -> T {
         self.value.skip_binder()
@@ -101,6 +107,13 @@ impl<I: Interner, T> Unnormalized<I, Binder<I, T>> {
     pub fn bound_vars(&self) -> I::BoundVarKinds {
         self.value.bound_vars()
     }
+
+    pub fn map_bound<F, U: TypeVisitable<I>>(self, f: F) -> Unnormalized<I, Binder<I, U>>
+    where
+        F: FnOnce(T) -> U,
+    {
+        self.map(|binder| binder.map_bound(f))
+    }
 }
 
 impl<I: Interner> Unnormalized<I, I::Clause> {
@@ -108,23 +121,20 @@ impl<I: Interner> Unnormalized<I, I::Clause> {
         self.value.as_trait_clause().map(|v| Unnormalized::new(v))
     }
 
+    pub fn as_projection_clause(
+        self,
+    ) -> Option<Unnormalized<I, Binder<I, ProjectionPredicate<I>>>> {
+        self.value.as_projection_clause().map(|v| Unnormalized::new(v))
+    }
+
+    pub fn as_host_effect_clause(
+        self,
+    ) -> Option<Unnormalized<I, Binder<I, HostEffectPredicate<I>>>> {
+        self.value.as_host_effect_clause().map(|v| Unnormalized::new(v))
+    }
+
     pub fn kind(self) -> Unnormalized<I, Binder<I, ClauseKind<I>>> {
         self.map(|v| v.kind())
-    }
-}
-
-impl<I: Interner> Unnormalized<I, Binder<I, TraitPredicate<I>>> {
-    pub fn self_ty(self) -> Unnormalized<I, Binder<I, I::Ty>> {
-        self.map(|pred| pred.self_ty())
-    }
-
-    pub fn def_id(self) -> I::TraitId {
-        self.value.skip_binder().def_id()
-    }
-
-    #[inline]
-    pub fn polarity(self) -> PredicatePolarity {
-        self.value.skip_binder().polarity
     }
 }
 
@@ -187,5 +197,42 @@ impl<I: Interner, T: TypeVisitable<I>> UnnormalizedAmbiguous<I, T> {
     pub fn no_ambiguous_aliases(self) -> T {
         assert!(!self.value.has_ambiguous_aliases());
         self.value
+    }
+}
+
+impl<I: Interner> Unnormalized<I, Binder<I, TraitPredicate<I>>> {
+    pub fn self_ty(self) -> Unnormalized<I, Binder<I, I::Ty>> {
+        self.map(|pred| pred.self_ty())
+    }
+
+    pub fn def_id(self) -> I::TraitId {
+        self.value.skip_binder().def_id()
+    }
+
+    #[inline]
+    pub fn polarity(self) -> PredicatePolarity {
+        self.value.skip_binder().polarity
+    }
+}
+
+impl<I: Interner> Unnormalized<I, Binder<I, ProjectionPredicate<I>>> {
+    pub fn item_def_id(self) -> I::DefId {
+        self.value.item_def_id()
+    }
+}
+
+impl<I: Interner> Unnormalized<I, Binder<I, HostEffectPredicate<I>>> {
+    pub fn def_id(self) -> I::TraitId {
+        self.value.def_id()
+    }
+
+    pub fn constness(self) -> BoundConstness {
+        self.value.constness()
+    }
+}
+
+impl<I: Interner, T: IntoIterator> Unnormalized<I, T> {
+    pub fn iter(self) -> impl Iterator<Item = Unnormalized<I, T::Item>> {
+        self.skip_normalization().into_iter().map(|v| Unnormalized::new(v))
     }
 }
