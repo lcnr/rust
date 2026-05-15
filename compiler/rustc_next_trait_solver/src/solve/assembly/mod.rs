@@ -79,6 +79,27 @@ where
         )
     }
 
+    fn probe_and_consider_normalized_implied_clause(
+        ecx: &mut EvalCtxt<'_, D>,
+        parent_source: CandidateSource<I>,
+        goal: Goal<I, Self>,
+        assumption: I::Clause,
+        requirements: impl IntoIterator<Item = (GoalSource, Goal<I, I::Predicate>)>,
+    ) -> Result<Candidate<I>, NoSolutionOrRerunNonErased> {
+        Self::probe_and_match_goal_against_normalized_assumption(
+            ecx,
+            parent_source,
+            goal,
+            assumption,
+            |ecx| {
+                for (nested_source, goal) in requirements {
+                    ecx.add_goal(nested_source, goal);
+                }
+                ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
+            },
+        )
+    }
+
     /// Consider a clause specifically for a `dyn Trait` self type. This requires
     /// additionally checking all of the supertraits and object bounds to hold,
     /// since they're not implied by the well-formedness of the object type.

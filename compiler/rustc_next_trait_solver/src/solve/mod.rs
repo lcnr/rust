@@ -244,7 +244,8 @@ where
                     .map_err(Into::into);
             }
             ty::ConstKind::Unevaluated(uv) => {
-                self.cx().type_of(uv.def.into()).instantiate(self.cx(), uv.args).skip_norm_wip()
+                let ty = self.cx().type_of(uv.def.into()).instantiate(self.cx(), uv.args);
+                self.normalize(goal.param_env, ty)?
             }
             ty::ConstKind::Expr(_) => unimplemented!(
                 "`feature(generic_const_exprs)` is not supported in the new trait solver"

@@ -385,15 +385,13 @@ where
                 ty::AliasTermKind::ProjectionTy { .. } => cx
                     .type_of(target_item_def_id.into())
                     .instantiate(cx, target_args)
-                    .skip_norm_wip()
-                    .into(),
+                    .map(Into::into),
                 ty::AliasTermKind::ProjectionConst { .. }
                     if cx.is_type_const(target_item_def_id.into()) =>
                 {
                     cx.const_of_item(target_item_def_id.into())
                         .instantiate(cx, target_args)
-                        .skip_norm_wip()
-                        .into()
+                        .map(Into::into)
                 }
                 ty::AliasTermKind::ProjectionConst { .. } => {
                     let uv = ty::UnevaluatedConst::new(
@@ -405,8 +403,9 @@ where
                 kind => panic!("expected projection, found {kind:?}"),
             };
 
+            let term = ecx.normalize(goal.param_env, term)?;
             ecx.instantiate_normalizes_to_term(goal, term);
-            ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes).map_err(Into::into)
+            ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
         })
     }
 
@@ -471,6 +470,7 @@ where
         else {
             return ecx.forced_ambiguity(MaybeInfo::AMBIGUOUS);
         };
+        let tupled_inputs_and_output = ecx.normalize(goal.param_env, tupled_inputs_and_output)?;
         let (inputs, output) =
             ecx.instantiate_binder_with_infer(goal.param_env, tupled_inputs_and_output)?;
 

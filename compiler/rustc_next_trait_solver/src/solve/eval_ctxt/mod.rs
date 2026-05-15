@@ -816,6 +816,8 @@ where
         goal: Goal<I, I::Predicate>,
     ) -> QueryResultOrRerunNonErased<I> {
         let Goal { param_env, predicate } = goal;
+        // TODO: we really shouldn't xd
+        let predicate = self.normalize(param_env, ty::Unnormalized::new_wip(predicate))?;
         let kind = predicate.kind();
         self.enter_forall_with_assumptions(kind, param_env, |ecx, kind| {
             Ok(match kind {

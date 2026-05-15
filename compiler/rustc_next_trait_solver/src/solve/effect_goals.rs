@@ -213,8 +213,9 @@ where
             // impl them, which means we're "stepping out of the impl constructor"
             // again. To handle this, we treat these cycles as ambiguous for now.
 
-            for where_clause in
-                cx.predicates_of(goal.predicate.def_id().into()).iter_instantiated(cx, impl_args)
+            for where_clause in cx
+                .predicates_of(goal.predicate.def_id().into())
+                .iter_instantiated(cx, goal.predicate.trait_ref.args)
             {
                 let normalized = ecx.normalize(goal.param_env, where_clause)?;
                 ecx.add_goal(GoalSource::ImplWhereBound, goal.with(cx, normalized));
@@ -252,8 +253,8 @@ where
         let self_ty = goal.predicate.self_ty();
         let constituent_tys =
             structural_traits::instantiate_constituent_tys_for_copy_clone_trait(ecx, self_ty)?;
-
         ecx.probe_builtin_trait_candidate(BuiltinImplSource::Misc).enter(|ecx| {
+            let constituent_tys = ecx.normalize(goal.param_env, constituent_tys)?;
             ecx.enter_forall_with_assumptions(constituent_tys, goal.param_env, |ecx, tys| {
                 ecx.add_goals(
                     GoalSource::ImplWhereBound,
@@ -291,6 +292,7 @@ where
         let self_ty = goal.predicate.self_ty();
         let (inputs_and_output, def_id, args) =
             structural_traits::extract_fn_def_from_const_callable(cx, self_ty)?;
+        let inputs_and_output = ecx.normalize(goal.param_env, inputs_and_output)?;
         let (inputs, output) =
             ecx.instantiate_binder_with_infer(goal.param_env, inputs_and_output)?;
 
@@ -298,7 +300,6 @@ where
         // (FIXME: technically we only need to check this if the type is a fn ptr...)
         let output_is_sized_pred =
             ty::TraitRef::new(cx, cx.require_trait_lang_item(SolverTraitLangItem::Sized), [output]);
-        for requirement in cx.const_conditions(def_id).iter_instantiated(cx, args) {}
         let requirements = cx
             .const_conditions(def_id)
             .iter_instantiated(cx, args)
@@ -413,16 +414,18 @@ where
         let const_conditions = structural_traits::const_conditions_for_destruct(cx, self_ty)?;
 
         ecx.probe_builtin_trait_candidate(BuiltinImplSource::Misc).enter(|ecx| {
-            ecx.add_goals(
-                GoalSource::AliasBoundConstCondition,
-                const_conditions.into_iter().map(|trait_ref| {
+            for const_condition in const_conditions {
+                let normalized = ecx.normalize(goal.param_env, const_condition)?;
+                ecx.add_goal(
+                    GoalSource::AliasBoundConstCondition,
                     goal.with(
                         cx,
-                        ty::Binder::dummy(trait_ref)
+                        ty::Binder::dummy(normalized)
                             .to_host_effect_clause(cx, goal.predicate.constness),
-                    )
-                }),
-            );
+                    ),
+                );
+            }
+
             ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
         })
     }

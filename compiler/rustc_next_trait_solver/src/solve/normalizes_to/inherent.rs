@@ -6,7 +6,7 @@
 //! 3. instantiate and register where clauses.
 
 use rustc_type_ir::solve::QueryResultOrRerunNonErased;
-use rustc_type_ir::{self as ty, Interner, Unnormalized};
+use rustc_type_ir::{self as ty, Interner};
 
 use crate::delegate::SolverDelegate;
 use crate::solve::{Certainty, EvalCtxt, Goal, GoalSource};
@@ -28,11 +28,9 @@ where
         let impl_args = self.fresh_args_for_item(impl_def_id.into());
 
         // Equate impl header and add impl where clauses
-        self.eq(
-            goal.param_env,
-            inherent.self_ty(),
-            cx.type_of(impl_def_id.into()).instantiate(cx, impl_args).skip_norm_wip(),
-        )?;
+        let impl_self_ty = cx.type_of(impl_def_id.into()).instantiate(cx, impl_args);
+        let impl_self_ty = self.normalize(goal.param_env, impl_self_ty)?;
+        self.eq(goal.param_env, inherent.self_ty(), impl_self_ty)?;
 
         // Equate IAT with the RHS of the project goal
         let inherent_args = inherent.rebase_inherent_args_onto_impl(impl_args, cx);
@@ -46,23 +44,18 @@ where
         //
         // Projecting to the IAT also "steps out the impl constructor", so we would have
         // to be very careful when changing the impl where-clauses to be productive.
-        self.add_goals(
-            GoalSource::Misc,
-            cx.predicates_of(def_id.into())
-                .iter_instantiated(cx, inherent_args)
-                .map(Unnormalized::skip_norm_wip)
-                .map(|pred| goal.with(cx, pred)),
-        );
+        for where_clause in cx.predicates_of(def_id.into()).iter_instantiated(cx, inherent_args) {
+            let normalized = self.normalize(goal.param_env, where_clause)?;
+            self.add_goal(GoalSource::Misc, goal.with(cx, normalized));
+        }
 
         let normalized = match inherent.kind(cx) {
             ty::AliasTermKind::InherentTy { def_id } => {
-                cx.type_of(def_id.into()).instantiate(cx, inherent_args).skip_norm_wip().into()
+                cx.type_of(def_id.into()).instantiate(cx, inherent_args).map(Into::into)
             }
-            ty::AliasTermKind::InherentConst { def_id } if cx.is_type_const(def_id.into()) => cx
-                .const_of_item(def_id.into())
-                .instantiate(cx, inherent_args)
-                .skip_norm_wip()
-                .into(),
+            ty::AliasTermKind::InherentConst { def_id } if cx.is_type_const(def_id.into()) => {
+                cx.const_of_item(def_id.into()).instantiate(cx, inherent_args).map(Into::into)
+            }
             ty::AliasTermKind::InherentConst { .. } => {
                 // FIXME(gca): This is dead code at the moment. It should eventually call
                 // self.evaluate_const like projected consts do in consider_impl_candidate in
@@ -74,6 +67,7 @@ where
             }
             kind => panic!("expected inherent alias, found {kind:?}"),
         };
+        let normalized = self.normalize(goal.param_env, normalized)?;
         self.instantiate_normalizes_to_term(goal, normalized);
         self.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
     }

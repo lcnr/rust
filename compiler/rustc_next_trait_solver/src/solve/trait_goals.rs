@@ -273,17 +273,19 @@ where
         let cx = ecx.cx();
 
         ecx.probe_builtin_trait_candidate(BuiltinImplSource::Misc).enter(|ecx| {
-            let nested_obligations = cx
-                .predicates_of(goal.predicate.def_id().into())
-                .iter_instantiated(cx, goal.predicate.trait_ref.args)
-                .map(Unnormalized::skip_norm_wip)
-                .map(|p| goal.with(cx, p));
             // While you could think of trait aliases to have a single builtin impl
             // which uses its implied trait bounds as where-clauses, using
             // `GoalSource::ImplWhereClause` here would be incorrect, as we also
             // impl them, which means we're "stepping out of the impl constructor"
             // again. To handle this, we treat these cycles as ambiguous for now.
-            ecx.add_goals(GoalSource::Misc, nested_obligations);
+            for nested_obligation in cx
+                .predicates_of(goal.predicate.def_id().into())
+                .iter_instantiated(cx, goal.predicate.trait_ref.args)
+            {
+                let normalized = ecx.normalize(goal.param_env, nested_obligation)?;
+                ecx.add_goal(GoalSource::Misc, goal.with(cx, normalized));
+            }
+
             ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
         })
     }
@@ -378,6 +380,7 @@ where
         else {
             return ecx.forced_ambiguity(MaybeInfo::AMBIGUOUS);
         };
+        let tupled_inputs_and_output = ecx.normalize(goal.param_env, tupled_inputs_and_output)?;
         let (inputs, output) =
             ecx.instantiate_binder_with_infer(goal.param_env, tupled_inputs_and_output)?;
 
@@ -440,7 +443,7 @@ where
             [goal.predicate.self_ty(), tupled_inputs_ty],
         )
         .upcast(cx);
-    
+
         Self::probe_and_consider_normalized_implied_clause(
             ecx,
             CandidateSource::BuiltinImpl(BuiltinImplSource::Misc),
@@ -633,9 +636,7 @@ where
             goal,
             ty::TraitRef::new(cx, goal.predicate.def_id(), [self_ty, coroutine.resume_ty()])
                 .upcast(cx),
-            |ecx| {
-                ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
-            },
+            |ecx| ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes),
         )
     }
 
@@ -1353,21 +1354,21 @@ where
         constituent_tys: impl Fn(
             &EvalCtxt<'_, D>,
             I::Ty,
-        ) -> Result<ty::Binder<I, Vec<I::Ty>>, NoSolution>,
+        )
+            -> Result<ty::Unnormalized<I, ty::Binder<I, Vec<I::Ty>>>, NoSolution>,
     ) -> Result<Candidate<I>, NoSolutionOrRerunNonErased> {
         self.probe_trait_candidate(source).enter(|ecx| {
-            let goals = ecx.enter_forall_with_assumptions(
-                constituent_tys(ecx, goal.predicate.self_ty())?,
-                goal.param_env,
-                |ecx, tys| {
+            let constituent_tys = constituent_tys(ecx, goal.predicate.self_ty())?;
+            let constituent_tys = ecx.normalize(goal.param_env, constituent_tys)?;
+            let goals =
+                ecx.enter_forall_with_assumptions(constituent_tys, goal.param_env, |ecx, tys| {
                     Ok(tys
                         .into_iter()
                         .map(|ty| {
                             goal.with(ecx.cx(), goal.predicate.with_replaced_self_ty(ecx.cx(), ty))
                         })
                         .collect::<Vec<_>>())
-                },
-            )?;
+                })?;
             ecx.add_goals(GoalSource::ImplWhereBound, goals);
             ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
         })

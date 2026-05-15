@@ -315,15 +315,13 @@ pub enum TyKind<I: Interner> {
 impl<I: Interner> Eq for TyKind<I> {}
 
 impl<I: Interner> TyKind<I> {
-    pub fn fn_sig(self, interner: I) -> ty::Binder<I, ty::FnSig<I>> {
+    pub fn fn_sig(self, interner: I) -> ty::Unnormalized<I, ty::Binder<I, ty::FnSig<I>>> {
         match self {
-            ty::FnPtr(sig_tys, hdr) => sig_tys.with(hdr),
-            ty::FnDef(def_id, args) => {
-                interner.fn_sig(def_id).instantiate(interner, args).skip_norm_wip()
-            }
+            ty::FnPtr(sig_tys, hdr) => ty::Unnormalized::dummy(sig_tys.with(hdr)),
+            ty::FnDef(def_id, args) => interner.fn_sig(def_id).instantiate(interner, args),
             ty::Error(_) => {
                 // ignore errors (#54954)
-                ty::Binder::dummy(ty::FnSig::dummy())
+                ty::Unnormalized::dummy(ty::Binder::dummy(ty::FnSig::dummy()))
             }
             ty::Closure(..) => panic!(
                 "to get the signature of a closure, use `args.as_closure().sig()` not `fn_sig()`",
@@ -998,6 +996,28 @@ impl<I: Interner> ty::Binder<I, FnSig<I>> {
     pub fn split(self) -> (ty::Binder<I, FnSigTys<I>>, FnHeader<I>) {
         let hdr = FnHeader { fn_sig_kind: self.fn_sig_kind() };
         (self.map_bound(|sig| FnSigTys { inputs_and_output: sig.inputs_and_output }), hdr)
+    }
+}
+
+impl<I: Interner> ty::Unnormalized<I, ty::Binder<I, FnSig<I>>> {
+    pub fn fn_sig_kind(self) -> FnSigKind<I> {
+        self.skip_binder().fn_sig_kind
+    }
+
+    pub fn c_variadic(self) -> bool {
+        self.skip_binder().c_variadic()
+    }
+
+    pub fn safety(self) -> I::Safety {
+        self.skip_binder().safety()
+    }
+
+    pub fn abi(self) -> ExternAbi {
+        self.skip_binder().abi()
+    }
+
+    pub fn is_fn_trait_compatible(&self) -> bool {
+        self.skip_binder().is_fn_trait_compatible()
     }
 }
 

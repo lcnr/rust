@@ -1596,7 +1596,7 @@ impl<'tcx> Ty<'tcx> {
     }
 
     #[tracing::instrument(level = "trace", skip(tcx))]
-    pub fn fn_sig(self, tcx: TyCtxt<'tcx>) -> PolyFnSig<'tcx> {
+    pub fn fn_sig(self, tcx: TyCtxt<'tcx>) -> ty::Unnormalized<'tcx, PolyFnSig<'tcx>> {
         self.kind().fn_sig(tcx)
     }
 
