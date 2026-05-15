@@ -1577,7 +1577,7 @@ fn confirm_fn_pointer_candidate<'cx, 'tcx>(
 ) -> Progress<'tcx> {
     let tcx = selcx.tcx();
     let fn_type = selcx.infcx.shallow_resolve(obligation.predicate.self_ty());
-    let sig = fn_type.fn_sig(tcx);
+    let sig = fn_type.fn_sig(tcx).skip_norm_wip();
     let Normalized { value: sig, obligations } = normalize_with_depth(
         selcx,
         obligation.param_env,
@@ -1798,7 +1798,7 @@ fn confirm_async_closure_candidate<'cx, 'tcx>(
                 .rebind(ty::ProjectionPredicate { projection_term, term: term.into() })
         }
         ty::FnDef(..) | ty::FnPtr(..) => {
-            let bound_sig = self_ty.fn_sig(tcx);
+            let bound_sig = self_ty.fn_sig(tcx).skip_norm_wip();
             let sig = bound_sig.skip_binder();
 
             let term = match item_name {

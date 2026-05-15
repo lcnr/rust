@@ -354,7 +354,7 @@ fn push_debuginfo_type_name<'tcx>(
 
             let sig = tcx.normalize_erasing_late_bound_regions(
                 ty::TypingEnv::fully_monomorphized(),
-                t.fn_sig(tcx),
+                t.fn_sig(tcx).skip_norm_wip(),
             );
 
             if cpp_like_debuginfo {

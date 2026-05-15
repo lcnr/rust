@@ -1461,7 +1461,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                     sig_tys.inputs(),
                 )),
                 ty::FnDef(def_id, _) => {
-                    let fn_sig = found.fn_sig(self.tcx);
+                    let fn_sig = found.fn_sig(self.tcx).skip_norm_wip();
                     Some((DefIdOrName::DefId(def_id), fn_sig.output(), fn_sig.inputs()))
                 }
                 ty::Closure(def_id, args) => {

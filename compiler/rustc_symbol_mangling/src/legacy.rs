@@ -149,7 +149,7 @@ fn get_symbol_hash<'tcx>(
             // This is not *strictly* needed, but it may help in some
             // situations, see the `run-make/a-b-a-linker-guard` test.
             if let ty::FnDef(..) = item_type.kind() {
-                item_type.fn_sig(tcx).stable_hash(hcx, &mut hasher);
+                item_type.fn_sig(tcx).skip_norm_wip().stable_hash(hcx, &mut hasher);
             }
 
             // also include any type parameters (for generic items)

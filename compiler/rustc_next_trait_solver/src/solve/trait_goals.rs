@@ -420,6 +420,8 @@ where
                 // This region doesn't matter because we're throwing away the coroutine type
                 Region::new_static(cx),
             )?;
+        let tupled_inputs_and_output_and_coroutine =
+            ecx.normalize(goal.param_env, tupled_inputs_and_output_and_coroutine)?;
         let AsyncCallableRelevantTypes {
             tupled_inputs_ty,
             output_coroutine_ty,
@@ -444,17 +446,20 @@ where
         )
         .upcast(cx);
 
-        Self::probe_and_consider_normalized_implied_clause(
+        Self::probe_and_match_goal_against_normalized_assumption(
             ecx,
             CandidateSource::BuiltinImpl(BuiltinImplSource::Misc),
             goal,
             pred,
-            [goal.with(cx, output_is_sized_pred)]
-                .into_iter()
-                .chain(nested_preds.into_iter().map(|pred| goal.with(cx, pred)))
-                .map(|goal| (GoalSource::ImplWhereBound, goal)),
+            |ecx| {
+                ecx.add_goal(GoalSource::ImplWhereBound, goal.with(cx, output_is_sized_pred));
+                for nested in nested_preds {
+                    let normalized = ecx.normalize(goal.param_env, nested)?;
+                    ecx.add_goal(GoalSource::ImplWhereBound, goal.with(cx, normalized));
+                }
+                ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
+            },
         )
-        .map_err(Into::into)
     }
 
     fn consider_builtin_async_fn_kind_helper_candidate(

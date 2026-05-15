@@ -321,8 +321,8 @@ fn structurally_same_type_impl<'tcx>(
                         && structurally_same_type_impl(seen_types, tcx, typing_env, *a_ty, *b_ty)
                 }
                 (ty::FnDef(..), ty::FnDef(..)) => {
-                    let a_poly_sig = a.fn_sig(tcx);
-                    let b_poly_sig = b.fn_sig(tcx);
+                    let a_poly_sig = a.fn_sig(tcx).skip_norm_wip();
+                    let b_poly_sig = b.fn_sig(tcx).skip_norm_wip();
 
                     // We don't compare regions, but leaving bound regions around ICEs, so
                     // we erase them.

@@ -128,8 +128,10 @@ impl<'tcx> TailCallCkVisitor<'_, 'tcx> {
         };
 
         // Erase regions since tail calls don't care about lifetimes
-        let callee_sig =
-            self.tcx.normalize_erasing_late_bound_regions(self.typing_env, ty.fn_sig(self.tcx));
+        let callee_sig = self.tcx.normalize_erasing_late_bound_regions(
+            self.typing_env,
+            ty.fn_sig(self.tcx).skip_norm_wip(),
+        );
 
         if caller_sig.abi() != callee_sig.abi() {
             self.report_abi_mismatch(expr.span, caller_sig.abi(), callee_sig.abi());
@@ -155,14 +157,11 @@ impl<'tcx> TailCallCkVisitor<'_, 'tcx> {
                 self.tcx
                     .liberate_late_bound_regions(
                         CRATE_DEF_ID.to_def_id(),
-                        ty::Unnormalized::new_wip(caller_ty.fn_sig(self.tcx)),
+                        caller_ty.fn_sig(self.tcx),
                     )
                     .skip_norm_wip(),
                 self.tcx
-                    .liberate_late_bound_regions(
-                        CRATE_DEF_ID.to_def_id(),
-                        ty::Unnormalized::new_wip(ty.fn_sig(self.tcx)),
-                    )
+                    .liberate_late_bound_regions(CRATE_DEF_ID.to_def_id(), ty.fn_sig(self.tcx))
                     .skip_norm_wip(),
             );
         }

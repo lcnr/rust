@@ -614,7 +614,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         };
 
         if let ty::FnDef(did, _) = *ty.kind() {
-            let fn_sig = ty.fn_sig(tcx);
+            let fn_sig = ty.fn_sig(tcx).skip_norm_wip();
 
             if tcx.is_intrinsic(did, sym::transmute) {
                 let Some(from) = fn_sig.inputs().skip_binder().get(0) else {
@@ -3677,7 +3677,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             let ty = self.structurally_resolve_type(expr.span, ty);
             match *ty.kind() {
                 ty::FnDef(..) => {
-                    let fnptr_ty = Ty::new_fn_ptr(self.tcx, ty.fn_sig(self.tcx));
+                    let fnptr_ty = Ty::new_fn_ptr(self.tcx, ty.fn_sig(self.tcx).skip_norm_wip());
                     self.demand_coerce(expr, ty, fnptr_ty, None, AllowTwoPhase::No);
                 }
                 ty::Ref(_, base_ty, mutbl) => {

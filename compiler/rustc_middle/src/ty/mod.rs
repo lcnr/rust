@@ -2344,7 +2344,7 @@ pub fn fnc_typetrees<'tcx>(tcx: TyCtxt<'tcx>, fn_ty: Ty<'tcx>) -> FncTree {
 
     // Get the function signature
     let fn_sig = fn_ty.fn_sig(tcx);
-    let sig = tcx.instantiate_bound_regions_with_erased(fn_sig);
+    let sig = tcx.instantiate_bound_regions_with_erased(fn_sig.skip_norm_wip());
 
     // Create TypeTrees for each input parameter
     let mut args = vec![];

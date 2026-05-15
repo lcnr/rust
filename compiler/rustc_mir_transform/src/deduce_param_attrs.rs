@@ -192,6 +192,7 @@ pub(super) fn deduced_param_attrs<'tcx>(
     if matches!(fn_ty.kind(), ty::FnDef(..))
         && fn_ty
             .fn_sig(tcx)
+            .skip_norm_wip()
             .inputs_and_output()
             .skip_binder()
             .iter()

@@ -457,7 +457,13 @@ pub(in crate::solve) fn extract_tupled_inputs_and_output_from_async_callable<I: 
     self_ty: I::Ty,
     goal_kind: ty::ClosureKind,
     env_region: I::Region,
-) -> Result<(ty::Unnormalized<I, ty::Binder<I, AsyncCallableRelevantTypes<I>>>, Vec<ty::Unnormalized<I, I::Predicate>>), NoSolution> {
+) -> Result<
+    (
+        ty::Unnormalized<I, ty::Binder<I, AsyncCallableRelevantTypes<I>>>,
+        Vec<ty::Unnormalized<I, I::Predicate>>,
+    ),
+    NoSolution,
+> {
     match self_ty.kind() {
         ty::CoroutineClosure(def_id, args) => {
             let args = args.as_coroutine_closure();
@@ -481,14 +487,14 @@ pub(in crate::solve) fn extract_tupled_inputs_and_output_from_async_callable<I: 
                 // the goal kind <= the closure kind. As a projection `AsyncFnKindHelper::Upvars`
                 // will project to the right upvars for the generator, appending the inputs and
                 // coroutine upvars respecting the closure kind.
-                nested.push(
+                nested.push(ty::Unnormalized::dummy(
                     ty::TraitRef::new(
                         cx,
                         cx.require_trait_lang_item(SolverTraitLangItem::AsyncFnKindHelper),
                         [kind_ty, Ty::from_closure_kind(cx, goal_kind)],
                     )
                     .upcast(cx),
-                );
+                ));
 
                 coroutine_closure_to_ambiguous_coroutine(
                     cx, goal_kind, env_region, def_id, args, sig,
@@ -496,11 +502,13 @@ pub(in crate::solve) fn extract_tupled_inputs_and_output_from_async_callable<I: 
             };
 
             Ok((
-                args.coroutine_closure_sig().rebind(AsyncCallableRelevantTypes {
-                    tupled_inputs_ty: sig.tupled_inputs_ty,
-                    output_coroutine_ty: coroutine_ty,
-                    coroutine_return_ty: sig.return_ty,
-                }),
+                ty::Unnormalized::new_wip(args.coroutine_closure_sig().rebind(
+                    AsyncCallableRelevantTypes {
+                        tupled_inputs_ty: sig.tupled_inputs_ty,
+                        output_coroutine_ty: coroutine_ty,
+                        coroutine_return_ty: sig.return_ty,
+                    },
+                )),
                 nested,
             ))
         }
@@ -529,11 +537,11 @@ pub(in crate::solve) fn extract_tupled_inputs_and_output_from_async_callable<I: 
             let future_trait_def_id = cx.require_trait_lang_item(SolverTraitLangItem::Future);
             // `Closure`s only implement `AsyncFn*` when their return type
             // implements `Future`.
-            let mut nested = vec![
+            let mut nested = vec![ty::Unnormalized::dummy(
                 bound_sig
                     .rebind(ty::TraitRef::new(cx, future_trait_def_id, [sig.output()]))
                     .upcast(cx),
-            ];
+            )];
 
             // Additionally, we need to check that the closure kind
             // is still compatible.
@@ -552,25 +560,25 @@ pub(in crate::solve) fn extract_tupled_inputs_and_output_from_async_callable<I: 
                 // the goal kind <= the closure kind. As a projection `AsyncFnKindHelper::Upvars`
                 // will project to the right upvars for the generator, appending the inputs and
                 // coroutine upvars respecting the closure kind.
-                nested.push(
+                nested.push(ty::Unnormalized::dummy(
                     ty::TraitRef::new(
                         cx,
                         async_fn_kind_trait_def_id,
                         [kind_ty, Ty::from_closure_kind(cx, goal_kind)],
                     )
                     .upcast(cx),
-                );
+                ));
             }
 
             let future_output_def_id =
                 cx.require_projection_lang_item(SolverProjectionLangItem::FutureOutput);
             let future_output_ty = Ty::new_projection(cx, future_output_def_id, [sig.output()]);
             Ok((
-                bound_sig.rebind(AsyncCallableRelevantTypes {
+                ty::Unnormalized::new(bound_sig.rebind(AsyncCallableRelevantTypes {
                     tupled_inputs_ty: sig.inputs().get(0).unwrap(),
                     output_coroutine_ty: sig.output(),
                     coroutine_return_ty: future_output_ty,
-                }),
+                })),
                 nested,
             ))
         }
@@ -610,15 +618,21 @@ pub(in crate::solve) fn extract_tupled_inputs_and_output_from_async_callable<I: 
 fn fn_item_to_async_callable<I: Interner>(
     cx: I,
     bound_sig: ty::Unnormalized<I, ty::Binder<I, ty::FnSig<I>>>,
-) -> Result<(ty::Unnormalized<I, ty::Binder<I, AsyncCallableRelevantTypes<I>>>, Vec<ty::Unnormalized<I, I::Predicate>>), NoSolution> {
+) -> Result<
+    (
+        ty::Unnormalized<I, ty::Binder<I, AsyncCallableRelevantTypes<I>>>,
+        Vec<ty::Unnormalized<I, I::Predicate>>,
+    ),
+    NoSolution,
+> {
     let bound_sig = bound_sig.skip_normalization();
     let sig = bound_sig.skip_binder();
     let future_trait_def_id = cx.require_trait_lang_item(SolverTraitLangItem::Future);
     // `FnDef` and `FnPtr` only implement `AsyncFn*` when their
     // return type implements `Future`.
-    let nested = vec![
-        ty::Unnormalized::new(bound_sig.rebind(ty::TraitRef::new(cx, future_trait_def_id, [sig.output()])).upcast(cx)),
-    ];
+    let nested = vec![ty::Unnormalized::new(
+        bound_sig.rebind(ty::TraitRef::new(cx, future_trait_def_id, [sig.output()])).upcast(cx),
+    )];
     let future_output_def_id =
         cx.require_projection_lang_item(SolverProjectionLangItem::FutureOutput);
     let future_output_ty = Ty::new_projection(cx, future_output_def_id, [sig.output()]);

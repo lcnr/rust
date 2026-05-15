@@ -463,7 +463,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
 
         let fn_sig_binder = {
             let _trace = enter_trace_span!(M, "fn_sig", ty = ?func.layout.ty.kind());
-            func.layout.ty.fn_sig(*self.tcx)
+            func.layout.ty.fn_sig(*self.tcx).skip_norm_wip()
         };
         let fn_sig = self.tcx.normalize_erasing_late_bound_regions(self.typing_env, fn_sig_binder);
         let extra_args = &args[fn_sig.inputs().len()..];

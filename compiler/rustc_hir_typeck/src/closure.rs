@@ -425,7 +425,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                     if resolved_sig.visit_with(&mut MentionsTy { expected_ty }).is_continue() {
                         expected_sig = Some(ExpectedSig {
                             cause_span: inferred_sig.cause_span,
-                            sig: resolved_sig.fn_sig(self.tcx),
+                            sig: resolved_sig.fn_sig(self.tcx).skip_norm_wip(),
                         });
                     }
                 } else {

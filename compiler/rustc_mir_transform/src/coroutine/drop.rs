@@ -79,7 +79,7 @@ fn build_pin_fut<'tcx>(
     let fut_ref_place = Place::from(body.local_decls.push(LocalDecl::new(fut_ref_ty, span)));
     let pin_fut_new_unchecked_fn =
         Ty::new_fn_def(tcx, tcx.require_lang_item(LangItem::PinNewUnchecked, span), [fut_ref_ty]);
-    let fut_pin_ty = pin_fut_new_unchecked_fn.fn_sig(tcx).output().skip_binder();
+    let fut_pin_ty = pin_fut_new_unchecked_fn.fn_sig(tcx).skip_norm_wip().output().skip_binder();
     let fut_pin_place = Place::from(body.local_decls.push(LocalDecl::new(fut_pin_ty, span)));
     let pin_fut_new_unchecked_fn = Operand::Constant(Box::new(ConstOperand {
         span,

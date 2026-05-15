@@ -509,7 +509,7 @@ fn lint_fn_pointer<'tcx>(
         // We only check for a right cast as `FnDef` == `FnPtr` is not possible,
         // only `FnPtr == FnDef` is possible.
         if !r_ty.is_fn_ptr() {
-            let fn_sig = r_ty.fn_sig(cx.tcx);
+            let fn_sig = r_ty.fn_sig(cx.tcx).skip_norm_wip();
 
             UnpredictableFunctionPointerComparisonsSuggestion::FnAddrEqWithCast {
                 ne,

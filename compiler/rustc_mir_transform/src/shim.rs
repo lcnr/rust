@@ -810,7 +810,7 @@ fn build_call_shim<'tcx>(
     // to instantiate into the signature of the shim. It is not necessary for users of this
     // MIR body to perform further instantiations (see `InstanceKind::has_polymorphic_mir_body`).
     let (sig_args, untuple_args) = if let ty::InstanceKind::FnPtrShim(_, ty) = instance {
-        let sig = tcx.instantiate_bound_regions_with_erased(ty.fn_sig(tcx));
+        let sig = tcx.instantiate_bound_regions_with_erased(ty.fn_sig(tcx).skip_norm_wip());
 
         let untuple_args = sig.inputs();
 

@@ -1758,7 +1758,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         };
 
         // Replace constructor type with constructed type for tuple struct patterns.
-        let pat_ty = pat_ty.fn_sig(tcx).output();
+        let pat_ty = pat_ty.fn_sig(tcx).skip_norm_wip().output();
         let pat_ty = pat_ty.no_bound_vars().expect("expected fn type");
 
         Ok(ResolvedPat { ty: pat_ty, kind: ResolvedPatKind::TupleStruct { res, variant } })

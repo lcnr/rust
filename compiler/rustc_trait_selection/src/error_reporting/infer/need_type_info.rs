@@ -316,7 +316,7 @@ fn ty_to_string<'tcx>(
         // We don't want the regular output for `fn`s because it includes its path in
         // invalid pseudo-syntax, we want the `fn`-pointer output instead.
         (ty::FnDef(..), _) => {
-            ty.fn_sig(infcx.tcx).print(&mut p).unwrap();
+            ty.fn_sig(infcx.tcx).skip_norm_wip().print(&mut p).unwrap();
             p.into_buffer()
         }
         (_, Some(def_id))

@@ -365,6 +365,7 @@ impl<'tcx> Collector<'tcx> {
                 .instantiate_identity()
                 .skip_norm_wip()
                 .fn_sig(self.tcx)
+                .skip_norm_wip()
                 .inputs()
                 .map_bound(|slice| self.tcx.mk_type_list(slice)),
         );

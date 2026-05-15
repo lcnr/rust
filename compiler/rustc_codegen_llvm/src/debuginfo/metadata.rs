@@ -284,8 +284,10 @@ fn build_subroutine_type_di_node<'ll, 'tcx>(
         .insert(unique_type_id, recursion_marker_type_di_node(cx));
 
     let fn_ty = unique_type_id.expect_ty();
-    let signature =
-        cx.tcx.normalize_erasing_late_bound_regions(cx.typing_env(), fn_ty.fn_sig(cx.tcx));
+    let signature = cx.tcx.normalize_erasing_late_bound_regions(
+        cx.typing_env(),
+        fn_ty.fn_sig(cx.tcx).skip_norm_wip(),
+    );
 
     let signature_di_nodes: SmallVec<_> = iter::once(
         // return type

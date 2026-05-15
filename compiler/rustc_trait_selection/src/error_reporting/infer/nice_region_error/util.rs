@@ -119,7 +119,7 @@ impl<'a, 'tcx> NiceRegionError<'a, 'tcx> {
     ) -> Option<Span> {
         let fn_ty = self.tcx().type_of(scope_def_id).instantiate_identity().skip_norm_wip();
         if let ty::FnDef(_, _) = fn_ty.kind() {
-            let ret_ty = fn_ty.fn_sig(self.tcx()).output();
+            let ret_ty = fn_ty.fn_sig(self.tcx()).skip_norm_wip().output();
             let span = hir_sig.decl.output.span();
             let future_output = if hir_sig.header.is_async() {
                 ret_ty.map_bound(|ty| self.cx.get_impl_future_output_ty(ty)).transpose()

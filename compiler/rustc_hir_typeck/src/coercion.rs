@@ -1254,7 +1254,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             return Err(TypeError::ForceInlineCast);
         }
 
-        let sig = fndef.fn_sig(tcx);
+        let sig = fndef.fn_sig(tcx).skip_norm_wip();
         let sig = if fn_attrs.safe_target_features {
             // Allow the coercion if the current function has all the features that would be
             // needed to call the coercee safely.

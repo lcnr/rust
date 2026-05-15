@@ -210,9 +210,9 @@ fn check_call_site_abi<'tcx>(
     }
     let typing_env = ty::TypingEnv::fully_monomorphized();
     let callee_abi = match *callee.kind() {
-        ty::FnPtr(..) => {
-            tcx.fn_abi_of_fn_ptr(typing_env.as_query_input((callee.fn_sig(tcx), ty::List::empty())))
-        }
+        ty::FnPtr(..) => tcx.fn_abi_of_fn_ptr(
+            typing_env.as_query_input((callee.fn_sig(tcx).skip_norm_wip(), ty::List::empty())),
+        ),
         ty::FnDef(def_id, args) => {
             // Intrinsics are handled separately by the compiler.
             if tcx.intrinsic(def_id).is_some() {

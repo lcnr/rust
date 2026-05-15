@@ -604,7 +604,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         let self_ty = self.infcx.shallow_resolve(placeholder_predicate.self_ty());
 
         let tcx = self.tcx();
-        let sig = self_ty.fn_sig(tcx);
+        let sig = self_ty.fn_sig(tcx).skip_norm_wip();
         let trait_ref = closure_trait_ref_and_return_type(
             tcx,
             obligation.predicate.def_id(),
@@ -846,7 +846,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 (trait_ref, args.kind_ty())
             }
             ty::FnDef(..) | ty::FnPtr(..) => {
-                let sig = self_ty.fn_sig(tcx);
+                let sig = self_ty.fn_sig(tcx).skip_norm_wip();
                 let trait_ref = sig.map_bound(|sig| {
                     ty::TraitRef::new(
                         self.tcx(),

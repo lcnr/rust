@@ -662,7 +662,7 @@ fn compute_unsafe_infer_vars<'a, 'tcx>(
                     let func_ty = typeck_results.expr_ty(func);
 
                     if func_ty.is_fn()
-                        && let sig = func_ty.fn_sig(self.fcx.tcx)
+                        && let sig = func_ty.fn_sig(self.fcx.tcx).skip_norm_wip()
                         && sig.safety().is_unsafe()
                     {
                         let mut collector = InferVarCollector {

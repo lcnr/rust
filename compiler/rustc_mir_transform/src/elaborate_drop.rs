@@ -279,7 +279,7 @@ where
                 return pin_obj_bb;
             };
             let drop_fn = Ty::new_fn_def(tcx, drop_fn_def_id, trait_args);
-            let sig = drop_fn.fn_sig(tcx);
+            let sig = drop_fn.fn_sig(tcx).skip_norm_wip();
             let sig = tcx.instantiate_bound_regions_with_erased(sig);
             (sig.output(), drop_fn_def_id, trait_args)
         } else {
@@ -314,7 +314,8 @@ where
             tcx.require_lang_item(LangItem::PinNewUnchecked, span),
             [GenericArg::from(obj_ref_ty)],
         );
-        let pin_obj_ty = pin_obj_new_unchecked_fn.fn_sig(tcx).output().no_bound_vars().unwrap();
+        let pin_obj_ty =
+            pin_obj_new_unchecked_fn.fn_sig(tcx).skip_norm_wip().output().no_bound_vars().unwrap();
         let pin_obj_place = Place::from(self.new_temp(pin_obj_ty));
         let pin_obj_new_unchecked_fn = Operand::Constant(Box::new(ConstOperand {
             span,
