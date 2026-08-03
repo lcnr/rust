@@ -103,8 +103,8 @@ use crate::traits::query::{
     CanonicalAliasGoal, CanonicalDropckOutlivesGoal, CanonicalImpliedOutlivesBoundsGoal,
     CanonicalMethodAutoderefStepsGoal, CanonicalPredicateGoal, CanonicalTypeOpAscribeUserTypeGoal,
     CanonicalTypeOpNormalizeGoal, CanonicalTypeOpProvePredicateGoal, DropckConstraint,
-    DropckOutlivesResult, MethodAutoderefStepsResult, NoSolution, NormalizationResult,
-    OutlivesBound,
+    DropckOutlivesResult, MethodAutoderefStepsResult, MirBorrowckImpliedOutlivesBounds, NoSolution,
+    NormalizationResult, OutlivesBound,
 };
 use crate::traits::{
     CodegenObligationError, DynCompatibilityViolation, EvaluationResult, ImplSource,
@@ -2530,6 +2530,16 @@ rustc_queries! {
         NoSolution,
     > {
         desc { "computing implied outlives bounds for `{}` (hack disabled = {:?})", key.0.canonical.value.value.ty, key.1 }
+    }
+
+    /// Computes implied bounds and the normalized signature outside the NLL inference context.
+    query mir_borrowck_implied_outlives_bounds(
+        mir_def: LocalDefId
+    ) -> Result<
+        &'tcx Canonical<'tcx, canonical::QueryResponse<'tcx, MirBorrowckImpliedOutlivesBounds<'tcx>>>,
+        NoSolution,
+    > {
+        desc { "computing implied outlives bounds for `{}`", tcx.def_path_str(mir_def) }
     }
 
     /// Do not call this query directly:

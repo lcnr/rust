@@ -10,8 +10,7 @@ pub mod util;
 use std::cmp;
 use std::hash::{Hash, Hasher};
 
-use hir::def_id::LocalDefId;
-use rustc_hir as hir;
+use rustc_hir::def_id::LocalDefId;
 use rustc_macros::{TypeFoldable, TypeVisitable};
 use rustc_middle::traits::query::NoSolution;
 use rustc_middle::traits::solve::Certainty;
