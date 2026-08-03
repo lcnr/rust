@@ -81,6 +81,7 @@ mod dataflow;
 mod def_use;
 mod diagnostics;
 mod handle_placeholders;
+mod implied_bounds;
 mod nll;
 mod path_utils;
 mod place_ext;
@@ -107,6 +108,7 @@ impl<'tcx> TyCtxtConsts<'tcx> {
 
 pub fn provide(providers: &mut Providers) {
     *providers = Providers { mir_borrowck, ..*providers };
+    implied_bounds::provide(providers);
 }
 
 /// Provider for `query mir_borrowck`. Unlike `typeck`, this must

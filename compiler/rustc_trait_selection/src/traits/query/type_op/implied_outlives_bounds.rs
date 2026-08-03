@@ -82,6 +82,64 @@ pub fn compute_implied_outlives_bounds_inner<'tcx>(
         )
         .map_err(|_| NoSolution)?;
 
+    let mut outlives_bounds =
+        compute_implied_outlives_bounds_from_normalized(ocx, param_env, ty, normalized_ty, span)?;
+
+    // If we detect `bevy_ecs::*::ParamSet` in the WF args list (and `disable_implied_bounds_hack`
+    // or `-Zno-implied-bounds-compat` are not set), then use the registered outlives obligations
+    // as implied bounds.
+    if !disable_implied_bounds_hack {
+        extend_implied_bounds_with_registered_region_obligations(
+            tcx,
+            [ty],
+            ocx.infcx.clone_registered_region_obligations(),
+            &mut outlives_bounds,
+        );
+    }
+
+    Ok(outlives_bounds)
+}
+
+/// Implements the temporary `bevy_ecs::ParamSet` compatibility behavior for implied bounds.
+///
+/// `region_obligations` must contain only obligations registered while computing implied bounds
+/// for `trigger_tys`. Keeping that provenance explicit prevents an obligation from an unrelated
+/// signature type from being promoted to an implied bound.
+pub fn extend_implied_bounds_with_registered_region_obligations<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    trigger_tys: impl IntoIterator<Item = Ty<'tcx>>,
+    region_obligations: impl IntoIterator<Item = TypeOutlivesConstraint<'tcx>>,
+    outlives_bounds: &mut Vec<OutlivesBound<'tcx>>,
+) {
+    if tcx.sess.opts.unstable_opts.no_implied_bounds_compat
+        || !trigger_tys
+            .into_iter()
+            .any(|ty| ty.visit_with(&mut ContainsBevyParamSet { tcx }).is_break())
+    {
+        return;
+    }
+
+    for TypeOutlivesConstraint { sup_type, sub_region, .. } in region_obligations {
+        let mut components = smallvec![];
+        push_outlives_components(tcx, sup_type, &mut components);
+        outlives_bounds.extend(implied_bounds_from_components(tcx, sub_region, components));
+    }
+}
+
+/// Computes the implied bounds of both `ty` and its normalized form.
+///
+/// `normalized_ty` must be the exact result of normalizing `ty` in `ocx`. Normalization may create
+/// fresh region variables, and those variables must be shared between the normalized signature and
+/// the bounds returned by this function.
+pub fn compute_implied_outlives_bounds_from_normalized<'tcx>(
+    ocx: &ObligationCtxt<'_, 'tcx>,
+    param_env: ty::ParamEnv<'tcx>,
+    ty: Ty<'tcx>,
+    normalized_ty: Ty<'tcx>,
+    span: Span,
+) -> Result<Vec<OutlivesBound<'tcx>>, NoSolution> {
+    let tcx = ocx.infcx.tcx;
+
     // Sometimes when we ask what it takes for T: WF, we get back that
     // U: WF is required; in that case, we push U onto this stack and
     // process it next. Because the resulting predicates aren't always
@@ -107,7 +165,7 @@ pub fn compute_implied_outlives_bounds_inner<'tcx>(
                 .deeply_normalize(
                     &ObligationCause::dummy_with_span(span),
                     param_env,
-                    Unnormalized::new_wip(obligation.predicate),
+                    ty::Unnormalized::new_wip(obligation.predicate),
                 )
                 .map_err(|_| NoSolution)?;
             let Some(pred) = pred.kind().no_bound_vars() else {
@@ -148,22 +206,6 @@ pub fn compute_implied_outlives_bounds_inner<'tcx>(
                     outlives_bounds.extend(implied_bounds_from_components(tcx, r_b, components))
                 }
             }
-        }
-    }
-
-    // If we detect `bevy_ecs::*::ParamSet` in the WF args list (and `disable_implied_bounds_hack`
-    // or `-Zno-implied-bounds-compat` are not set), then use the registered outlives obligations
-    // as implied bounds.
-    if !disable_implied_bounds_hack
-        && !ocx.infcx.tcx.sess.opts.unstable_opts.no_implied_bounds_compat
-        && ty.visit_with(&mut ContainsBevyParamSet { tcx: ocx.infcx.tcx }).is_break()
-    {
-        for TypeOutlivesConstraint { sup_type, sub_region, .. } in
-            ocx.infcx.clone_registered_region_obligations()
-        {
-            let mut components = smallvec![];
-            push_outlives_components(tcx, sup_type, &mut components);
-            outlives_bounds.extend(implied_bounds_from_components(tcx, sub_region, components));
         }
     }
 
