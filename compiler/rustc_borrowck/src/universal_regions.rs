@@ -26,8 +26,8 @@ use rustc_macros::extension;
 use rustc_middle::mir::RETURN_PLACE;
 use rustc_middle::ty::print::with_no_trimmed_paths;
 use rustc_middle::ty::{
-    self, GenericArgs, GenericArgsRef, InlineConstArgs, InlineConstArgsParts, RegionExt, RegionVid,
-    Ty, TyCtxt, TypeFoldable, TypeVisitableExt, fold_regions,
+    self, BoundVariableKind, GenericArgs, GenericArgsRef, InlineConstArgs, InlineConstArgsParts,
+    List, RegionExt, RegionVid, Ty, TyCtxt, TypeFoldable, TypeVisitableExt, fold_regions,
 };
 use rustc_middle::{bug, span_bug};
 use rustc_span::{ErrorGuaranteed, kw, sym};
@@ -135,7 +135,7 @@ pub(crate) enum DefiningTy<'tcx> {
 
 impl<'tcx> DefiningTy<'tcx> {
     #[instrument(level = "debug", skip(tcx), ret)]
-    fn new(tcx: TyCtxt<'tcx>, body_def_id: LocalDefId) -> DefiningTy<'tcx> {
+    pub(crate) fn new(tcx: TyCtxt<'tcx>, body_def_id: LocalDefId) -> DefiningTy<'tcx> {
         match tcx.hir_body_owner_kind(body_def_id) {
             BodyOwnerKind::Closure | BodyOwnerKind::Fn => {
                 let defining_ty = tcx.type_of(body_def_id).instantiate_identity().skip_norm_wip();
@@ -191,8 +191,38 @@ impl<'tcx> DefiningTy<'tcx> {
         }
     }
 
+    /// The bound variables for a given defining type. This differs from their usual bound vars
+    /// in that closures and coroutine closures have an additional `'env`.
+    pub(crate) fn bound_vars(self, tcx: TyCtxt<'tcx>) -> &'tcx List<BoundVariableKind<'tcx>> {
+        match self {
+            DefiningTy::Closure(_, args) => {
+                let closure_sig = args.as_closure().sig();
+                let inputs_and_output = closure_sig.inputs_and_output();
+                tcx.mk_bound_variable_kinds_from_iter(inputs_and_output.bound_vars().iter().chain(
+                    iter::once(ty::BoundVariableKind::Region(ty::BoundRegionKind::ClosureEnv)),
+                ))
+            }
+
+            DefiningTy::CoroutineClosure(_, args) => {
+                let closure_sig = args.as_coroutine_closure().coroutine_closure_sig();
+                tcx.mk_bound_variable_kinds_from_iter(closure_sig.bound_vars().iter().chain(
+                    iter::once(ty::BoundVariableKind::Region(ty::BoundRegionKind::ClosureEnv)),
+                ))
+            }
+
+            DefiningTy::FnDef(def_id, _) => {
+                tcx.fn_sig(def_id).instantiate_identity().skip_norm_wip().bound_vars()
+            }
+
+            DefiningTy::Coroutine(..)
+            | DefiningTy::Const(..)
+            | DefiningTy::InlineConst(..)
+            | DefiningTy::GlobalAsm(..) => ty::List::empty(),
+        }
+    }
+
     #[instrument(level = "debug", skip(tcx, c_variadic_region), ret)]
-    fn inputs_and_output(
+    pub(crate) fn inputs_and_output(
         self,
         tcx: TyCtxt<'tcx>,
         c_variadic_region: impl FnOnce() -> ty::Region<'tcx>,
@@ -201,11 +231,7 @@ impl<'tcx> DefiningTy<'tcx> {
             DefiningTy::Closure(def_id, args) => {
                 let closure_sig = args.as_closure().sig();
                 let inputs_and_output = closure_sig.inputs_and_output();
-                let bound_vars = tcx.mk_bound_variable_kinds_from_iter(
-                    inputs_and_output.bound_vars().iter().chain(iter::once(
-                        ty::BoundVariableKind::Region(ty::BoundRegionKind::ClosureEnv),
-                    )),
-                );
+                let bound_vars = self.bound_vars(tcx);
                 let br = ty::BoundRegion {
                     var: ty::BoundVar::from_usize(bound_vars.len() - 1),
                     kind: ty::BoundRegionKind::ClosureEnv,
@@ -253,10 +279,7 @@ impl<'tcx> DefiningTy<'tcx> {
             // Then we wrap it all up into a list of inputs and output.
             DefiningTy::CoroutineClosure(def_id, args) => {
                 let closure_sig = args.as_coroutine_closure().coroutine_closure_sig();
-                let bound_vars =
-                    tcx.mk_bound_variable_kinds_from_iter(closure_sig.bound_vars().iter().chain(
-                        iter::once(ty::BoundVariableKind::Region(ty::BoundRegionKind::ClosureEnv)),
-                    ));
+                let bound_vars = self.bound_vars(tcx);
                 let br = ty::BoundRegion {
                     var: ty::BoundVar::from_usize(bound_vars.len() - 1),
                     kind: ty::BoundRegionKind::ClosureEnv,
@@ -539,6 +562,10 @@ impl<'tcx> UniversalRegions<'tcx> {
         self.region_classification(r) == Some(RegionClassification::Local)
     }
 
+    pub(crate) fn is_external_free_region(&self, r: RegionVid) -> bool {
+        self.region_classification(r) == Some(RegionClassification::External)
+    }
+
     /// Returns the number of universal regions created in any category.
     pub(crate) fn len(&self) -> usize {
         self.num_universals
@@ -553,7 +580,7 @@ impl<'tcx> UniversalRegions<'tcx> {
         self.first_local_index
     }
 
-    /// Gets an iterator over all the early-bound regions that have names.
+    /// Gets an iterator over all early bound regions starting with `'static`.
     pub(crate) fn named_universal_regions_iter(
         &self,
     ) -> impl Iterator<Item = (ty::Region<'tcx>, ty::RegionVid)> {
@@ -943,7 +970,7 @@ impl<'tcx> UniversalRegionIndices<'tcx> {
 /// Iterates over the late-bound regions defined on `mir_def_id` and all of its
 /// parents, up to the typeck root, and invokes `f` with the liberated form
 /// of each one.
-fn for_each_late_bound_region_in_recursive_scope<'tcx>(
+pub(crate) fn for_each_late_bound_region_in_recursive_scope<'tcx>(
     tcx: TyCtxt<'tcx>,
     mut mir_def_id: LocalDefId,
     mut f: impl FnMut(ty::Region<'tcx>),
