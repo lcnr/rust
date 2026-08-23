@@ -4,6 +4,7 @@
 use rustc_type_ir::fast_reject::DeepRejectCtxt;
 use rustc_type_ir::inherent::*;
 use rustc_type_ir::lang_items::SolverTraitLangItem;
+use rustc_type_ir::search_graph::CandidateHeadUsages;
 use rustc_type_ir::solve::inspect::ProbeKind;
 use rustc_type_ir::solve::{
     AliasBoundKind, NoSolutionOrRerunNonErased, QueryResultOrRerunNonErased, RerunNonErased,
@@ -138,6 +139,7 @@ where
         goal: Goal<I, Self>,
         goal_trait_ref: ty::TraitRef<I>,
         impl_def_id: I::ImplId,
+        _failed_head_usages: &mut CandidateHeadUsages,
         then: impl FnOnce(&mut EvalCtxt<'_, D>, Certainty) -> QueryResultOrRerunNonErased<I>,
     ) -> Result<Candidate<I>, NoSolutionOrRerunNonErased> {
         let cx = ecx.cx();

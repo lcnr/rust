@@ -134,6 +134,24 @@ where
         let (result, head_usages) = self.cx.enter_single_candidate(f);
         Ok(Candidate { source: self.source, result: result?, head_usages })
     }
+
+    /// Like [`Self::enter`], but retains cycle-head usages if the candidate does not apply.
+    #[instrument(level = "debug", skip_all, fields(source = ?self.source))]
+    pub(in crate::solve) fn enter_with_failed_usages(
+        self,
+        failed_head_usages: &mut CandidateHeadUsages,
+        f: impl FnOnce(&mut EvalCtxt<'_, D>) -> Result<CanonicalResponse<I>, NoSolutionOrRerunNonErased>,
+    ) -> Result<Candidate<I>, NoSolutionOrRerunNonErased> {
+        let (result, head_usages) = self.cx.enter_single_candidate(f);
+        match result {
+            Ok(result) => Ok(Candidate { source: self.source, result, head_usages }),
+            Err(error @ NoSolutionOrRerunNonErased::NoSolution(_)) => {
+                failed_head_usages.merge_usages(head_usages);
+                Err(error)
+            }
+            Err(error @ NoSolutionOrRerunNonErased::RerunNonErased(_)) => Err(error),
+        }
+    }
 }
 
 impl<'a, D, I> EvalCtxt<'a, D, I>

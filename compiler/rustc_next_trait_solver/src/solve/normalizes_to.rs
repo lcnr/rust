@@ -3,6 +3,7 @@ use std::debug_assert_matches;
 use rustc_type_ir::fast_reject::DeepRejectCtxt;
 use rustc_type_ir::inherent::*;
 use rustc_type_ir::lang_items::{SolverAdtLangItem, SolverProjectionLangItem, SolverTraitLangItem};
+use rustc_type_ir::search_graph::CandidateHeadUsages;
 use rustc_type_ir::solve::{
     FetchEligibleAssocItemResponse, NoSolutionOrRerunNonErased, QueryResultOrRerunNonErased,
     RerunNonErased, RerunReason, RerunResultExt,
@@ -255,6 +256,7 @@ where
         goal: Goal<I, NormalizesTo<I>>,
         goal_trait_ref: ty::TraitRef<I>,
         impl_def_id: I::ImplId,
+        _failed_head_usages: &mut CandidateHeadUsages,
         then: impl FnOnce(&mut EvalCtxt<'_, D>, Certainty) -> QueryResultOrRerunNonErased<I>,
     ) -> Result<Candidate<I>, NoSolutionOrRerunNonErased> {
         let cx = ecx.cx();

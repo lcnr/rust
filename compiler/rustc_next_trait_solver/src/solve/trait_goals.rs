@@ -4,6 +4,7 @@ use rustc_type_ir::data_structures::IndexSet;
 use rustc_type_ir::fast_reject::DeepRejectCtxt;
 use rustc_type_ir::inherent::*;
 use rustc_type_ir::lang_items::SolverTraitLangItem;
+use rustc_type_ir::search_graph::CandidateHeadUsages;
 use rustc_type_ir::solve::{
     AliasBoundKind, CandidatePreferenceMode, CanonicalResponse, MaybeInfo,
     NoSolutionOrRerunNonErased, OpaqueTypesJank, QueryResultOrRerunNonErased, RerunNonErased,
@@ -62,6 +63,7 @@ where
         goal: Goal<I, TraitClause<I>>,
         goal_trait_ref: TraitRef<I>,
         impl_def_id: I::ImplId,
+        failed_head_usages: &mut CandidateHeadUsages,
         then: impl FnOnce(&mut EvalCtxt<'_, D>, Certainty) -> QueryResultOrRerunNonErased<I>,
     ) -> Result<Candidate<I>, NoSolutionOrRerunNonErased> {
         let cx = ecx.cx();
@@ -112,32 +114,35 @@ where
             }
         };
 
-        ecx.probe_trait_candidate(CandidateSource::Impl(impl_def_id)).enter(|ecx| {
-            let impl_args = ecx.fresh_args_for_item(impl_def_id.into());
-            ecx.record_impl_args(impl_args);
-            let impl_trait_ref = impl_trait_ref.instantiate(cx, impl_args).skip_norm_wip();
+        ecx.probe_trait_candidate(CandidateSource::Impl(impl_def_id)).enter_with_failed_usages(
+            failed_head_usages,
+            |ecx| {
+                let impl_args = ecx.fresh_args_for_item(impl_def_id.into());
+                ecx.record_impl_args(impl_args);
+                let impl_trait_ref = impl_trait_ref.instantiate(cx, impl_args).skip_norm_wip();
 
-            ecx.eq(goal.param_env, goal_trait_ref, impl_trait_ref)?;
-            let where_clause_bounds = cx
-                .clauses_of(impl_def_id.into())
-                .iter_instantiated(cx, impl_args)
-                .map(Unnormalized::skip_norm_wip)
-                .map(|clause| goal.with(cx, clause));
-            ecx.add_goals(GoalSource::ImplWhereBound, where_clause_bounds)?;
-
-            // We currently elaborate all supertrait outlives obligations from impls.
-            // This can be removed when we actually do coinduction correctly, and prove
-            // all supertrait obligations unconditionally.
-            ecx.add_goals(
-                GoalSource::Misc,
-                cx.impl_super_outlives(impl_def_id)
+                ecx.eq(goal.param_env, goal_trait_ref, impl_trait_ref)?;
+                let where_clause_bounds = cx
+                    .clauses_of(impl_def_id.into())
                     .iter_instantiated(cx, impl_args)
                     .map(Unnormalized::skip_norm_wip)
-                    .map(|pred| goal.with(cx, pred)),
-            )?;
+                    .map(|clause| goal.with(cx, clause));
+                ecx.add_goals(GoalSource::ImplWhereBound, where_clause_bounds)?;
 
-            then(ecx, maximal_certainty)
-        })
+                // We currently elaborate all supertrait outlives obligations from impls.
+                // This can be removed when we actually do coinduction correctly, and prove
+                // all supertrait obligations unconditionally.
+                ecx.add_goals(
+                    GoalSource::Misc,
+                    cx.impl_super_outlives(impl_def_id)
+                        .iter_instantiated(cx, impl_args)
+                        .map(Unnormalized::skip_norm_wip)
+                        .map(|pred| goal.with(cx, pred)),
+                )?;
+
+                then(ecx, maximal_certainty)
+            },
+        )
     }
 
     fn consider_error_guaranteed_candidate(
@@ -1565,9 +1570,17 @@ where
             let where_bounds: Vec<_> = candidates
                 .extract_if(.., |c| matches!(c.source, CandidateSource::ParamEnv(_)))
                 .collect();
+            // Non-global where-bounds are preferred over all remaining candidates,
+            // so these candidates cannot affect the result of this goal.
+            for candidate in candidates {
+                self.ignore_candidate_head_usages(candidate.head_usages);
+            }
+            self.ignore_candidate_head_usages(failed_candidate_info.impl_head_usages);
+
             let Some((response, info)) = self.try_merge_candidates(&where_bounds) else {
                 return Ok((self.bail_with_ambiguity(&where_bounds), None));
             };
+
             match info {
                 // If there's an always applicable candidate, the result of all
                 // other candidates does not matter. This means we can ignore
