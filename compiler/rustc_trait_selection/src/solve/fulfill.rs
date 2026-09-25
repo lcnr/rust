@@ -27,8 +27,7 @@ mod derive_errors;
 // simple and sub-optimal in terms of how it moves elements, but it can be inlined.
 // `Vec::retain_mut` is more sophisticated and minimizes element moves, but also contains more code
 // and doesn't get inlined in `try_evaluate_obligations`, giving worse performance overall.
-type PendingObligations<'tcx> =
-    ThinVec<(PredicateObligation<'tcx>, Option<GoalStalledOn<TyCtxt<'tcx>>>)>;
+type PendingObligations<'tcx> = ThinVec<(PredicateObligation<'tcx>, GoalStalledOn<TyCtxt<'tcx>>)>;
 
 /// A trait engine using the new trait solver.
 ///
@@ -61,7 +60,7 @@ impl<'tcx> ObligationStorage<'tcx> {
     fn register(
         &mut self,
         obligation: PredicateObligation<'tcx>,
-        stalled_on: Option<GoalStalledOn<TyCtxt<'tcx>>>,
+        stalled_on: GoalStalledOn<TyCtxt<'tcx>>,
     ) {
         self.pending.push((obligation, stalled_on));
     }
@@ -76,14 +75,14 @@ impl<'tcx> ObligationStorage<'tcx> {
 
     fn clone_pending_filtered<F>(&self, f: F) -> PredicateObligations<'tcx>
     where
-        F: FnMut(&&(PredicateObligation<'tcx>, Option<GoalStalledOn<TyCtxt<'tcx>>>)) -> bool,
+        F: FnMut(&&(PredicateObligation<'tcx>, GoalStalledOn<TyCtxt<'tcx>>)) -> bool,
     {
         self.pending.iter().filter(f).map(|(o, _)| o.clone()).collect()
     }
 
     fn drain_pending(
         &mut self,
-        cond: impl Fn(&PredicateObligation<'tcx>, &Option<GoalStalledOn<TyCtxt<'tcx>>>) -> bool,
+        cond: impl Fn(&PredicateObligation<'tcx>, &GoalStalledOn<TyCtxt<'tcx>>) -> bool,
     ) -> PendingObligations<'tcx> {
         let (unstalled, pending) =
             mem::take(&mut self.pending).into_iter().partition(|(o, s)| cond(o, s));

@@ -411,29 +411,49 @@ where
     }
 }
 
+/// [`Certainty`], but tracking [GoalStalledOn] in the `Maybe` case.
+#[derive_where(Debug; I: Interner)]
+pub enum EvaluationResult<I: Interner> {
+    Yes,
+    Maybe {
+        maybe_info: MaybeInfo,
+        /// The goal we've evaluated. This is the input goal, but potentially with its
+        /// inference variables resolved. This never applies any inference constraints
+        /// from evaluating the goal.
+        ///
+        /// We rely on this to check whether root goals in HIR typeck had an unresolved
+        /// type inference variable in the input. We must not resolve this after evaluating
+        /// the goal as even if the inference variable has been resolved by evaluating the
+        /// goal itself, this goal may still end up failing due to region uniquification
+        /// later on.
+        ///
+        /// This is used as a minor optimization to avoid re-resolving inference variables
+        /// when reevaluating ambiguous goals. E.g. if we've got a goal `?x: Trait` with `?x`
+        /// already being constrained to `Vec<?y>`, then the first evaluation resolves it to
+        /// `Vec<?y>: Trait`. If this goal is still ambiguous and we later resolve `?y` to `u32`,
+        /// then reevaluating this goal now only needs to resolve `?y` while it would otherwise
+        /// have to resolve both `?x` and `?y`.
+        resolved_goal: Goal<I, I::Predicate>,
+        /// If the certainty was `Maybe`, then we want to keep track of whether the goal
+        /// has changed before trying to rerun it.
+        stalled_on: GoalStalledOn<I>,
+    },
+}
+
+impl<I: Interner> EvaluationResult<I> {
+    pub fn certainty(self) -> Certainty {
+        match self {
+            EvaluationResult::Yes => Certainty::Yes,
+            EvaluationResult::Maybe { maybe_info, resolved_goal: _, stalled_on: _ } => {
+                Certainty::Maybe(maybe_info)
+            }
+        }
+    }
+}
+
 /// The result of evaluating a goal.
 #[derive_where(Debug; I: Interner)]
 pub struct GoalEvaluation<I: Interner> {
-    /// The goal we've evaluated. This is the input goal, but potentially with its
-    /// inference variables resolved. This never applies any inference constraints
-    /// from evaluating the goal.
-    ///
-    /// We rely on this to check whether root goals in HIR typeck had an unresolved
-    /// type inference variable in the input. We must not resolve this after evaluating
-    /// the goal as even if the inference variable has been resolved by evaluating the
-    /// goal itself, this goal may still end up failing due to region uniquification
-    /// later on.
-    ///
-    /// This is used as a minor optimization to avoid re-resolving inference variables
-    /// when reevaluating ambiguous goals. E.g. if we've got a goal `?x: Trait` with `?x`
-    /// already being constrained to `Vec<?y>`, then the first evaluation resolves it to
-    /// `Vec<?y>: Trait`. If this goal is still ambiguous and we later resolve `?y` to `u32`,
-    /// then reevaluating this goal now only needs to resolve `?y` while it would otherwise
-    /// have to resolve both `?x` and `?y`,
-    pub goal: Goal<I, I::Predicate>,
-    pub certainty: Certainty,
+    pub evaluation_result: EvaluationResult<I>,
     pub has_changed: HasChanged,
-    /// If the [`Certainty`] was `Maybe`, then keep track of whether the goal has changed
-    /// before rerunning it.
-    pub stalled_on: Option<GoalStalledOn<I>>,
 }

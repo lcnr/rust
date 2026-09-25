@@ -1818,9 +1818,9 @@ where
             let pred = ty::ProjectionClause { projection_term: alias_term, term: infer_term };
             let goal = Goal::new(self.cx(), param_env, pred);
             self.inspect.add_goal(self.delegate, self.max_input_universe, source, goal);
-            let GoalEvaluation { goal, certainty, has_changed: _, stalled_on } =
+            let GoalEvaluation { evaluation_result, has_changed: _, } =
                 self.evaluate_goal(source, goal, None)?;
-            let normalization_was_ambiguous = match certainty {
+            let normalization_was_ambiguous = match evaluation_result {
                 Certainty::Yes => NormalizationWasAmbiguous::No,
                 Certainty::Maybe(_) => {
                     self.nested_goals.push((source, goal, stalled_on));

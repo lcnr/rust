@@ -68,7 +68,7 @@ where
         // will then also reevaluate the `NormalizesTo` goal.
         let (
             NestedNormalizationGoals(nested_goals),
-            GoalEvaluation { goal: _, certainty, stalled_on: _, has_changed: _ },
+            GoalEvaluation { evaluation_result, has_changed: _ },
         ) = self.evaluate_goal_raw(GoalSource::TypeRelating, normalizes_to)?;
 
         trace!(?nested_goals);
@@ -86,6 +86,6 @@ where
             self.add_goal(s, g)?;
         }
 
-        self.evaluate_added_goals_and_make_canonical_response(certainty)
+        self.evaluate_added_goals_and_make_canonical_response(evaluation_result.certainty())
     }
 }
