@@ -1,5 +1,6 @@
 //@ revisions: bfail
 #![feature(generic_const_exprs, adt_const_params)]
+//~^ WARN `feature(generic_const_exprs)` is not supported with the next-generation trait solver
 #![allow(incomplete_features)]
 
 use std::marker::ConstParamTy;

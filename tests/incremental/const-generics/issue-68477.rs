@@ -3,6 +3,7 @@
 
 // Needed to supply generic arguments to the anon const in `[(); FOO]`.
 #![feature(generic_const_exprs)]
+//~^ WARN `feature(generic_const_exprs)` is not supported with the next-generation trait solver
 
 const FOO: usize = 1;
 

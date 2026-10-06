@@ -7,8 +7,8 @@ pub type Foo = impl Sized;
 #[cfg_attr(rpass1, define_opaque())]
 #[cfg_attr(bfail2, define_opaque(Foo))]
 fn a() {
-    //[bfail2]~^ ERROR item does not constrain `Foo::{opaque#0}`
     let _: Foo = b();
+    //[bfail2]~^ ERROR: type annotations needed
 }
 
 #[define_opaque(Foo)]

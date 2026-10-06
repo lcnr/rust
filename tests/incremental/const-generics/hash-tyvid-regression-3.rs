@@ -1,5 +1,6 @@
 //@ revisions: bfail
 #![feature(generic_const_exprs)]
+//~^ WARN `feature(generic_const_exprs)` is not supported with the next-generation trait solver
 #![allow(incomplete_features)]
 // regression test for #79251
 struct Node<const D: usize>

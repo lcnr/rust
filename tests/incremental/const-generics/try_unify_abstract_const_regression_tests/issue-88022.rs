@@ -1,5 +1,6 @@
 //@ revisions: bfail
 #![feature(generic_const_exprs)]
+//~^ WARN `feature(generic_const_exprs)` is not supported with the next-generation trait solver
 #![allow(incomplete_features, unused_braces)]
 
 struct Buffer<T, const S: usize>

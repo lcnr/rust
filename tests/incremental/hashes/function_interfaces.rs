@@ -321,9 +321,9 @@ pub fn change_return_impl_trait() -> impl Clone {
 #[cfg(not(any(bpass1,bpass4)))]
 #[rustc_clean(cfg = "bpass2", except = "hir_owner")]
 #[rustc_clean(cfg = "bpass3")]
-#[rustc_clean(cfg = "bpass5", except = "hir_owner, typeck_root")]
+#[rustc_clean(cfg = "bpass5", except = "hir_owner, typeck_root, optimized_mir")]
 #[rustc_clean(cfg = "bpass6")]
-pub fn change_return_impl_trait() -> impl  Copy {
+pub fn change_return_impl_trait() -> impl Copy {
     0u32
 }
 

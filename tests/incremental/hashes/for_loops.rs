@@ -156,7 +156,7 @@ pub fn add_loop_label() {
 #[cfg(not(any(bpass1,bpass4)))]
 #[rustc_clean(cfg="bpass2", except="hir_owner")]
 #[rustc_clean(cfg="bpass3")]
-#[rustc_clean(cfg="bpass5", except="hir_owner, optimized_mir")]
+#[rustc_clean(cfg="bpass5", except="hir_owner, typeck_root, optimized_mir")]
 #[rustc_clean(cfg="bpass6")]
 pub fn add_loop_label() {
     let mut _x = 0;

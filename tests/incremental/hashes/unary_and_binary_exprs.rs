@@ -297,9 +297,9 @@ pub fn bitwise_and_to_lshift(a: i32) -> i32 {
 }
 
 #[cfg(not(any(bpass1,bpass4)))]
-#[rustc_clean(except="hir_owner,optimized_mir", cfg="bpass2")]
+#[rustc_clean(except="hir_owner,typeck_root,optimized_mir", cfg="bpass2")]
 #[rustc_clean(cfg="bpass3")]
-#[rustc_clean(except="hir_owner,optimized_mir", cfg="bpass5")]
+#[rustc_clean(except="hir_owner,typeck_root,optimized_mir", cfg="bpass5")]
 #[rustc_clean(cfg="bpass6")]
 pub fn bitwise_and_to_lshift(a: i32) -> i32 {
     a << 1
@@ -314,9 +314,9 @@ pub fn bitwise_and_to_rshift(a: i32) -> i32 {
 }
 
 #[cfg(not(any(bpass1,bpass4)))]
-#[rustc_clean(except="hir_owner,optimized_mir", cfg="bpass2")]
+#[rustc_clean(except="hir_owner,typeck_root,optimized_mir", cfg="bpass2")]
 #[rustc_clean(cfg="bpass3")]
-#[rustc_clean(except="hir_owner,optimized_mir", cfg="bpass5")]
+#[rustc_clean(except="hir_owner,typeck_root,optimized_mir", cfg="bpass5")]
 #[rustc_clean(cfg="bpass6")]
 pub fn bitwise_and_to_rshift(a: i32) -> i32 {
     a >> 1
@@ -350,7 +350,7 @@ pub fn eq_to_lt(a: i32) -> bool {
 #[cfg(not(any(bpass1,bpass4)))]
 #[rustc_clean(except="hir_owner,optimized_mir", cfg="bpass2")]
 #[rustc_clean(cfg="bpass3")]
-#[rustc_clean(except="hir_owner,optimized_mir", cfg="bpass5")]
+#[rustc_clean(except="hir_owner,typeck_root,optimized_mir", cfg="bpass5")]
 #[rustc_clean(cfg="bpass6")]
 pub fn eq_to_lt(a: i32) -> bool {
     a  < 1
@@ -367,7 +367,7 @@ pub fn eq_to_gt(a: i32) -> bool {
 #[cfg(not(any(bpass1,bpass4)))]
 #[rustc_clean(except="hir_owner,optimized_mir", cfg="bpass2")]
 #[rustc_clean(cfg="bpass3")]
-#[rustc_clean(except="hir_owner,optimized_mir", cfg="bpass5")]
+#[rustc_clean(except="hir_owner,typeck_root,optimized_mir", cfg="bpass5")]
 #[rustc_clean(cfg="bpass6")]
 pub fn eq_to_gt(a: i32) -> bool {
     a  > 1
