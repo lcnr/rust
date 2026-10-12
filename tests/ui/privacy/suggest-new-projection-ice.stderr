@@ -5,6 +5,11 @@ LL |     let _ = m::Foo {};
    |             ^^^^^^
    |
    = note: private field `_priv` that was not provided
+help: you might have meant to use the `new` associated function
+   |
+LL -     let _ = m::Foo {};
+LL +     let _ = m::Foo::new();
+   |
 
 error: aborting due to 1 previous error
 

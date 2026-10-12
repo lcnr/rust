@@ -1,8 +1,8 @@
 error[E0277]: the trait bound `T: Trait` is not satisfied
-  --> $DIR/underconstrained_generic.rs:23:5
+  --> $DIR/underconstrained_generic.rs:22:1
    |
-LL |     ()
-   |     ^^ the trait `Trait` is not implemented for `T`
+LL | fn _defining_use<T: Trait>() -> Converter<T> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Trait` is not implemented for `T`
    |
 note: required for `()` to implement `ProofForConversion<T>`
   --> $DIR/underconstrained_generic.rs:13:16

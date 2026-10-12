@@ -1,20 +1,32 @@
-error: implementation of `DistributedIteratorMulti` is not general enough
-  --> $DIR/hrtb-associated-type-leak-check-55731.rs:49:5
+error[E0277]: the trait bound `for<'a> Map<Cloned<&()>, X>: DistributedIteratorMulti<&'a ()>` is not satisfied
+  --> $DIR/hrtb-associated-type-leak-check-55731.rs:49:11
    |
-LL | /     multi(Map {
+LL |       multi(Map {
+   |  _____-----_^
+   | |     |
+   | |     required by a bound introduced by this call
 LL | |         i: Cloned(PhantomData),
 LL | |         f: X,
 LL | |     });
-   | |______^
+   | |_____^ unsatisfied trait bound
    |
-note: `DistributedIteratorMulti<&'0 ()>` would have to be implemented for the type `Cloned<&()>`, for any lifetime `'0`...
+help: the trait `for<'a> DistributedIteratorMulti<&'a ()>` is not implemented for `Map<Cloned<&()>, X>`
+  --> $DIR/hrtb-associated-type-leak-check-55731.rs:25:1
+   |
+LL | struct Map<I, F> {
+   | ^^^^^^^^^^^^^^^^
+note: required by a bound in `multi`
   --> $DIR/hrtb-associated-type-leak-check-55731.rs:43:8
    |
 LL | fn multi<I>(_reducer: I)
 LL | where
 LL |     I: for<'a> DistributedIteratorMulti<&'a ()>,
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `multi`
-   = note: ...but `DistributedIteratorMulti<&'1 ()>` is actually implemented for the type `Cloned<&'1 ()>`, for some specific lifetime `'1`
+help: consider introducing a `where` clause, but there might be an alternative better way to express this requirement
+   |
+LL | fn main() where for<'a> Map<Cloned<&()>, X>: DistributedIteratorMulti<&'a ()> {
+   |           +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 error: aborting due to 1 previous error
 
+For more information about this error, try `rustc --explain E0277`.

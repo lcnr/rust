@@ -1,3 +1,13 @@
+error[E0277]: the trait bound `(dyn Trait<'a> + 'static): Unsize<(dyn for<'b> Trait<'b> + 'static)>` is not satisfied
+  --> $DIR/ptr-to-trait-obj-different-regions-misc.rs:20:5
+   |
+LL |     x as _
+   |     ^ the nightly-only, unstable trait `Unsize<(dyn for<'b> Trait<'b> + 'static)>` is not implemented for `(dyn Trait<'a> + 'static)`
+   |
+   = note: all implementations of `Unsize` are provided automatically by the compiler, see <https://doc.rust-lang.org/stable/std/marker/trait.Unsize.html> for more information
+   = note: required for `*mut (dyn Trait<'a> + 'static)` to implement `CoerceUnsized<*mut (dyn for<'b> Trait<'b> + 'static)>`
+   = note: required for the cast from `*mut (dyn Trait<'a> + 'static)` to `*mut (dyn for<'b> Trait<'b> + 'static)`
+
 error: lifetime may not live long enough
   --> $DIR/ptr-to-trait-obj-different-regions-misc.rs:7:5
    |
@@ -93,28 +103,6 @@ LL |     x as _
    |     ^^^^^^
    = note: this was previously accepted by the compiler but was changed recently
    = help: see <https://github.com/rust-lang/rust/issues/141402> for more information
-
-error: lifetime may not live long enough
-  --> $DIR/ptr-to-trait-obj-different-regions-misc.rs:20:5
-   |
-LL | fn change_lt_hr<'a>(x: *mut dyn Trait<'a>) -> *mut dyn for<'b> Trait<'b> {
-   |                 -- lifetime `'a` defined here
-LL |     x as _
-   |     ^^^^^^ cast requires that `'a` must outlive `'static`
-   |
-help: to declare that the trait object captures data from argument `x`, you can add an explicit `'a` lifetime bound
-   |
-LL | fn change_lt_hr<'a>(x: *mut dyn Trait<'a>) -> *mut dyn for<'b> Trait<'b> + 'a {
-   |                                                                          ++++
-
-error[E0308]: mismatched types
-  --> $DIR/ptr-to-trait-obj-different-regions-misc.rs:20:5
-   |
-LL |     x as _
-   |     ^^^^^^ one type is more general than the other
-   |
-   = note: expected trait object `dyn for<'b> Trait<'b>`
-              found trait object `dyn Trait<'_>`
 
 error: lifetime may not live long enough
   --> $DIR/ptr-to-trait-obj-different-regions-misc.rs:32:5
@@ -247,7 +235,7 @@ LL |     require_static(ptr as _)
    = note: this was previously accepted by the compiler but was changed recently
    = help: see <https://github.com/rust-lang/rust/issues/141402> for more information
 
-error: aborting due to 14 previous errors
+error: aborting due to 13 previous errors
 
-Some errors have detailed explanations: E0308, E0521.
-For more information about an error, try `rustc --explain E0308`.
+Some errors have detailed explanations: E0277, E0521.
+For more information about an error, try `rustc --explain E0277`.

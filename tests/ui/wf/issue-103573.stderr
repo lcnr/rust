@@ -9,6 +9,12 @@ help: consider further restricting the associated type
 LL |     fn g<'a>(_: &<<Self::TypeC<'a> as TraitB>::TypeB as TraitA>::TypeA) where <<Self as TraitC<E>>::TypeC<'a> as TraitB>::TypeB: TraitA;
    |                                                                         +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-error: aborting due to 1 previous error
+error: the type `&<<<Self as TraitC<E>>::TypeC<'a> as TraitB>::TypeB as TraitA>::TypeA` is not well-formed
+  --> $DIR/issue-103573.rs:18:17
+   |
+LL |     fn g<'a>(_: &<<Self::TypeC<'a> as TraitB>::TypeB as TraitA>::TypeA);
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

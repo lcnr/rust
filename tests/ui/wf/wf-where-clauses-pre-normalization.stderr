@@ -5,7 +5,7 @@ LL | pub fn repro<'a, T>()
    |              -- the parameter type `T` must be valid for the lifetime `'a` as defined here...
 LL | where
 LL |     <View<&'a T> as Data>::Elem: Sized,
-   |                                  ^^^^^ ...so that the reference type `&'a T` does not outlive the data it points at
+   |                                  ^^^^^ ...so that the type `T` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |

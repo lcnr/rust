@@ -4,6 +4,7 @@ error[E0282]: type annotations needed
 LL |     PhantomData
    |     ^^^^^^^^^^^ cannot infer type of the type parameter `T` declared on the struct `PhantomData`
    |
+   = note: cannot infer type of hidden type of opaque
 help: consider specifying a concrete type for the type parameter `T`
    |
 LL |     PhantomData::</* Type */>

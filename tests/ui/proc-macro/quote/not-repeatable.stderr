@@ -14,7 +14,7 @@ LL |     let _ = quote! { $($ip)* };
            which is required by `&Ipv4Addr: proc_macro::ext::RepIteratorExt`
            `Ipv4Addr: ToTokens`
            which is required by `Ipv4Addr: proc_macro::ext::RepToTokensExt`
-           `&mut Ipv4Addr: Iterator`
+           `Ipv4Addr: Iterator`
            which is required by `&mut Ipv4Addr: proc_macro::ext::RepIteratorExt`
 note: the traits `Iterator` and `ToTokens` must be implemented
   --> $SRC_DIR/proc_macro/src/to_tokens.rs:LL:COL

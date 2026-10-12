@@ -9,8 +9,7 @@ note: lifetime parameter instantiated with the lifetime `'a` as defined here
    |
 LL | struct Hello<'a> {
    |              ^^
-note: but lifetime parameter must outlive the static lifetime
-  --> $SRC_DIR/core/src/any.rs:LL:COL
+   = note: but lifetime parameter must outlive the static lifetime
 
 error[E0310]: the parameter type `T` may not live long enough
   --> $DIR/explicit-static-bound-on-trait.rs:8:23

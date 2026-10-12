@@ -6,7 +6,6 @@ LL |     get_iter().foo();
    |
 note: the following trait bounds were not satisfied:
       `&impl Iterator: Iterator`
-      `&impl Iterator: Missing`
       `&mut impl Iterator: Missing`
       `impl Iterator: Missing`
   --> $DIR/iterator-does-not-need-into-iter.rs:7:9

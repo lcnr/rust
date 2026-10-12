@@ -36,6 +36,14 @@ LL |     let _ = Iterator::next(&mut ());
    = help: the trait `Iterator` is not implemented for `()`
 
 error[E0277]: `()` is not an iterator
+  --> $DIR/issue-28098.rs:9:13
+   |
+LL |     let _ = Iterator::next(&mut ());
+   |             ^^^^^^^^^^^^^^^^^^^^^^^ `()` is not an iterator
+   |
+   = help: the trait `Iterator` is not implemented for `()`
+
+error[E0277]: `()` is not an iterator
   --> $DIR/issue-28098.rs:18:28
    |
 LL |     let _ = Iterator::next(&mut ());
@@ -72,6 +80,14 @@ LL |     let _ = Iterator::next(&mut ());
    |
    = help: the trait `Iterator` is not implemented for `()`
 
-error: aborting due to 8 previous errors
+error[E0277]: `()` is not an iterator
+  --> $DIR/issue-28098.rs:22:13
+   |
+LL |     let _ = Iterator::next(&mut ());
+   |             ^^^^^^^^^^^^^^^^^^^^^^^ `()` is not an iterator
+   |
+   = help: the trait `Iterator` is not implemented for `()`
+
+error: aborting due to 10 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

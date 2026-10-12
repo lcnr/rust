@@ -1,12 +1,15 @@
-error[E0792]: expected generic lifetime parameter, found `'a`
-  --> $DIR/higher-ranked-regions-gat.rs:19:5
+error: item does not constrain `Foo::{opaque#0}`
+  --> $DIR/higher-ranked-regions-gat.rs:18:4
    |
-LL | pub type FooAssoc<'a> = impl Sized;
-   |                   -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |     Struct
-   |     ^^^^^^
+LL | fn foo() -> Foo {
+   |    ^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/higher-ranked-regions-gat.rs:9:16
+   |
+LL | pub type Foo = impl for<'a> Trait<Assoc<'a> = FooAssoc<'a>>;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0792`.

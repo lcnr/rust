@@ -1,16 +1,11 @@
 error[E0275]: overflow evaluating the requirement `NoClone: Magic`
-  --> $DIR/supertrait.rs:13:18
+  --> $DIR/supertrait.rs:13:23
    |
 LL |     let (a, b) = copy(NoClone);
-   |                  ^^^^^^^^^^^^^
+   |                  ---- ^^^^^^^
+   |                  |
+   |                  required by a bound introduced by this call
    |
-note: required for `NoClone` to implement `Magic`
-  --> $DIR/supertrait.rs:5:16
-   |
-LL | impl<T: Magic> Magic for T {}
-   |         -----  ^^^^^     ^
-   |         |
-   |         unsatisfied trait bound introduced here
 note: required by a bound in `copy`
   --> $DIR/supertrait.rs:7:12
    |

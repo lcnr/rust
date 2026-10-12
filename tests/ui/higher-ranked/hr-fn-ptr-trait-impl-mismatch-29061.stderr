@@ -1,41 +1,63 @@
-error: implementation of `HR` is not general enough
-  --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:25:5
+error[E0277]: the trait bound `fn(&()): HR` is not satisfied
+  --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:25:8
    |
 LL |     hr(not_hr_func);
-   |     ^^^^^^^^^^^^^^^
+   |     -- ^^^^^^^^^^^ the trait `HR` is not implemented for `fn(&())`
+   |     |
+   |     required by a bound introduced by this call
    |
-note: `HR` would have to be implemented for the type `fn(&'0 ())`, for some specific lifetime `'0`...
+help: the trait `HR` is not implemented for `fn(&())`
+      but it is implemented for `for<'a> fn(&'a ())`
+  --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:14:1
+   |
+LL | impl HR for fn(&()) {}
+   | ^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `hr`
   --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:15:10
    |
 LL | fn hr<T: HR>(_: T) {}
    |          ^^ required by this bound in `hr`
-   = note: ...but `HR` is actually implemented for the type `for<'a> fn(&'a ())`
 
-error: implementation of `NotHR` is not general enough
-  --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:27:5
+error[E0277]: the trait bound `for<'a> fn(&'a ()): NotHR` is not satisfied
+  --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:27:12
    |
 LL |     not_hr(hr_func);
-   |     ^^^^^^^^^^^^^^^
+   |     ------ ^^^^^^^ the trait `NotHR` is not implemented for `for<'a> fn(&'a ())`
+   |     |
+   |     required by a bound introduced by this call
    |
-note: `NotHR` would have to be implemented for the type `for<'a> fn(&'a ())`
+help: the trait `NotHR` is not implemented for `for<'a> fn(&'a ())`
+      but it is implemented for `fn(&())`
+  --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:18:1
+   |
+LL | impl<'a> NotHR for fn(&'a ()) {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `not_hr`
   --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:19:14
    |
 LL | fn not_hr<T: NotHR>(_: T) {}
    |              ^^^^^ required by this bound in `not_hr`
-   = note: ...but `NotHR` is actually implemented for the type `fn(&'0 ())`, for some specific lifetime `'0`
 
-error: implementation of `NotHR` is not general enough
-  --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:29:5
+error[E0277]: the trait bound `for<'b> fn(&'b ()): NotHR` is not satisfied
+  --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:29:12
    |
 LL |     not_hr(hr_func2);
-   |     ^^^^^^^^^^^^^^^^
+   |     ------ ^^^^^^^^ the trait `NotHR` is not implemented for `for<'b> fn(&'b ())`
+   |     |
+   |     required by a bound introduced by this call
    |
-note: `NotHR` would have to be implemented for the type `for<'b> fn(&'b ())`
+help: the trait `NotHR` is not implemented for `for<'b> fn(&'b ())`
+      but it is implemented for `fn(&())`
+  --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:18:1
+   |
+LL | impl<'a> NotHR for fn(&'a ()) {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `not_hr`
   --> $DIR/hr-fn-ptr-trait-impl-mismatch-29061.rs:19:14
    |
 LL | fn not_hr<T: NotHR>(_: T) {}
    |              ^^^^^ required by this bound in `not_hr`
-   = note: ...but `NotHR` is actually implemented for the type `fn(&'0 ())`, for some specific lifetime `'0`
 
 error: aborting due to 3 previous errors
 
+For more information about this error, try `rustc --explain E0277`.

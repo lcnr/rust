@@ -23,16 +23,16 @@ LL | trait Project {
    | ^^^^^^^^^^^^^
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
-error[E0593]: function is expected to take 1 argument, but it takes 0 arguments
+error[E0277]: expected an `Fn(TokenStream)` closure, found `fn() -> <() as Project>::Assoc {uwu}`
   --> $DIR/bad-projection.rs:14:1
    |
 LL | pub fn uwu() -> <() as Project>::Assoc {}
-   | --------------------------------------^^^
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    | |
-   | expected function that takes 1 argument
-   | takes 0 arguments
+   | expected an `Fn(TokenStream)` closure, found `fn() -> <() as Project>::Assoc {uwu}`
    | required by a bound introduced by this call
    |
+   = help: the trait `Fn(TokenStream)` is not implemented for fn item `fn() -> <() as Project>::Assoc {uwu}`
 note: required by a bound in `proc_macro::bridge::client::Client::expand1`
   --> $SRC_DIR/proc_macro/src/bridge/client.rs:LL:COL
 
@@ -62,5 +62,4 @@ LL | trait Project {
 
 error: aborting due to 5 previous errors
 
-Some errors have detailed explanations: E0277, E0593.
-For more information about an error, try `rustc --explain E0277`.
+For more information about this error, try `rustc --explain E0277`.

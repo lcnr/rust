@@ -9,36 +9,30 @@ note: first, the lifetime cannot outlive the lifetime `'s` as defined here...
    |
 LL |     fn get<'s>(s: &'s str, _: ()) -> &'_ str;
    |            ^^
-note: ...so that the method type is compatible with trait
+note: ...so that the declared lifetime parameter bounds are satisfied
   --> $DIR/compare-impl-item-conflicting-lifetime-requirements.rs:17:5
    |
 LL |     fn get<'s>(s: &'s str, _: <&&'s () as Project>::Ty) -> &'static str {
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: expected `fn(&'s _, ()) -> &'s _`
-              found `fn(&_, ()) -> &'static _`
    = note: but, the lifetime must be valid for the static lifetime...
-note: ...so that the types are compatible
+note: ...so that the declared lifetime parameter bounds are satisfied
   --> $DIR/compare-impl-item-conflicting-lifetime-requirements.rs:17:5
    |
 LL |     fn get<'s>(s: &'s str, _: <&&'s () as Project>::Ty) -> &'static str {
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: expected `<&&() as Project>`
-              found `<&&'static () as Project>`
 
-error[E0308]: mismatched types
+error[E0478]: lifetime bound not satisfied
   --> $DIR/compare-impl-item-conflicting-lifetime-requirements.rs:17:31
    |
 LL |     fn get<'s>(s: &'s str, _: <&&'s () as Project>::Ty) -> &'static str {
-   |                               ^^^^^^^^^^^^^^^^^^^^^^^^ lifetime mismatch
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: expected trait `<&&'s () as Project>`
-              found trait `<&&'static () as Project>`
-note: the lifetime `'s` as defined here...
+note: lifetime parameter instantiated with the lifetime `'s` as defined here
   --> $DIR/compare-impl-item-conflicting-lifetime-requirements.rs:17:12
    |
 LL |     fn get<'s>(s: &'s str, _: <&&'s () as Project>::Ty) -> &'static str {
    |            ^^
-   = note: ...does not necessarily outlive the static lifetime
+   = note: but lifetime parameter must outlive the static lifetime
 
 error: lifetime may not live long enough
   --> $DIR/compare-impl-item-conflicting-lifetime-requirements.rs:17:5
@@ -51,5 +45,5 @@ LL |     fn get<'s>(s: &'s str, _: <&&'s () as Project>::Ty) -> &'static str {
 
 error: aborting due to 3 previous errors
 
-Some errors have detailed explanations: E0308, E0803.
-For more information about an error, try `rustc --explain E0308`.
+Some errors have detailed explanations: E0478, E0803.
+For more information about an error, try `rustc --explain E0478`.

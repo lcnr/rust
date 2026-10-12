@@ -1,13 +1,58 @@
+error[E0277]: the trait bound `for<'b> <T as X<'b, T>>::U: Clone` is not satisfied
+  --> $DIR/hr-associated-type-bound-param-6.rs:14:14
+   |
+LL |     type U = str;
+   |              ^^^ the trait `for<'b> Clone` is not implemented for `<T as X<'b, T>>::U`
+   |
+note: required by a bound in `X`
+  --> $DIR/hr-associated-type-bound-param-6.rs:4:33
+   |
+LL | trait X<'a, T>
+...
+LL |     for<'b> <T as X<'b, T>>::U: Clone,
+   |                                 ^^^^^ required by this bound in `X`
+help: consider further restricting the associated type
+   |
+LL | impl<S, T> X<'_, T> for (S,) where for<'b> <T as X<'b, T>>::U: Clone {
+   |                              +++++++++++++++++++++++++++++++++++++++
+
 error[E0277]: the trait bound `for<'b> T: X<'b, T>` is not satisfied
   --> $DIR/hr-associated-type-bound-param-6.rs:12:12
    |
 LL | impl<S, T> X<'_, T> for (S,) {
    |            ^^^^^^^^ the trait `for<'b> X<'b, T>` is not implemented for `T`
    |
+note: required by a bound in `X`
+  --> $DIR/hr-associated-type-bound-param-6.rs:3:16
+   |
+LL | trait X<'a, T>
+LL | where
+LL |     for<'b> T: X<'b, T>,
+   |                ^^^^^^^^ required by this bound in `X`
 help: consider restricting type parameter `T` with trait `X`
    |
 LL | impl<S, T: for<'b> X<'b, T>> X<'_, T> for (S,) {
    |          ++++++++++++++++++
+
+error[E0277]: the size for values of type `<T as X<'b, T>>::U` cannot be known at compilation time
+  --> $DIR/hr-associated-type-bound-param-6.rs:14:14
+   |
+LL |     type U = str;
+   |              ^^^ doesn't have a size known at compile-time
+   |
+   = help: the trait `for<'b> Sized` is not implemented for `<T as X<'b, T>>::U`
+   = note: required for `<T as X<'b, T>>::U` to implement `for<'b> Clone`
+note: required by a bound in `X`
+  --> $DIR/hr-associated-type-bound-param-6.rs:4:33
+   |
+LL | trait X<'a, T>
+...
+LL |     for<'b> <T as X<'b, T>>::U: Clone,
+   |                                 ^^^^^ required by this bound in `X`
+help: consider further restricting the associated type
+   |
+LL | impl<S, T> X<'_, T> for (S,) where for<'b> <T as X<'b, T>>::U: Sized {
+   |                              +++++++++++++++++++++++++++++++++++++++
 
 error[E0277]: the trait bound `for<'b> i32: X<'b, i32>` is not satisfied
   --> $DIR/hr-associated-type-bound-param-6.rs:18:18
@@ -43,6 +88,23 @@ help: the trait `X<'_, T>` is implemented for `(S,)`
 LL | impl<S, T> X<'_, T> for (S,) {
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+error[E0277]: the trait bound `for<'b> <i32 as X<'b, i32>>::U: Clone` is not satisfied
+  --> $DIR/hr-associated-type-bound-param-6.rs:18:18
+   |
+LL |     <(i32,) as X<i32>>::f("abc");
+   |                  ^^^ the trait `for<'b> Clone` is not implemented for `<i32 as X<'b, i32>>::U`
+   |
+note: required by a bound in `X::f`
+  --> $DIR/hr-associated-type-bound-param-6.rs:4:33
+   |
+LL | trait X<'a, T>
+...
+LL |     for<'b> <T as X<'b, T>>::U: Clone,
+   |                                 ^^^^^ required by this bound in `X::f`
+...
+LL |     fn f(x: &<T as X<'_, T>>::U) {
+   |
+
 error[E0277]: the trait bound `i32: X<'_, i32>` is not satisfied
   --> $DIR/hr-associated-type-bound-param-6.rs:18:27
    |
@@ -55,6 +117,6 @@ help: the trait `X<'_, T>` is implemented for `(S,)`
 LL | impl<S, T> X<'_, T> for (S,) {
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 4 previous errors
+error: aborting due to 7 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

@@ -8,16 +8,20 @@ LL | pub fn foo(x: dyn CoerceUnsized<*const dyn Trait>) -> *const dyn Trait {
    = note: for a trait to be dyn compatible it needs to allow building a vtable
            for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
 
-error[E0277]: the size for values of type `(dyn CoerceUnsized<*const (dyn Trait + 'static)> + 'static)` cannot be known at compilation time
+error[E0308]: mismatched types
   --> $DIR/dyn-coerce-unsized-ice.rs:12:5
    |
+LL | pub fn foo(x: dyn CoerceUnsized<*const dyn Trait>) -> *const dyn Trait {
+   |                                                       ---------------- expected `*const (dyn Trait + 'static)` because of return type
+LL |
 LL |     x
-   |     ^ doesn't have a size known at compile-time
+   |     ^ expected `*const dyn Trait`, found `dyn CoerceUnsized`
    |
-   = help: the trait `Sized` is not implemented for `(dyn CoerceUnsized<*const (dyn Trait + 'static)> + 'static)`
-   = note: required for the cast from `(dyn CoerceUnsized<*const (dyn Trait + 'static)> + 'static)` to `*const (dyn Trait + 'static)`
+   = note: expected raw pointer `*const (dyn Trait + 'static)`
+             found trait object `(dyn CoerceUnsized<*const (dyn Trait + 'static)> + 'static)`
+   = help: `*const (dyn Trait + 'static)` implements `CoerceUnsized` so you could change the expected type to `Box<dyn CoerceUnsized>`
 
 error: aborting due to 2 previous errors
 
-Some errors have detailed explanations: E0038, E0277.
+Some errors have detailed explanations: E0038, E0308.
 For more information about an error, try `rustc --explain E0038`.

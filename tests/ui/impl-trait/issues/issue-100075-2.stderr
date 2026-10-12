@@ -1,21 +1,11 @@
-error[E0720]: cannot resolve opaque type
+error[E0282]: type annotations needed
   --> $DIR/issue-100075-2.rs:1:23
    |
 LL | fn opaque<T>(t: T) -> impl Sized {
-   |                       ^^^^^^^^^^
-
-warning: function cannot return without recursing
-  --> $DIR/issue-100075-2.rs:1:1
+   |                       ^^^^^^^^^^ cannot infer type
    |
-LL | fn opaque<T>(t: T) -> impl Sized {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot return without recursing
-...
-LL |     opaque(Some(t))
-   |     --------------- recursive call site
-   |
-   = help: a `loop` may express intention better if this is on purpose
-   = note: `#[warn(unconditional_recursion)]` on by default
+   = note: cannot infer type of hidden type of opaque
 
-error: aborting due to 1 previous error; 1 warning emitted
+error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0720`.
+For more information about this error, try `rustc --explain E0282`.

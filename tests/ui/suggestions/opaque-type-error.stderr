@@ -12,10 +12,12 @@ LL | |         thing_one()
    | |         ----------- expected because of this
 LL | |     } else {
 LL | |         thing_two()
-   | |         ^^^^^^^^^^^ expected future, found a different future
+   | |         ^^^^^^^^^^^ expected `thing_one::{opaque#0}`, found `thing_two::{opaque#0}`
 LL | |     }.await
    | |_____- `if` and `else` have incompatible types
    |
+   = note: expected opaque type `impl Future<Output = Result<(), ()>>`
+              found opaque type `impl Future<Output = Result<(), ()>>`
    = note: distinct uses of `impl Trait` result in different opaque types
 help: consider `await`ing on both `Future`s
    |

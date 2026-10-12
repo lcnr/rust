@@ -1,84 +1,24 @@
-error: implementation of `FnOnce` is not general enough
-  --> $DIR/missing-universe-cause-issue-114907.rs:33:5
+error[E0277]: expected an `FnOnce(&())` closure, found `{closure@$DIR/missing-universe-cause-issue-114907.rs:32:20: 32:23}`
+  --> $DIR/missing-universe-cause-issue-114907.rs:33:12
    |
 LL |     accept(callback);
-   |     ^^^^^^^^^^^^^^^^
+   |     ------ ^^^^^^^^ expected an `FnOnce(&())` closure, found `{closure@$DIR/missing-universe-cause-issue-114907.rs:32:20: 32:23}`
+   |     |
+   |     required by a bound introduced by this call
    |
-note: closure with signature `fn(&'2 ())` must implement `FnOnce<(&'1 (),)>`, for any lifetime `'1`...
+help: the trait `for<'a> FnOnce(&'a ())` is not implemented for closure `{closure@$DIR/missing-universe-cause-issue-114907.rs:32:20: 32:23}`
+  --> $DIR/missing-universe-cause-issue-114907.rs:32:20
+   |
+LL |     let callback = |_| {};
+   |                    ^^^
+   = note: expected a closure with signature `for<'a> fn(&'a ())`
+              found a closure with signature `fn(&())`
+note: required by a bound in `accept`
   --> $DIR/missing-universe-cause-issue-114907.rs:27:14
    |
 LL | fn accept<C: FnOnce(&())>(_: C) -> Handshake<HandshakeCallback<C>> {
    |              ^^^^^^^^^^^ required by this bound in `accept`
-   = note: ...but it actually implements `FnOnce<(&'2 (),)>`, for some specific lifetime `'2`
-help: consider adding an explicit type annotation to the closure's argument
-   |
-LL |     let callback = |_: &()| {};
-   |                      +++++
 
-error: implementation of `FnOnce` is not general enough
-  --> $DIR/missing-universe-cause-issue-114907.rs:33:5
-   |
-LL |     accept(callback);
-   |     ^^^^^^^^^^^^^^^^
-   |
-note: closure with signature `fn(&'2 ())` must implement `FnOnce<(&'1 (),)>`, for any lifetime `'1`...
-  --> $DIR/missing-universe-cause-issue-114907.rs:27:14
-   |
-LL | fn accept<C: FnOnce(&())>(_: C) -> Handshake<HandshakeCallback<C>> {
-   |              ^^^^^^^^^^^ required by this bound in `accept`
-   = note: ...but it actually implements `FnOnce<(&'2 (),)>`, for some specific lifetime `'2`
-   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
-help: consider adding an explicit type annotation to the closure's argument
-   |
-LL |     let callback = |_: &()| {};
-   |                      +++++
+error: aborting due to 1 previous error
 
-error: implementation of `FnOnce` is not general enough
-  --> $DIR/missing-universe-cause-issue-114907.rs:33:5
-   |
-LL |     accept(callback);
-   |     ^^^^^^^^^^^^^^^^
-   |
-note: closure with signature `fn(&'2 ())` must implement `FnOnce<(&'1 (),)>`, for any lifetime `'1`...
-  --> $DIR/missing-universe-cause-issue-114907.rs:20:21
-   |
-LL | struct Handshake<R: Role> {
-   |                     ^^^^ required by this bound in `Handshake`
-   = note: ...but it actually implements `FnOnce<(&'2 (),)>`, for some specific lifetime `'2`
-help: consider adding an explicit type annotation to the closure's argument
-   |
-LL |     let callback = |_: &()| {};
-   |                      +++++
-
-error: implementation of `FnOnce` is not general enough
-  --> $DIR/missing-universe-cause-issue-114907.rs:33:5
-   |
-LL |     accept(callback);
-   |     ^^^^^^^^^^^^^^^^
-   |
-note: closure with signature `fn(&'2 ())` must implement `FnOnce<(&'1 (),)>`, for any lifetime `'1`...
-  --> $DIR/missing-universe-cause-issue-114907.rs:20:21
-   |
-LL | struct Handshake<R: Role> {
-   |                     ^^^^ required by this bound in `Handshake`
-   = note: ...but it actually implements `FnOnce<(&'2 (),)>`, for some specific lifetime `'2`
-   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
-help: consider adding an explicit type annotation to the closure's argument
-   |
-LL |     let callback = |_: &()| {};
-   |                      +++++
-
-error: higher-ranked subtype error
-  --> $DIR/missing-universe-cause-issue-114907.rs:33:5
-   |
-LL |     accept(callback);
-   |     ^^^^^^^^^^^^^^^^
-
-error: higher-ranked subtype error
-  --> $DIR/missing-universe-cause-issue-114907.rs:33:21
-   |
-LL |     accept(callback);
-   |                     ^
-
-error: aborting due to 6 previous errors
-
+For more information about this error, try `rustc --explain E0277`.

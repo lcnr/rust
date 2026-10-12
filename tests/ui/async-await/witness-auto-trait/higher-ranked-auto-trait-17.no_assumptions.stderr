@@ -1,29 +1,32 @@
-error: implementation of `FnOnce` is not general enough
-  --> $DIR/higher-ranked-auto-trait-17.rs:12:5
+error: higher-ranked subtype error
+  --> $DIR/higher-ranked-auto-trait-17.rs:11:1
    |
-LL | /     async move {
-LL | |         let iter = Adaptor::new(a.iter().map(|_: &()| {}));
-LL | |         std::future::pending::<()>().await;
-LL | |         drop(iter);
-LL | |     }
-   | |_____^ implementation of `FnOnce` is not general enough
-   |
-   = note: closure with signature `fn(&'0 ())` must implement `FnOnce<(&'1 (),)>`, for any two lifetimes `'0` and `'1`...
-   = note: ...but it actually implements `FnOnce<(&(),)>`
+LL | fn foo(a: [(); 0]) -> impl std::future::Future<Output = ()> + Send {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: implementation of `FnOnce` is not general enough
-  --> $DIR/higher-ranked-auto-trait-17.rs:12:5
+error: higher-ranked subtype error
+  --> $DIR/higher-ranked-auto-trait-17.rs:11:1
    |
-LL | /     async move {
-LL | |         let iter = Adaptor::new(a.iter().map(|_: &()| {}));
-LL | |         std::future::pending::<()>().await;
-LL | |         drop(iter);
-LL | |     }
-   | |_____^ implementation of `FnOnce` is not general enough
+LL | fn foo(a: [(); 0]) -> impl std::future::Future<Output = ()> + Send {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: closure with signature `fn(&'0 ())` must implement `FnOnce<(&'1 (),)>`, for any two lifetimes `'0` and `'1`...
-   = note: ...but it actually implements `FnOnce<(&(),)>`
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
-error: aborting due to 2 previous errors
+error: higher-ranked subtype error
+  --> $DIR/higher-ranked-auto-trait-17.rs:11:1
+   |
+LL | fn foo(a: [(); 0]) -> impl std::future::Future<Output = ()> + Send {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error: higher-ranked subtype error
+  --> $DIR/higher-ranked-auto-trait-17.rs:11:1
+   |
+LL | fn foo(a: [(); 0]) -> impl std::future::Future<Output = ()> + Send {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error: aborting due to 4 previous errors
 

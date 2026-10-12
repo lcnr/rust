@@ -28,6 +28,12 @@ help: consider introducing lifetime `'a` here
 LL | trait Foo<'a> {
    |          ++++
 
-error: aborting due to 2 previous errors
+error: non-defining use of `impl Sized + '_` in the defining scope
+  --> $DIR/bad-item-bound-within-rpitit-2.rs:4:5
+   |
+LL |     fn bar<'other: 'a>() -> impl Sized + 'a {}
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to 3 previous errors
 
 For more information about this error, try `rustc --explain E0261`.

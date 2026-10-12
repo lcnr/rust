@@ -7,7 +7,7 @@
 fn check() -> impl Sized {
     let x = 0;
     #[coroutine]
-    static move || {
+    static || {
         //~^ ERROR E0373
         yield;
         x

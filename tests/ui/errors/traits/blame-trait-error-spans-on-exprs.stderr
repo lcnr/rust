@@ -224,7 +224,7 @@ LL | impl<A: T3, B: T3> T2 for (A, B) {}
    |                --  ^^     ^^^^^^
    |                |
    |                unsatisfied trait bound introduced here
-note: required for `((i32, Q), i32)` to implement `T1`
+note: required for `((i32, Q), {integer})` to implement `T1`
   --> $DIR/blame-trait-error-spans-on-exprs.rs:51:20
    |
 LL | impl<A: T2, B: T2> T1 for (A, B) {}

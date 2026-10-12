@@ -40,6 +40,37 @@ note: lifetime declared here
 LL | fn make_bad_impl<'b>(x: &'b ()) -> impl for<'a> Hrtb<'a, Assoc = impl Send + 'a> {
    |                                             ^^
 
-error: aborting due to 3 previous errors
+error[E0277]: the trait bound `for<'a> &(): Hrtb<'a>` is not satisfied
+  --> $DIR/issue-88236-2.rs:18:38
+   |
+LL | fn make_weird_impl<'b>(x: &'b ()) -> impl for<'a> Hrtb<'a, Assoc = impl Send + 'a> {
+   |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `for<'a> Hrtb<'a>` is not implemented for `&()`
+   |
+help: the following other types implement trait `Hrtb<'a>`
+  --> $DIR/issue-88236-2.rs:7:1
+   |
+LL | impl<'a> Hrtb<'a> for () {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ `()`
+...
+LL | impl<'a> Hrtb<'a> for &'a () {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `&()`
 
-For more information about this error, try `rustc --explain E0657`.
+error[E0277]: the trait bound `for<'a> &(): Hrtb<'a>` is not satisfied
+  --> $DIR/issue-88236-2.rs:23:36
+   |
+LL | fn make_bad_impl<'b>(x: &'b ()) -> impl for<'a> Hrtb<'a, Assoc = impl Send + 'a> {
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `for<'a> Hrtb<'a>` is not implemented for `&()`
+   |
+help: the following other types implement trait `Hrtb<'a>`
+  --> $DIR/issue-88236-2.rs:7:1
+   |
+LL | impl<'a> Hrtb<'a> for () {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ `()`
+...
+LL | impl<'a> Hrtb<'a> for &'a () {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `&()`
+
+error: aborting due to 5 previous errors
+
+Some errors have detailed explanations: E0277, E0657.
+For more information about an error, try `rustc --explain E0277`.

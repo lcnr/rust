@@ -30,6 +30,24 @@ LL |     type A<'a> where Self: 'a;
    |          ^ ...because it contains generic associated type `A`
    = help: consider moving `A` to another trait
 
-error: aborting due to 2 previous errors
+error[E0308]: mismatched types
+  --> $DIR/gat-in-trait-path.rs:27:5
+   |
+LL |   f(Box::new(foo));
+   |   - ^^^^^^^^^^^^^ expected `Box<dyn Foo<A<'_> = &()>>`, found `Box<Fooer<{integer}>>`
+   |   |
+   |   arguments to this function are incorrect
+   |
+   = note: expected struct `Box<(dyn Foo<A<'a> = &'a ()> + 'static)>`
+              found struct `Box<Fooer<{integer}>>`
+   = help: `Fooer<{integer}>` implements `Foo` so you could box the found value and coerce it to the trait object `Box<dyn Foo>`, you will have to change the expected type as well
+note: function defined here
+  --> $DIR/gat-in-trait-path.rs:22:4
+   |
+LL | fn f(_arg : Box<dyn for<'a> Foo<A<'a> = &'a ()>>) {}
+   |    ^ -------------------------------------------
 
-For more information about this error, try `rustc --explain E0038`.
+error: aborting due to 3 previous errors
+
+Some errors have detailed explanations: E0038, E0308.
+For more information about an error, try `rustc --explain E0038`.

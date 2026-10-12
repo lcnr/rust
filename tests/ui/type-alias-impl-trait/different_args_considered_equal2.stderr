@@ -1,12 +1,19 @@
-error[E0792]: expected generic lifetime parameter, found `'static`
+error: lifetime may not live long enough
   --> $DIR/different_args_considered_equal2.rs:10:9
    |
-LL | pub type Opaque<'a> = impl Sized;
-   |                 -- cannot use static lifetime; use a bound lifetime instead or remove the lifetime parameter from the opaque type
+LL | fn get_one<'a>(a: *mut &'a str) -> impl IntoIterator<Item = Opaque<'a>> {
+   |            -- lifetime `'a` defined here
 ...
 LL |         None::<Opaque<'static>>
-   |         ^^^^^^^^^^^^^^^^^^^^^^^
+   |         ^^^^^^^^^^^^^^^^^^^^^^^ returning this value requires that `'a` must outlive `'static`
+   |
+   = note: requirement occurs because of a mutable pointer to `&str`
+   = note: mutable pointers are invariant over their type parameter
+   = help: see <https://doc.rust-lang.org/nomicon/subtyping.html> for more information about variance
+help: to declare that `impl IntoIterator<Item = Opaque<'a>>` captures data from argument `a`, you can add an explicit `'a` lifetime bound
+   |
+LL | fn get_one<'a>(a: *mut &'a str) -> impl IntoIterator<Item = Opaque<'a>> + 'a {
+   |                                                                         ++++
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0792`.

@@ -1,10 +1,10 @@
-error[E0283]: type annotations needed: cannot satisfy `T: FnMut(&'a ())`
-  --> $DIR/issue-85735.rs:7:8
+error[E0283]: type annotations needed: cannot satisfy `T: FnMut(&())`
+  --> $DIR/issue-85735.rs:5:25
    |
-LL |     T: FnMut(&'a ()),
-   |        ^^^^^^^^^^^^^
+LL | impl<'a, 'b, T> Foo for T
+   |                         ^
    |
-note: multiple `impl`s or `where` clauses satisfying `T: FnMut(&'a ())` found
+note: multiple `impl`s or `where` clauses satisfying `T: FnMut(&())` found
   --> $DIR/issue-85735.rs:7:8
    |
 LL |     T: FnMut(&'a ()),
@@ -12,6 +12,14 @@ LL |     T: FnMut(&'a ()),
 LL |
 LL |     T: FnMut(&'b ()),
    |        ^^^^^^^^^^^^^
+note: required for `T` to implement `Foo`
+  --> $DIR/issue-85735.rs:5:17
+   |
+LL | impl<'a, 'b, T> Foo for T
+   |                 ^^^     ^
+LL | where
+LL |     T: FnMut(&'a ()),
+   |        ------------- unsatisfied trait bound introduced here
 
 error: aborting due to 1 previous error
 

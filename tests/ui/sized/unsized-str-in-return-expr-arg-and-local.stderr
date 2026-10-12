@@ -3,16 +3,8 @@ error[E0277]: the size for values of type `str` cannot be known at compilation t
    |
 LL | fn foo() -> impl Sized {
    |             ^^^^^^^^^^ doesn't have a size known at compile-time
-...
-LL |     *""
-   |     --- return type was inferred to be `str` here
    |
    = help: the trait `Sized` is not implemented for `str`
-help: references are always `Sized`, even if they point to unsized data; consider not dereferencing the expression
-   |
-LL -     *""
-LL +     ""
-   |
 
 error[E0277]: the size for values of type `str` cannot be known at compilation time
   --> $DIR/unsized-str-in-return-expr-arg-and-local.rs:15:9

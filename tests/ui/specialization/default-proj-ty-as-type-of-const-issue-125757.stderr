@@ -6,19 +6,22 @@ LL | struct Wrapper<const C: <i32 as Trait>::Type> {}
    |
    = note: the only supported types are integers, `bool`, and `char`
 
-error: the constant `C` is not of type `<i32 as Trait>::Type`
+error[E0271]: type mismatch resolving `<i32 as Trait>::Type == usize`
   --> $DIR/default-proj-ty-as-type-of-const-issue-125757.rs:15:22
    |
 LL | impl<const C: usize> Wrapper<C> {}
-   |                      ^^^^^^^^^^ expected associated type, found `usize`
+   |                      ^^^^^^^^^^ expected `usize`, found associated type
    |
+   = note:         expected type `usize`
+           found associated type `<i32 as Trait>::Type`
    = help: consider constraining the associated type `<i32 as Trait>::Type` to `usize`
    = note: for more information, visit https://doc.rust-lang.org/book/ch19-03-advanced-traits.html
-note: required by a const generic parameter in `Wrapper`
+note: required by a bound in `Wrapper`
   --> $DIR/default-proj-ty-as-type-of-const-issue-125757.rs:12:16
    |
 LL | struct Wrapper<const C: <i32 as Trait>::Type> {}
-   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this const generic parameter in `Wrapper`
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Wrapper`
 
 error: aborting due to 2 previous errors
 
+For more information about this error, try `rustc --explain E0271`.

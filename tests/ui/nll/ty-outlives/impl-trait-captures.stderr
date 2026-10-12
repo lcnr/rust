@@ -1,12 +1,11 @@
 error[E0700]: hidden type for `Opaque(DefId(0:11 ~ impl_trait_captures[aeb9]::foo::{opaque#0}), ['a/#0, T, 'a/#0])` captures lifetime that does not appear in bounds
-  --> $DIR/impl-trait-captures.rs:11:5
+  --> $DIR/impl-trait-captures.rs:10:1
    |
 LL | fn foo<'a, T>(x: &T) -> impl Foo<'a> {
-   |                  --     ------------ opaque type defined here
-   |                  |
+   | ^^^^^^^^^^^^^^^^^--^^^^^------------
+   |                  |      |
+   |                  |      opaque type defined here
    |                  hidden type `&ReLateParam(DefId(0:8 ~ impl_trait_captures[aeb9]::foo), LateNamed(DefId(0:13 ~ impl_trait_captures[aeb9]::foo::'_))) T` captures the anonymous lifetime defined here
-LL |     x
-   |     ^
    |
 help: add a `use<...>` bound to explicitly capture `ReLateParam(DefId(0:8 ~ impl_trait_captures[aeb9]::foo), LateNamed(DefId(0:13 ~ impl_trait_captures[aeb9]::foo::'_)))`
    |

@@ -28,17 +28,21 @@ error[E0308]: mismatched types
 LL |     foo(|| ());
    |            ^^ expected `i32`, found `()`
 
-error[E0631]: type mismatch in closure arguments
-  --> $DIR/recover-fn-trait-from-fn-kw.rs:10:5
+error[E0277]: expected an `Fn(i32)` closure, found `{closure@$DIR/recover-fn-trait-from-fn-kw.rs:10:10: 10:17}`
+  --> $DIR/recover-fn-trait-from-fn-kw.rs:10:10
    |
 LL |     foo2(|_: ()| {});
-   |     ^^^^^-------^^^^
-   |     |    |
-   |     |    found signature defined here
-   |     expected due to this
+   |     ---- ^^^^^^^^^^ expected an `Fn(i32)` closure, found `{closure@$DIR/recover-fn-trait-from-fn-kw.rs:10:10: 10:17}`
+   |     |
+   |     required by a bound introduced by this call
    |
-   = note: expected closure signature `fn(i32) -> _`
-              found closure signature `fn(()) -> _`
+help: the trait `Fn(i32)` is not implemented for closure `{closure@$DIR/recover-fn-trait-from-fn-kw.rs:10:10: 10:17}`
+  --> $DIR/recover-fn-trait-from-fn-kw.rs:10:10
+   |
+LL |     foo2(|_: ()| {});
+   |          ^^^^^^^
+   = note: expected a closure with signature `fn(i32)`
+              found a closure with signature `fn(())`
 note: required by a bound in `foo2`
   --> $DIR/recover-fn-trait-from-fn-kw.rs:4:12
    |
@@ -47,5 +51,5 @@ LL | fn foo2<T: fn(i32)>(_: T) {}
 
 error: aborting due to 4 previous errors
 
-Some errors have detailed explanations: E0308, E0631.
-For more information about an error, try `rustc --explain E0308`.
+Some errors have detailed explanations: E0277, E0308.
+For more information about an error, try `rustc --explain E0277`.

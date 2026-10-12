@@ -1,11 +1,11 @@
-error[E0271]: type mismatch resolving `<&i32 as Deref>::Target == String`
+error[E0271]: type mismatch resolving `impl Deref<Target = String> == &i32`
   --> $DIR/default-body-type-err.rs:4:22
    |
 LL |     fn lol(&self) -> impl Deref<Target = String> {
-   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `String`, found `i32`
-LL |
-LL |         &1i32
-   |         ----- return type was inferred to be `&i32` here
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&i32`, found associated type
+   |
+   = note:    expected reference `&i32`
+           found associated type `impl Deref<Target = String>`
 
 error: aborting due to 1 previous error
 

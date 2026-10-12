@@ -11,6 +11,19 @@ LL | trait Trait {
 LL |     type P<T: Copy, U: Copy>;
    |               ^^^^ required by this bound in `Trait::P`
 
-error: aborting due to 1 previous error
+error[E0271]: type mismatch resolving `<() as Trait>::P<String, String> == _`
+  --> $DIR/multiple-type-params-with-unmet-bounds.rs:8:12
+   |
+LL |     let _: <() as Trait>::P<String, String>;
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<() as Trait>::P<String, String> == _`
+   |
+note: types differ
+  --> $DIR/multiple-type-params-with-unmet-bounds.rs:5:32
+   |
+LL |     type P<T: Copy, U: Copy> = ();
+   |                                ^^
 
-For more information about this error, try `rustc --explain E0277`.
+error: aborting due to 2 previous errors
+
+Some errors have detailed explanations: E0271, E0277.
+For more information about an error, try `rustc --explain E0271`.

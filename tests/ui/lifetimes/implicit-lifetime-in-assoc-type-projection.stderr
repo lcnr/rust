@@ -1,26 +1,36 @@
-error[E0803]: cannot infer an appropriate lifetime for lifetime parameter `'a` due to conflicting requirements
+error[E0478]: lifetime bound not satisfied
   --> $DIR/implicit-lifetime-in-assoc-type-projection.rs:29:33
    |
 LL |     fn subscribe(&mut self, t : Box<dyn Subscriber<Input=<Self as Publisher>::Output> + 'a>) {
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-note: first, the lifetime cannot outlive the anonymous lifetime as defined here...
-  --> $DIR/implicit-lifetime-in-assoc-type-projection.rs:29:67
+note: lifetime parameter instantiated with the anonymous lifetime as defined here
+  --> $DIR/implicit-lifetime-in-assoc-type-projection.rs:29:18
    |
 LL |     fn subscribe(&mut self, t : Box<dyn Subscriber<Input=<Self as Publisher>::Output> + 'a>) {
-   |                                                                   ^^^^^^^^^
-note: ...but the lifetime must also be valid for the lifetime `'a` as defined here...
+   |                  ^
+note: but lifetime parameter must outlive the lifetime `'a` as defined here
   --> $DIR/implicit-lifetime-in-assoc-type-projection.rs:27:6
    |
 LL | impl<'a> Publisher<'a> for MyStruct<'a> {
    |      ^^
-note: ...so that the types are compatible
+
+error[E0478]: lifetime bound not satisfied
   --> $DIR/implicit-lifetime-in-assoc-type-projection.rs:29:33
    |
 LL |     fn subscribe(&mut self, t : Box<dyn Subscriber<Input=<Self as Publisher>::Output> + 'a>) {
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: expected `<MyStruct<'a> as Publisher<'_>>`
-              found `<MyStruct<'_> as Publisher<'_>>`
+   |
+note: lifetime parameter instantiated with the lifetime `'a` as defined here
+  --> $DIR/implicit-lifetime-in-assoc-type-projection.rs:27:6
+   |
+LL | impl<'a> Publisher<'a> for MyStruct<'a> {
+   |      ^^
+note: but lifetime parameter must outlive the anonymous lifetime as defined here
+  --> $DIR/implicit-lifetime-in-assoc-type-projection.rs:29:18
+   |
+LL |     fn subscribe(&mut self, t : Box<dyn Subscriber<Input=<Self as Publisher>::Output> + 'a>) {
+   |                  ^
 
 error: lifetime may not live long enough
   --> $DIR/implicit-lifetime-in-assoc-type-projection.rs:29:5
@@ -46,6 +56,6 @@ LL |     fn subscribe(&mut self, t : Box<dyn Subscriber<Input=<Self as Publisher
    |     |                       has type `Box<dyn Subscriber<Input = <MyStruct<'_> as Publisher<'1>>::Output>>`
    |     requires that `'1` must outlive `'a`
 
-error: aborting due to 3 previous errors
+error: aborting due to 4 previous errors
 
-For more information about this error, try `rustc --explain E0803`.
+For more information about this error, try `rustc --explain E0478`.

@@ -1,8 +1,10 @@
-error[E0275]: overflow assigning `_` to `*const _`
+error[E0275]: overflow assigning `*const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const _` to `*const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const _`
   --> $DIR/subtype-recursion-limit.rs:12:17
    |
 LL |     let mut w = (x, y);
    |                 ^^^^^^
+   |
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`subtype_recursion_limit`)
 
 error: aborting due to 1 previous error
 

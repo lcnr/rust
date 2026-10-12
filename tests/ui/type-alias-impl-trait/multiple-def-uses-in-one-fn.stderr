@@ -1,15 +1,37 @@
-error[E0277]: the trait bound `&'static B: From<&A>` is not satisfied
+error[E0308]: mismatched types
   --> $DIR/multiple-def-uses-in-one-fn.rs:10:45
    |
 LL | fn f<A, B: 'static>(a: &'static A, b: B) -> (X<A, B>, X<B, A>) {
-   |                                             ^^^^^^^^^^^^^^^^^^ the trait `From<&A>` is not implemented for `&'static B`
+   |      -  - expected type parameter           ^^^^^^^^^^^^^^^^^^ expected `&B`, found `&A`
+   |      |
+   |      found type parameter
    |
-   = note: required for `&A` to implement `Into<&'static B>`
-help: consider introducing a `where` clause, but there might be an alternative better way to express this requirement
+   = note: expected reference `&B`
+              found reference `&A`
+   = note: a type parameter was expected, but a different one was found; you might be missing a type parameter or trait bound
+   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
+
+error[E0271]: type mismatch resolving `X<B, A> == &A`
+  --> $DIR/multiple-def-uses-in-one-fn.rs:10:45
    |
-LL | fn f<A, B: 'static>(a: &'static A, b: B) -> (X<A, B>, X<B, A>) where &'static B: From<&A> {
-   |                                                                ++++++++++++++++++++++++++
+LL | fn f<A, B: 'static>(a: &'static A, b: B) -> (X<A, B>, X<B, A>) {
+   |                                             ^^^^^^^^^^^^^^^^^^ types differ
 
-error: aborting due to 1 previous error
+error[E0308]: mismatched types
+  --> $DIR/multiple-def-uses-in-one-fn.rs:10:45
+   |
+LL | fn f<A, B: 'static>(a: &'static A, b: B) -> (X<A, B>, X<B, A>) {
+   |      -  - expected type parameter           ^^^^^^^^^^^^^^^^^^ expected `&B`, found `&A`
+   |      |
+   |      found type parameter
+   |
+   = note: expected reference `&B`
+              found reference `&A`
+   = note: a type parameter was expected, but a different one was found; you might be missing a type parameter or trait bound
+   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
-For more information about this error, try `rustc --explain E0277`.
+error: aborting due to 3 previous errors
+
+Some errors have detailed explanations: E0271, E0308.
+For more information about an error, try `rustc --explain E0271`.

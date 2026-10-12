@@ -45,7 +45,7 @@ help: the trait `T1` is conditionally implemented for `Option<It>`
 LL | impl<It: Iterator> T1 for Option<It> {}
    | ^^^^^^^^^--------^^^^^^^^^^^^^^^^^^^
    |          |
-   |          unsatisfied requirement introduced here: `(): Iterator`
+   |          unsatisfied requirement introduced here: `_: Iterator`
 note: required for `Option<()>` to implement `T1`
   --> $DIR/blame-trait-error.rs:21:20
    |

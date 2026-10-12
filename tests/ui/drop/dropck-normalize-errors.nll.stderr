@@ -1,24 +1,14 @@
-error[E0277]: the trait bound `NonImplementedStruct: NonImplementedTrait` is not satisfied in `ADecoder<'a>`
+error[E0277]: the size for values of type `BDecoder` cannot be known at compilation time
   --> $DIR/dropck-normalize-errors.rs:20:28
    |
 LL | fn make_a_decoder<'a>() -> ADecoder<'a> {
-   |                            ^^^^^^^^^^^^ unsatisfied trait bound
+   |                            ^^^^^^^^^^^^ doesn't have a size known at compile-time
    |
-help: within `ADecoder<'a>`, the trait `NonImplementedTrait` is not implemented for `NonImplementedStruct`
-  --> $DIR/dropck-normalize-errors.rs:15:1
-   |
-LL | struct NonImplementedStruct;
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-help: this trait has no implementations, consider adding one
-  --> $DIR/dropck-normalize-errors.rs:12:1
-   |
-LL | trait NonImplementedTrait {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^
-note: required because it appears within the type `BDecoder`
-  --> $DIR/dropck-normalize-errors.rs:31:12
+help: within `ADecoder<'a>`, the trait `Sized` is not implemented for `BDecoder`
+  --> $DIR/dropck-normalize-errors.rs:31:1
    |
 LL | pub struct BDecoder {
-   |            ^^^^^^^^
+   | ^^^^^^^^^^^^^^^^^^^
 note: required because it appears within the type `ADecoder<'a>`
   --> $DIR/dropck-normalize-errors.rs:17:12
    |
@@ -26,27 +16,17 @@ LL | pub struct ADecoder<'a> {
    |            ^^^^^^^^
    = note: the return type of a function must have a statically known size
 
-error[E0277]: the trait bound `NonImplementedStruct: NonImplementedTrait` is not satisfied in `BDecoder`
+error[E0277]: the size for values of type `BDecoder` cannot be known at compilation time
   --> $DIR/dropck-normalize-errors.rs:28:20
    |
 LL |     type Decoder = BDecoder;
-   |                    ^^^^^^^^ unsatisfied trait bound
+   |                    ^^^^^^^^ doesn't have a size known at compile-time
    |
-help: within `BDecoder`, the trait `NonImplementedTrait` is not implemented for `NonImplementedStruct`
-  --> $DIR/dropck-normalize-errors.rs:15:1
-   |
-LL | struct NonImplementedStruct;
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-help: this trait has no implementations, consider adding one
-  --> $DIR/dropck-normalize-errors.rs:12:1
-   |
-LL | trait NonImplementedTrait {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^
-note: required because it appears within the type `BDecoder`
-  --> $DIR/dropck-normalize-errors.rs:31:12
+help: the trait `Sized` is not implemented for `BDecoder`
+  --> $DIR/dropck-normalize-errors.rs:31:1
    |
 LL | pub struct BDecoder {
-   |            ^^^^^^^^
+   | ^^^^^^^^^^^^^^^^^^^
 note: required by a bound in `Decode::Decoder`
   --> $DIR/dropck-normalize-errors.rs:9:5
    |

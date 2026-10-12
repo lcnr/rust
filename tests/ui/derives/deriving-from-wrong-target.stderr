@@ -72,6 +72,27 @@ help: function arguments must have a statically known size, borrowed types alway
 LL |     last: &T,
    |           +
 
-error: aborting due to 6 previous errors
+error[E0277]: the size for values of type `T` cannot be known at compilation time
+  --> $DIR/deriving-from-wrong-target.rs:31:10
+   |
+LL | #[derive(From)]
+   |          ^^^^ doesn't have a size known at compile-time
+LL | struct SUnsizedField<T: ?Sized> {
+   |                      - this type parameter needs to be `Sized`
+   |
+note: required because it appears within the type `SUnsizedField<T>`
+  --> $DIR/deriving-from-wrong-target.rs:33:5
+   |
+LL | struct SUnsizedField<T: ?Sized> {
+LL |     last: T,
+   |     ^^^^^^^ required by this field
+   = note: structs must have a statically known size to be initialized
+help: consider removing the `?Sized` bound to make the type parameter `Sized`
+   |
+LL - struct SUnsizedField<T: ?Sized> {
+LL + struct SUnsizedField<T> {
+   |
+
+error: aborting due to 7 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

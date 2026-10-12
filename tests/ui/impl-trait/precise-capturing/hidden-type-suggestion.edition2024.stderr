@@ -1,13 +1,11 @@
 error[E0700]: hidden type for `impl Sized` captures lifetime that does not appear in bounds
-  --> $DIR/hidden-type-suggestion.rs:6:5
+  --> $DIR/hidden-type-suggestion.rs:4:1
    |
 LL | fn lifetime<'a, 'b>(x: &'a ()) -> impl Sized + use<'b> {
-   |             --                    -------------------- opaque type defined here
-   |             |
+   | ^^^^^^^^^^^^--^^^^^^^^^^^^^^^^^^^^--------------------
+   |             |                     |
+   |             |                     opaque type defined here
    |             hidden type `&'a ()` captures the lifetime `'a` as defined here
-LL |
-LL |     x
-   |     ^
    |
 help: add `'a` to the `use<...>` bound to explicitly capture it
    |
@@ -15,15 +13,13 @@ LL | fn lifetime<'a, 'b>(x: &'a ()) -> impl Sized + use<'b, 'a> {
    |                                                      ++++
 
 error[E0700]: hidden type for `impl Sized` captures lifetime that does not appear in bounds
-  --> $DIR/hidden-type-suggestion.rs:12:5
+  --> $DIR/hidden-type-suggestion.rs:10:1
    |
 LL | fn param<'a, T>(x: &'a ()) -> impl Sized + use<T> {
-   |          --                   ------------------- opaque type defined here
-   |          |
+   | ^^^^^^^^^--^^^^^^^^^^^^^^^^^^^-------------------
+   |          |                    |
+   |          |                    opaque type defined here
    |          hidden type `&'a ()` captures the lifetime `'a` as defined here
-LL |
-LL |     x
-   |     ^
    |
 help: add `'a` to the `use<...>` bound to explicitly capture it
    |
@@ -31,15 +27,13 @@ LL | fn param<'a, T>(x: &'a ()) -> impl Sized + use<'a, T> {
    |                                                +++
 
 error[E0700]: hidden type for `impl Sized` captures lifetime that does not appear in bounds
-  --> $DIR/hidden-type-suggestion.rs:18:5
+  --> $DIR/hidden-type-suggestion.rs:16:1
    |
 LL | fn empty<'a>(x: &'a ()) -> impl Sized + use<> {
-   |          --                ------------------ opaque type defined here
-   |          |
+   | ^^^^^^^^^--^^^^^^^^^^^^^^^^------------------
+   |          |                 |
+   |          |                 opaque type defined here
    |          hidden type `&'a ()` captures the lifetime `'a` as defined here
-LL |
-LL |     x
-   |     ^
    |
 help: add `'a` to the `use<...>` bound to explicitly capture it
    |

@@ -4,16 +4,12 @@ error[E0207]: the lifetime parameter `'a` is not constrained by the impl trait, 
 LL | impl<'a, I> UnwrapItemsExt for I {
    |      ^^ unconstrained lifetime parameter
 
-error[E0792]: expected generic lifetime parameter, found `'_`
-  --> $DIR/assoc-type-lifetime-unconstrained.rs:22:9
+error: non-defining use of `<I as UnwrapItemsExt>::Iter` in the defining scope
+  --> $DIR/assoc-type-lifetime-unconstrained.rs:21:5
    |
-LL | impl<'a, I> UnwrapItemsExt for I {
-   |      -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |         MyStruct {}
-   |         ^^^^^^^^^^^
+LL |     fn unwrap_items(self) -> Self::Iter {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 2 previous errors
 
-Some errors have detailed explanations: E0207, E0792.
-For more information about an error, try `rustc --explain E0207`.
+For more information about this error, try `rustc --explain E0207`.

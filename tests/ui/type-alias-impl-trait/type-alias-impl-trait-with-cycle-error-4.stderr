@@ -1,27 +1,46 @@
-error[E0275]: overflow evaluating the requirement `Ty: Id`
+error[E0275]: overflow evaluating the requirement `Ty == _`
   --> $DIR/type-alias-impl-trait-with-cycle-error-4.rs:11:1
    |
 LL | type Ty
    | ^^^^^^^
-   |
-note: required by a bound on the type alias `Ty`
-  --> $DIR/type-alias-impl-trait-with-cycle-error-4.rs:13:9
-   |
-LL |     Ty: Id<Assoc = Ty>,
-   |         ^^^^^^^^^^^^^^ required by this bound
 
-error[E0275]: overflow evaluating the requirement `Ty: Id`
+error[E0275]: overflow evaluating the requirement `Ty == _`
+  --> $DIR/type-alias-impl-trait-with-cycle-error-4.rs:15:16
+   |
+LL | fn define() -> Ty {}
+   |                ^^
+
+error[E0275]: overflow evaluating the requirement `Ty: Sized`
   --> $DIR/type-alias-impl-trait-with-cycle-error-4.rs:15:16
    |
 LL | fn define() -> Ty {}
    |                ^^
    |
-note: required by a bound on the type alias `Ty`
-  --> $DIR/type-alias-impl-trait-with-cycle-error-4.rs:13:9
+   = note: the return type of a function must have a statically known size
+
+error[E0275]: overflow evaluating whether `Ty` is well-formed
+  --> $DIR/type-alias-impl-trait-with-cycle-error-4.rs:15:16
    |
-LL |     Ty: Id<Assoc = Ty>,
-   |         ^^^^^^^^^^^^^^ required by this bound
+LL | fn define() -> Ty {}
+   |                ^^
 
-error: aborting due to 2 previous errors
+error: unconstrained opaque type
+  --> $DIR/type-alias-impl-trait-with-cycle-error-4.rs:14:3
+   |
+LL | = impl Sized;
+   |   ^^^^^^^^^^
+   |
+   = note: `Ty` must be used in combination with a concrete type within the same crate
 
-For more information about this error, try `rustc --explain E0275`.
+error[E0271]: type mismatch resolving `Ty == ()`
+  --> $DIR/type-alias-impl-trait-with-cycle-error-4.rs:15:16
+   |
+LL | fn define() -> Ty {}
+   |                ^^ types differ
+
+error[E0275]: overflow evaluating the requirement `Ty == _`
+
+error: aborting due to 7 previous errors
+
+Some errors have detailed explanations: E0271, E0275.
+For more information about an error, try `rustc --explain E0271`.

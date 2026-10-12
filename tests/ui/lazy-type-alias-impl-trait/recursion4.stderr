@@ -1,23 +1,27 @@
-error[E0277]: a value of type `Foo` cannot be built from an iterator over elements of type `_`
-  --> $DIR/recursion4.rs:11:28
+error[E0282]: type annotations needed for `Vec<_>`
+  --> $DIR/recursion4.rs:10:9
    |
-LL |     x = std::iter::empty().collect();
-   |                            ^^^^^^^ value of type `Foo` cannot be built from `std::iter::Iterator<Item=_>`
+LL |     let mut x = foo(false);
+   |         ^^^^^
    |
-   = help: the trait `FromIterator<_>` is not implemented for `Foo`
-note: required by a bound in `collect`
-  --> $SRC_DIR/core/src/iter/traits/iterator.rs:LL:COL
+   = note: cannot infer type of hidden type of opaque
+help: consider giving `x` an explicit type, where the placeholder `_` is specified
+   |
+LL |     let mut x: Vec<_> = foo(false);
+   |              ++++++++
 
-error[E0277]: a value of type `impl Debug` cannot be built from an iterator over elements of type `_`
-  --> $DIR/recursion4.rs:20:28
+error[E0282]: type annotations needed for `Vec<_>`
+  --> $DIR/recursion4.rs:19:9
    |
-LL |     x = std::iter::empty().collect();
-   |                            ^^^^^^^ value of type `impl Debug` cannot be built from `std::iter::Iterator<Item=_>`
+LL |     let mut x = bar(false);
+   |         ^^^^^
    |
-   = help: the trait `FromIterator<_>` is not implemented for `impl Debug`
-note: required by a bound in `collect`
-  --> $SRC_DIR/core/src/iter/traits/iterator.rs:LL:COL
+   = note: cannot infer type of hidden type of opaque
+help: consider giving `x` an explicit type, where the placeholder `_` is specified
+   |
+LL |     let mut x: Vec<_> = bar(false);
+   |              ++++++++
 
 error: aborting due to 2 previous errors
 
-For more information about this error, try `rustc --explain E0277`.
+For more information about this error, try `rustc --explain E0282`.

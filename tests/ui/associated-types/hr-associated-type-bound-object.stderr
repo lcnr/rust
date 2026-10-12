@@ -1,4 +1,22 @@
 error[E0277]: the trait bound `for<'b> <T as X<'b>>::U: Clone` is not satisfied
+  --> $DIR/hr-associated-type-bound-object.rs:7:32
+   |
+LL | fn f<'a, T: X<'a> + ?Sized>(x: &<T as X<'a>>::U) {
+   |                                ^^^^^^^^^^^^^^^^ the trait `for<'b> Clone` is not implemented for `<T as X<'b>>::U`
+   |
+note: required by a bound in `X`
+  --> $DIR/hr-associated-type-bound-object.rs:3:33
+   |
+LL | trait X<'a>
+LL | where
+LL |     for<'b> <Self as X<'b>>::U: Clone,
+   |                                 ^^^^^ required by this bound in `X`
+help: consider further restricting the associated type
+   |
+LL | fn f<'a, T: X<'a> + ?Sized>(x: &<T as X<'a>>::U) where for<'b> <T as X<'b>>::U: Clone {
+   |                                                  ++++++++++++++++++++++++++++++++++++
+
+error[E0277]: the trait bound `for<'b> <T as X<'b>>::U: Clone` is not satisfied
   --> $DIR/hr-associated-type-bound-object.rs:7:13
    |
 LL | fn f<'a, T: X<'a> + ?Sized>(x: &<T as X<'a>>::U) {
@@ -37,17 +55,17 @@ help: consider further restricting the associated type
 LL | fn f<'a, T: X<'a> + ?Sized>(x: &<T as X<'a>>::U) where for<'b> <T as X<'b>>::U: Clone {
    |                                                  ++++++++++++++++++++++++++++++++++++
 
-error[E0277]: the trait bound `<T as X<'_>>::U: Clone` is not satisfied
+error[E0277]: the trait bound `<T as X<'a>>::U: Clone` is not satisfied
   --> $DIR/hr-associated-type-bound-object.rs:9:6
    |
 LL |     <<T as X<'_>>::U>::clone(x);
-   |      ^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `<T as X<'_>>::U`
+   |      ^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `<T as X<'a>>::U`
    |
 help: consider further restricting the associated type
    |
-LL | fn f<'a, T: X<'a> + ?Sized>(x: &<T as X<'a>>::U) where <T as X<'_>>::U: Clone {
+LL | fn f<'a, T: X<'a> + ?Sized>(x: &<T as X<'a>>::U) where <T as X<'a>>::U: Clone {
    |                                                  ++++++++++++++++++++++++++++
 
-error: aborting due to 3 previous errors
+error: aborting due to 4 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

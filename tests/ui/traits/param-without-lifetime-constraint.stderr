@@ -1,21 +1,30 @@
-error: `impl` item signature doesn't match `trait` item signature
+error[E0803]: cannot infer an appropriate lifetime for lifetime parameter '_ in generic type due to conflicting requirements
   --> $DIR/param-without-lifetime-constraint.rs:14:5
    |
-LL | pub trait HaveRelationship<To> {
-LL |     fn get_relation(&self) -> To;
-   |     ----------------------------- expected `fn(&'1 Article) -> &'2 ProofReader`
-...
-LL | impl HaveRelationship<&ProofReader> for Article {
 LL |     fn get_relation(&self) -> &ProofReader {
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ found `fn(&'1 Article) -> &'1 ProofReader`
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: expected signature `fn(&'1 Article) -> &'2 ProofReader`
-              found signature `fn(&'1 Article) -> &'1 ProofReader`
-help: the lifetime requirements from the `impl` do not correspond to the requirements in the `trait`
-  --> $DIR/param-without-lifetime-constraint.rs:10:31
+note: first, the lifetime cannot outlive the anonymous lifetime defined here...
+  --> $DIR/param-without-lifetime-constraint.rs:10:21
    |
 LL |     fn get_relation(&self) -> To;
-   |                               ^^ consider borrowing this type parameter in the trait
+   |                     ^^^^^
+note: ...so that the declared lifetime parameter bounds are satisfied
+  --> $DIR/param-without-lifetime-constraint.rs:14:5
+   |
+LL |     fn get_relation(&self) -> &ProofReader {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: but, the lifetime must be valid for the anonymous lifetime as defined here...
+  --> $DIR/param-without-lifetime-constraint.rs:13:23
+   |
+LL | impl HaveRelationship<&ProofReader> for Article {
+   |                       ^
+note: ...so that the declared lifetime parameter bounds are satisfied
+  --> $DIR/param-without-lifetime-constraint.rs:14:5
+   |
+LL |     fn get_relation(&self) -> &ProofReader {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 
+For more information about this error, try `rustc --explain E0803`.

@@ -44,43 +44,40 @@ LL | impl<'a, 't> Foo<'a, 't> for &'a isize {
 LL |     fn has_bound<'b>(self, b: Inv<'b>) {
    |                  ^^ `'b` is late-bound
 
-error[E0308]: method not compatible with trait
+error[E0478]: lifetime bound not satisfied
   --> $DIR/regions-bound-missing-bound-in-impl.rs:27:5
    |
 LL |     fn wrong_bound1<'b,'c,'d:'a+'c>(self, b: Inv<'b>, c: Inv<'c>, d: Inv<'d>) {
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ lifetime mismatch
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: expected signature `fn(&'a _, Inv<'c>, Inv<'c>, Inv<'_>)`
-              found signature `fn(&'a _, Inv<'_>, Inv<'c>, Inv<'_>)`
-note: the lifetime `'c` as defined here...
+note: lifetime parameter instantiated with the lifetime `'c` as defined here
   --> $DIR/regions-bound-missing-bound-in-impl.rs:27:24
    |
 LL |     fn wrong_bound1<'b,'c,'d:'a+'c>(self, b: Inv<'b>, c: Inv<'c>, d: Inv<'d>) {
    |                        ^^
-note: ...does not necessarily outlive the lifetime `'c` as defined here
-  --> $DIR/regions-bound-missing-bound-in-impl.rs:12:24
+note: but lifetime parameter must outlive the lifetime `'c` as defined here
+  --> $DIR/regions-bound-missing-bound-in-impl.rs:27:24
    |
-LL |     fn wrong_bound1<'b,'c,'d:'a+'b>(self, b: Inv<'b>, c: Inv<'c>, d: Inv<'d>);
+LL |     fn wrong_bound1<'b,'c,'d:'a+'c>(self, b: Inv<'b>, c: Inv<'c>, d: Inv<'d>) {
    |                        ^^
 
-error[E0308]: method not compatible with trait
+error[E0478]: lifetime bound not satisfied
   --> $DIR/regions-bound-missing-bound-in-impl.rs:27:5
    |
 LL |     fn wrong_bound1<'b,'c,'d:'a+'c>(self, b: Inv<'b>, c: Inv<'c>, d: Inv<'d>) {
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ lifetime mismatch
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: expected signature `fn(&'a _, Inv<'c>, Inv<'c>, Inv<'_>)`
-              found signature `fn(&'a _, Inv<'_>, Inv<'c>, Inv<'_>)`
-note: the lifetime `'c` as defined here...
-  --> $DIR/regions-bound-missing-bound-in-impl.rs:12:24
-   |
-LL |     fn wrong_bound1<'b,'c,'d:'a+'b>(self, b: Inv<'b>, c: Inv<'c>, d: Inv<'d>);
-   |                        ^^
-note: ...does not necessarily outlive the lifetime `'c` as defined here
+note: lifetime parameter instantiated with the lifetime `'c` as defined here
   --> $DIR/regions-bound-missing-bound-in-impl.rs:27:24
    |
 LL |     fn wrong_bound1<'b,'c,'d:'a+'c>(self, b: Inv<'b>, c: Inv<'c>, d: Inv<'d>) {
    |                        ^^
+note: but lifetime parameter must outlive the lifetime `'c` as defined here
+  --> $DIR/regions-bound-missing-bound-in-impl.rs:27:24
+   |
+LL |     fn wrong_bound1<'b,'c,'d:'a+'c>(self, b: Inv<'b>, c: Inv<'c>, d: Inv<'d>) {
+   |                        ^^
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
 error[E0195]: lifetime parameters do not match the trait definition
   --> $DIR/regions-bound-missing-bound-in-impl.rs:42:30
@@ -122,16 +119,24 @@ LL | impl<'a, 't> Foo<'a, 't> for &'a isize {
 LL |     fn wrong_bound2(self, b: Inv, c: Inv, d: Inv) {
    |                                              ^^^ `'_` is late-bound
 
-error[E0276]: impl has stricter requirements than trait
+error[E0478]: lifetime bound not satisfied
   --> $DIR/regions-bound-missing-bound-in-impl.rs:49:26
    |
-LL |     fn another_bound<'x: 'a>(self, x: Inv<'x>, y: Inv<'t>);
-   |     ------------------------------------------------------- definition of `another_bound` from trait
-...
 LL |     fn another_bound<'x: 't>(self, x: Inv<'x>, y: Inv<'t>) {
-   |                          ^^ impl has extra requirement `'x: 't`
+   |                          ^^
+   |
+note: lifetime parameter instantiated with the lifetime `'x` as defined here
+  --> $DIR/regions-bound-missing-bound-in-impl.rs:49:22
+   |
+LL |     fn another_bound<'x: 't>(self, x: Inv<'x>, y: Inv<'t>) {
+   |                      ^^
+note: but lifetime parameter must outlive the lifetime `'t` as defined here
+  --> $DIR/regions-bound-missing-bound-in-impl.rs:18:10
+   |
+LL | impl<'a, 't> Foo<'a, 't> for &'a isize {
+   |          ^^
 
 error: aborting due to 6 previous errors
 
-Some errors have detailed explanations: E0195, E0276, E0308.
+Some errors have detailed explanations: E0195, E0478.
 For more information about an error, try `rustc --explain E0195`.

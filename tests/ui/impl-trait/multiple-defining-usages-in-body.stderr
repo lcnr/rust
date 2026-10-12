@@ -1,26 +1,36 @@
-error: concrete type differs from previous defining opaque type use
+error[E0308]: mismatched types
   --> $DIR/multiple-defining-usages-in-body.rs:8:16
    |
+LL | fn foo<T: Trait, U: Trait>() -> impl Trait {
+   |        -         - expected type parameter
+   |        |
+   |        found type parameter
+...
 LL |     let _: T = foo::<U, T>();
-   |                ^^^^^^^^^^^^^ expected `T`, got `U`
+   |                ^^^^^^^^^^^^^ expected type parameter `U`, found type parameter `T`
    |
-note: previous use here
-  --> $DIR/multiple-defining-usages-in-body.rs:6:16
-   |
-LL |     let a: T = foo::<T, U>();
-   |                ^^^^^^^^^^^^^
+   = note: expected type parameter `U`
+              found type parameter `T`
+   = note: a type parameter was expected, but a different one was found; you might be missing a type parameter or trait bound
+   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
 
-warning: function cannot return without recursing
-  --> $DIR/multiple-defining-usages-in-body.rs:4:1
+error[E0308]: mismatched types
+  --> $DIR/multiple-defining-usages-in-body.rs:8:16
    |
 LL | fn foo<T: Trait, U: Trait>() -> impl Trait {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot return without recursing
-LL |
-LL |     let a: T = foo::<T, U>();
-   |                ------------- recursive call site
+   |        -         - expected type parameter
+   |        |
+   |        found type parameter
+...
+LL |     let _: T = foo::<U, T>();
+   |                ^^^^^^^^^^^^^ expected type parameter `U`, found type parameter `T`
    |
-   = help: a `loop` may express intention better if this is on purpose
-   = note: `#[warn(unconditional_recursion)]` on by default
+   = note: expected type parameter `U`
+              found type parameter `T`
+   = note: a type parameter was expected, but a different one was found; you might be missing a type parameter or trait bound
+   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
-error: aborting due to 1 previous error; 1 warning emitted
+error: aborting due to 2 previous errors
 
+For more information about this error, try `rustc --explain E0308`.

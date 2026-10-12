@@ -1,12 +1,16 @@
-error[E0276]: impl has stricter requirements than trait
+error[E0309]: the parameter type `U` may not live long enough
   --> $DIR/proj-outlives-region.rs:9:23
    |
-LL |     fn foo() where T: 'a;
-   |     --------------------- definition of `foo` from trait
-...
+LL | impl<'a, U: Iterator> Master<'a, U::Item, U> for () {
+   |      -- the parameter type `U` must be valid for the lifetime `'a` as defined here...
 LL |     fn foo() where U: 'a { }
-   |                       ^^ impl has extra requirement `U: 'a`
+   |                       ^^ ...so that the type `U` will meet its required lifetime bounds
+   |
+help: consider adding an explicit lifetime bound
+   |
+LL | impl<'a, U: Iterator + 'a> Master<'a, U::Item, U> for () {
+   |                      ++++
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0276`.
+For more information about this error, try `rustc --explain E0309`.

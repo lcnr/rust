@@ -1,83 +1,70 @@
-error: implementation of `FnOnce` is not general enough
-  --> $DIR/issue-79187-2.rs:8:5
+error[E0277]: the trait bound `{closure@$DIR/issue-79187-2.rs:8:14: 8:17}: Foo` is not satisfied
+  --> $DIR/issue-79187-2.rs:8:14
    |
 LL |     take_foo(|a| a);
-   |     ^^^^^^^^^^^^^^^
+   |     -------- ^^^^^ unsatisfied trait bound
+   |     |
+   |     required by a bound introduced by this call
    |
-note: closure with signature `fn(&'2 i32) -> &i32` must implement `FnOnce<(&'1 i32,)>`, for any lifetime `'1`...
+help: the trait `for<'a> FnOnce(&'a i32)` is not implemented for closure `{closure@$DIR/issue-79187-2.rs:8:14: 8:17}`
+  --> $DIR/issue-79187-2.rs:8:14
+   |
+LL |     take_foo(|a| a);
+   |              ^^^
+   = note: expected a closure with signature `for<'a> fn(&'a _)`
+              found a closure with signature `fn(&_)`
+note: required for `{closure@$DIR/issue-79187-2.rs:8:14: 8:17}` to implement `Foo`
+  --> $DIR/issue-79187-2.rs:3:9
+   |
+LL | impl<F> Foo for F where F: Fn(&i32) -> &i32 {}
+   |         ^^^     ^                      ---- unsatisfied trait bound introduced here
+note: required by a bound in `take_foo`
   --> $DIR/issue-79187-2.rs:5:21
    |
 LL | fn take_foo(_: impl Foo) {}
    |                     ^^^ required by this bound in `take_foo`
-   = note: ...but it actually implements `FnOnce<(&'2 i32,)>`, for some specific lifetime `'2`
-help: consider adding an explicit type annotation to the closure's argument
-   |
-LL |     take_foo(|a: &i32| a);
-   |                ++++++
 
-error: implementation of `Fn` is not general enough
-  --> $DIR/issue-79187-2.rs:8:5
-   |
-LL |     take_foo(|a| a);
-   |     ^^^^^^^^^^^^^^^
-   |
-note: closure with signature `fn(&'2 i32) -> &i32` must implement `Fn<(&'1 i32,)>`, for any lifetime `'1`...
-  --> $DIR/issue-79187-2.rs:5:21
-   |
-LL | fn take_foo(_: impl Foo) {}
-   |                     ^^^ required by this bound in `take_foo`
-   = note: ...but it actually implements `Fn<(&'2 i32,)>`, for some specific lifetime `'2`
-help: consider adding an explicit type annotation to the closure's argument
-   |
-LL |     take_foo(|a: &i32| a);
-   |                ++++++
-
-error[E0308]: mismatched types
-  --> $DIR/issue-79187-2.rs:11:5
-   |
-LL |     take_foo(|a: &i32| a);
-   |     ^^^^^^^^^^^^^^^^^^^^^ one type is more general than the other
-   |
-   = note: expected reference `&_`
-              found reference `&_`
-note: the lifetime requirement is introduced here
-  --> $DIR/issue-79187-2.rs:5:21
-   |
-LL | fn take_foo(_: impl Foo) {}
-   |                     ^^^
-
-error: lifetime may not live long enough
+error[E0271]: type mismatch resolving `<{closure@issue-79187-2.rs:11:14} as FnOnce<(&i32,)>>::Output == &i32`
   --> $DIR/issue-79187-2.rs:11:24
    |
 LL |     take_foo(|a: &i32| a);
-   |                  -   - ^ returning this value requires that `'1` must outlive `'2`
-   |                  |   |
-   |                  |   return type of closure is &'2 i32
-   |                  let's call the lifetime of this reference `'1`
-
-error[E0308]: mismatched types
-  --> $DIR/issue-79187-2.rs:14:5
+   |     -------- --------- ^ types differ
+   |     |        |
+   |     |        this closure
+   |     required by a bound introduced by this call
    |
-LL |     take_foo(|a: &i32| -> &i32 { a });
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ one type is more general than the other
+note: required for `{closure@$DIR/issue-79187-2.rs:11:14: 11:23}` to implement `Foo`
+  --> $DIR/issue-79187-2.rs:3:9
    |
-   = note: expected reference `&_`
-              found reference `&_`
-note: the lifetime requirement is introduced here
+LL | impl<F> Foo for F where F: Fn(&i32) -> &i32 {}
+   |         ^^^     ^                      ---- unsatisfied trait bound introduced here
+note: required by a bound in `take_foo`
   --> $DIR/issue-79187-2.rs:5:21
    |
 LL | fn take_foo(_: impl Foo) {}
-   |                     ^^^
+   |                     ^^^ required by this bound in `take_foo`
 
-error: lifetime may not live long enough
+error[E0271]: type mismatch resolving `<{closure@issue-79187-2.rs:14:14} as FnOnce<(&i32,)>>::Output == &i32`
   --> $DIR/issue-79187-2.rs:14:34
    |
 LL |     take_foo(|a: &i32| -> &i32 { a });
-   |                  -        -      ^ returning this value requires that `'1` must outlive `'2`
-   |                  |        |
-   |                  |        let's call the lifetime of this reference `'2`
-   |                  let's call the lifetime of this reference `'1`
+   |     -------- -----------------   ^ types differ
+   |     |        |
+   |     |        this closure
+   |     required by a bound introduced by this call
+   |
+note: required for `{closure@$DIR/issue-79187-2.rs:14:14: 14:31}` to implement `Foo`
+  --> $DIR/issue-79187-2.rs:3:9
+   |
+LL | impl<F> Foo for F where F: Fn(&i32) -> &i32 {}
+   |         ^^^     ^                      ---- unsatisfied trait bound introduced here
+note: required by a bound in `take_foo`
+  --> $DIR/issue-79187-2.rs:5:21
+   |
+LL | fn take_foo(_: impl Foo) {}
+   |                     ^^^ required by this bound in `take_foo`
 
-error: aborting due to 6 previous errors
+error: aborting due to 3 previous errors
 
-For more information about this error, try `rustc --explain E0308`.
+Some errors have detailed explanations: E0271, E0277.
+For more information about an error, try `rustc --explain E0271`.

@@ -8,7 +8,7 @@ error[E0282]: type annotations needed
   --> $DIR/unconstrained-param-ice-137308.rs:18:16
    |
 LL | struct S([u8; <u8 as A>::B]);
-   |                ^^ cannot infer type for type parameter `C`
+   |                ^^ cannot infer type
 
 error: the type has an unknown layout
   --> $DIR/unconstrained-param-ice-137308.rs:18:1

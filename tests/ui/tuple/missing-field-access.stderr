@@ -7,10 +7,17 @@ LL | struct F(BufReader<File>);
 LL |     let x = f.get_ref();
    |               ^^^^^^^ method not found in `F`
    |
+  --> $SRC_DIR/core/src/pin.rs:LL:COL
+   |
+   = note: the method is available for `Pin<&F>` here
 help: one of the expressions' fields has a method of the same name
    |
 LL |     let x = f.0.get_ref();
    |               ++
+help: consider wrapping the receiver expression with the appropriate type
+   |
+LL |     let x = Pin::new(&f).get_ref();
+   |             ++++++++++ +
 
 error[E0599]: no method named `get_ref` found for tuple `(BufReader<File>,)` in the current scope
   --> $DIR/missing-field-access.rs:14:15
@@ -18,10 +25,17 @@ error[E0599]: no method named `get_ref` found for tuple `(BufReader<File>,)` in 
 LL |     let x = f.get_ref();
    |               ^^^^^^^ method not found in `(BufReader<File>,)`
    |
+  --> $SRC_DIR/core/src/pin.rs:LL:COL
+   |
+   = note: the method is available for `Pin<&(BufReader<File>,)>` here
 help: one of the expressions' fields has a method of the same name
    |
 LL |     let x = f.0.get_ref();
    |               ++
+help: consider wrapping the receiver expression with the appropriate type
+   |
+LL |     let x = Pin::new(&f).get_ref();
+   |             ++++++++++ +
 
 error: aborting due to 2 previous errors
 

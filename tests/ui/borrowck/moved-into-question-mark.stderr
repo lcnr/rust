@@ -12,7 +12,7 @@ LL |             dbg!(entry?.file_name());
    |
 note: the question mark operator is desugared into a call to `std::ops::Try::branch`, which takes ownership of the receiver `self`, which moves `entry`
   --> $SRC_DIR/core/src/ops/try_trait.rs:LL:COL
-help: you could `clone` the value and consume it, if the following trait bounds could be satisfied: `DirEntry: Clone` and `std::io::Error: Clone`
+help: you could `clone` the value and consume it, if the `DirEntry: Clone` trait bound could be satisfied
    |
 LL |         let file_type = entry.clone()?.file_type()?;
    |                              ++++++++

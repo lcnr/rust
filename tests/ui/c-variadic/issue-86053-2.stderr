@@ -1,16 +1,11 @@
-error[E0491]: in type `&'static &'a ()`, reference has a longer lifetime than the data it references
+error[E0477]: the type `&'a ()` does not fulfill the required lifetime
   --> $DIR/issue-86053-2.rs:6:39
    |
 LL | unsafe extern "C" fn ordering4<'a, F: H<&'static &'a ()>>(_: (), _: ...) {}
    |                                       ^^^^^^^^^^^^^^^^^^
    |
-   = note: the pointer is valid for the static lifetime
-note: but the referenced data is only valid for the lifetime `'a` as defined here
-  --> $DIR/issue-86053-2.rs:6:32
-   |
-LL | unsafe extern "C" fn ordering4<'a, F: H<&'static &'a ()>>(_: (), _: ...) {}
-   |                                ^^
+   = note: type must satisfy the static lifetime
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0491`.
+For more information about this error, try `rustc --explain E0477`.

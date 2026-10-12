@@ -1,22 +1,16 @@
-error[E0631]: type mismatch in function arguments
+error[E0277]: expected an `FnOnce(String)` closure, found `for<'a, 'b> fn(&'a &'b str) -> Option<()> {takes_str_but_too_many_refs}`
   --> $DIR/suggest-option-asderef-unfixable.rs:24:40
    |
-LL | fn takes_str_but_too_many_refs(_: &&str) -> Option<()> {
-   | ------------------------------------------------------ found signature defined here
-...
 LL |     let _ = produces_string().and_then(takes_str_but_too_many_refs);
-   |                               -------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected due to this
+   |                               -------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected an `FnOnce(String)` closure, found `for<'a, 'b> fn(&'a &'b str) -> Option<()> {takes_str_but_too_many_refs}`
    |                               |
    |                               required by a bound introduced by this call
    |
-   = note: expected function signature `fn(String) -> _`
-              found function signature `fn(&&str) -> _`
+   = help: the trait `FnOnce(String)` is not implemented for fn item `for<'a, 'b> fn(&'a &'b str) -> Option<()> {takes_str_but_too_many_refs}`
+   = note: expected a closure with signature `fn(String)`
+              found a closure with signature `fn(&&str)`
 note: required by a bound in `Option::<T>::and_then`
   --> $SRC_DIR/core/src/option.rs:LL:COL
-help: consider wrapping the function in a closure
-   |
-LL |     let _ = produces_string().and_then(|arg0: String| takes_str_but_too_many_refs(/* &&str */));
-   |                                        ++++++++++++++                            +++++++++++++
 
 error[E0277]: expected an `FnOnce(String)` closure, found `for<'a> extern "C" fn(&'a str) -> Option<()> {takes_str_but_wrong_abi}`
   --> $DIR/suggest-option-asderef-unfixable.rs:26:40
@@ -43,41 +37,33 @@ LL |     let _ = produces_string().and_then(takes_str_but_unsafe);
 note: required by a bound in `Option::<T>::and_then`
   --> $SRC_DIR/core/src/option.rs:LL:COL
 
-error[E0593]: function is expected to take 1 argument, but it takes 0 arguments
+error[E0277]: expected an `FnOnce(String)` closure, found `fn() -> Option<()> {no_args}`
   --> $DIR/suggest-option-asderef-unfixable.rs:30:40
    |
-LL | fn no_args() -> Option<()> {
-   | -------------------------- takes 0 arguments
-...
 LL |     let _ = produces_string().and_then(no_args);
-   |                               -------- ^^^^^^^ expected function that takes 1 argument
+   |                               -------- ^^^^^^^ expected an `FnOnce(String)` closure, found `fn() -> Option<()> {no_args}`
    |                               |
    |                               required by a bound introduced by this call
    |
+   = help: the trait `FnOnce(String)` is not implemented for fn item `fn() -> Option<()> {no_args}`
+   = note: expected a closure taking 0 arguments, but one taking 1 argument was given
 note: required by a bound in `Option::<T>::and_then`
   --> $SRC_DIR/core/src/option.rs:LL:COL
 
-error[E0631]: type mismatch in function arguments
+error[E0277]: expected an `FnOnce(TypeWithoutDeref)` closure, found `for<'a, 'b> fn(&'a &'b str) -> Option<()> {takes_str_but_too_many_refs}`
   --> $DIR/suggest-option-asderef-unfixable.rs:32:45
    |
-LL | fn takes_str_but_too_many_refs(_: &&str) -> Option<()> {
-   | ------------------------------------------------------ found signature defined here
-...
 LL |     let _ = Some(TypeWithoutDeref).and_then(takes_str_but_too_many_refs);
-   |                                    -------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected due to this
+   |                                    -------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected an `FnOnce(TypeWithoutDeref)` closure, found `for<'a, 'b> fn(&'a &'b str) -> Option<()> {takes_str_but_too_many_refs}`
    |                                    |
    |                                    required by a bound introduced by this call
    |
-   = note: expected function signature `fn(TypeWithoutDeref) -> _`
-              found function signature `fn(&&str) -> _`
+   = help: the trait `FnOnce(TypeWithoutDeref)` is not implemented for fn item `for<'a, 'b> fn(&'a &'b str) -> Option<()> {takes_str_but_too_many_refs}`
+   = note: expected a closure with signature `fn(TypeWithoutDeref)`
+              found a closure with signature `fn(&&str)`
 note: required by a bound in `Option::<T>::and_then`
   --> $SRC_DIR/core/src/option.rs:LL:COL
-help: consider wrapping the function in a closure
-   |
-LL |     let _ = Some(TypeWithoutDeref).and_then(|arg0: TypeWithoutDeref| takes_str_but_too_many_refs(/* &&str */));
-   |                                             ++++++++++++++++++++++++                            +++++++++++++
 
 error: aborting due to 5 previous errors
 
-Some errors have detailed explanations: E0277, E0593, E0631.
-For more information about an error, try `rustc --explain E0277`.
+For more information about this error, try `rustc --explain E0277`.

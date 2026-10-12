@@ -1,8 +1,10 @@
 error[E0277]: the trait bound `T: Trait` is not satisfied
-  --> $DIR/issue-89686.rs:19:9
+  --> $DIR/issue-89686.rs:15:5
    |
-LL |         async move { self.f().await }
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Trait` is not implemented for `T`
+LL | /     fn g<'a>(&'a self) -> G<'a, Self>
+LL | |     where
+LL | |         Self: Sized,
+   | |____________________^ the trait `Trait` is not implemented for `T`
    |
 help: consider restricting type parameter `T` with trait `Trait`
    |

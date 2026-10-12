@@ -1,30 +1,28 @@
-error[E0277]: can't compare `SomeNode` with `SomeNode`
+error[E0277]: can't compare `Id<SomeNode>` with `Id<SomeNode>`
   --> $DIR/derive-implicit-bound.rs:25:15
    |
 LL |     accept_eq(&node);
-   |     --------- ^^^^^ no implementation for `SomeNode == SomeNode`
+   |     --------- ^^^^^ no implementation for `Id<SomeNode> == Id<SomeNode>`
    |     |
    |     required by a bound introduced by this call
    |
-   = help: the trait `PartialEq` is not implemented for `SomeNode`
-note: required for `Id<SomeNode>` to implement `PartialEq`
-  --> $DIR/derive-implicit-bound.rs:6:12
+   = help: the trait `PartialEq` is not implemented for `Id<SomeNode>`
+help: the trait `PartialEq` is conditionally implemented for `Id<T>`
+  --> $DIR/derive-implicit-bound.rs:5:10
    |
 LL | #[derive(PartialEq, Eq)]
-   |          --------- in this derive macro expansion
+   |          ^^^^^^^^^
 LL | pub struct Id<T>(PhantomData<T>);
-   |            ^^ - type parameter would need to implement `PartialEq`
-   = help: consider manually implementing `PartialEq` to avoid undesired bounds caused by "imperfect derives"
-   = note: to learn more, visit <https://github.com/rust-lang/rust/issues/26925>
+   |               - unsatisfied requirement introduced here: `_: PartialEq`
 note: required by a bound in `accept_eq`
   --> $DIR/derive-implicit-bound.rs:17:23
    |
 LL | fn accept_eq(_: &impl PartialEq) { }
    |                       ^^^^^^^^^ required by this bound in `accept_eq`
-help: consider annotating `SomeNode` with `#[derive(PartialEq)]`
+help: consider annotating `Id<SomeNode>` with `#[derive(PartialEq)]`
    |
 LL + #[derive(PartialEq)]
-LL | struct SomeNode();
+LL | pub struct Id<T>(PhantomData<T>);
    |
 
 error: aborting due to 1 previous error

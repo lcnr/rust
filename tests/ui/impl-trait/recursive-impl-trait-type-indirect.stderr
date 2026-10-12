@@ -1,68 +1,126 @@
-error[E0720]: cannot resolve opaque type
-  --> $DIR/recursive-impl-trait-type-indirect.rs:6:22
+error[E0275]: overflow assigning `(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(_, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)` to `(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(Option<(_, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)>, i32)`
+  --> $DIR/recursive-impl-trait-type-indirect.rs:8:5
    |
-LL | fn option(i: i32) -> impl Sized {
-   |                      ^^^^^^^^^^
+LL |     if i < 0 { None } else { Some((option(i - 1), i)) }
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`recursive_impl_trait_type_indirect`)
 
-error[E0720]: cannot resolve opaque type
+warning: overflow evaluating the requirement `tuple::{opaque#0} == (((((((((((_,),),),),),),),),),),)`
   --> $DIR/recursive-impl-trait-type-indirect.rs:11:15
    |
 LL | fn tuple() -> impl Sized {
    |               ^^^^^^^^^^
-
-error[E0720]: cannot resolve opaque type
-  --> $DIR/recursive-impl-trait-type-indirect.rs:16:15
    |
-LL | fn array() -> impl Sized {
-   |               ^^^^^^^^^^
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: which requires `(((((((((((_,),),),),),),),),),),): Sized`
+   = note: and so on...
+   = help: consider adding a manual `impl` of auto traits like `Send` for intermediate types, if auto traits are involved
+   = help: or consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`recursive_impl_trait_type_indirect`)
+   = note: this lint is attached to the whole crate and can't be disabled on a per-function basis
+   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+   = note: for more information, see issue #159228 <https://github.com/rust-lang/rust/issues/159228>
+   = note: `#[warn(recursion_depth_exceeding_limit)]` (part of `#[warn(future_incompatible)]`) on by default
 
-error[E0720]: cannot resolve opaque type
-  --> $DIR/recursive-impl-trait-type-indirect.rs:21:13
+error[E0275]: overflow assigning `((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((_,),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),)` to `((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((_,),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),),)`
+  --> $DIR/recursive-impl-trait-type-indirect.rs:13:6
    |
-LL | fn ptr() -> impl Sized {
-   |             ^^^^^^^^^^
-
-error[E0720]: cannot resolve opaque type
-  --> $DIR/recursive-impl-trait-type-indirect.rs:26:16
+LL |     (tuple(),)
+   |      ^^^^^^^
    |
-LL | fn fn_ptr() -> impl Sized {
-   |                ^^^^^^^^^^
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`recursive_impl_trait_type_indirect`)
 
-error[E0720]: cannot resolve opaque type
-  --> $DIR/recursive-impl-trait-type-indirect.rs:31:25
+error[E0275]: overflow assigning `[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[_; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]` to `[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[_; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]`
+  --> $DIR/recursive-impl-trait-type-indirect.rs:18:6
    |
-LL | fn closure_capture() -> impl Sized {
-   |                         ^^^^^^^^^^
-
-error[E0720]: cannot resolve opaque type
-  --> $DIR/recursive-impl-trait-type-indirect.rs:39:29
+LL |     [array()]
+   |      ^^^^^^^
    |
-LL | fn closure_ref_capture() -> impl Sized {
-   |                             ^^^^^^^^^^
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`recursive_impl_trait_type_indirect`)
 
-error[E0720]: cannot resolve opaque type
-  --> $DIR/recursive-impl-trait-type-indirect.rs:47:21
+error[E0275]: overflow assigning `*const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const _` to `*const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const *const _`
+  --> $DIR/recursive-impl-trait-type-indirect.rs:23:5
    |
-LL | fn closure_sig() -> impl Sized {
-   |                     ^^^^^^^^^^
-
-error[E0720]: cannot resolve opaque type
-  --> $DIR/recursive-impl-trait-type-indirect.rs:52:23
+LL |     &ptr() as *const _
+   |     ^^^^^^^^^^^^^^^^^^
    |
-LL | fn coroutine_sig() -> impl Sized {
-   |                       ^^^^^^^^^^
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`recursive_impl_trait_type_indirect`)
 
-error[E0720]: cannot resolve opaque type
-  --> $DIR/recursive-impl-trait-type-indirect.rs:58:27
+error[E0275]: overflow assigning `fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> _` to `fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> fn() -> _`
+  --> $DIR/recursive-impl-trait-type-indirect.rs:28:5
    |
-LL | fn coroutine_capture() -> impl Sized {
-   |                           ^^^^^^^^^^
+LL |     fn_ptr as fn() -> _
+   |     ^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`recursive_impl_trait_type_indirect`)
 
-error[E0720]: cannot resolve opaque type
+error[E0308]: mismatched types
+  --> $DIR/recursive-impl-trait-type-indirect.rs:34:5
+   |
+LL | /     move || {
+LL | |         x;
+LL | |     }
+   | |_____^ recursive type with infinite-size name
+
+error[E0308]: mismatched types
+  --> $DIR/recursive-impl-trait-type-indirect.rs:42:5
+   |
+LL | /     move || {
+LL | |         &x;
+LL | |     }
+   | |_____^ recursive type with infinite-size name
+
+error[E0308]: mismatched types
+  --> $DIR/recursive-impl-trait-type-indirect.rs:49:8
+   |
+LL |     || closure_sig()
+   |     -- ^^^^^^^^^^^^^ expected inferred type, found closure
+   |     |
+   |     the found closure
+   |
+   = note: expected type `_`
+           found closure `{closure@$DIR/recursive-impl-trait-type-indirect.rs:49:5: 49:7}`
+
+error[E0308]: mismatched types
+  --> $DIR/recursive-impl-trait-type-indirect.rs:55:14
+   |
+LL |     || yield coroutine_sig()
+   |     --       ^^^^^^^^^^^^^^^ expected inferred type, found coroutine
+   |     |
+   |     the found coroutine
+   |
+   = note:   expected type `_`
+           found coroutine `{coroutine@$DIR/recursive-impl-trait-type-indirect.rs:55:5: 55:7}`
+
+error[E0308]: mismatched types
+  --> $DIR/recursive-impl-trait-type-indirect.rs:63:5
+   |
+LL | /     move || {
+LL | |         yield;
+LL | |         x;
+LL | |     }
+   | |_____^ recursive type with infinite-size name
+
+error[E0282]: type annotations needed
   --> $DIR/recursive-impl-trait-type-indirect.rs:69:35
    |
 LL | fn substs_change<T: 'static>() -> impl Sized {
-   |                                   ^^^^^^^^^^
+   |                                   ^^^^^^^^^^ cannot infer type
+   |
+   = note: cannot infer type of hidden type of opaque
 
 error[E0720]: cannot resolve opaque type
   --> $DIR/recursive-impl-trait-type-indirect.rs:79:26
@@ -88,6 +146,7 @@ LL |
 LL |     mutual_recursion()
    |     ------------------ returning here with type `impl Sync`
 
-error: aborting due to 13 previous errors
+error: aborting due to 13 previous errors; 1 warning emitted
 
-For more information about this error, try `rustc --explain E0720`.
+Some errors have detailed explanations: E0275, E0282, E0308, E0720.
+For more information about an error, try `rustc --explain E0275`.

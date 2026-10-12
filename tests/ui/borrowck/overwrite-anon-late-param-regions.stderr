@@ -1,21 +1,15 @@
-error[E0792]: expected generic lifetime parameter, found `'a`
-  --> $DIR/overwrite-anon-late-param-regions.rs:11:5
+error: item does not constrain `test2::{opaque#0}`
+  --> $DIR/overwrite-anon-late-param-regions.rs:10:4
    |
-LL | type Opaque2<'a> = impl Sized + 'a;
-   |              -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |     |x| x
-   |     ^^^^^
-
-error: lifetime may not live long enough
-  --> $DIR/overwrite-anon-late-param-regions.rs:11:9
+LL | fn test2() -> impl for<'a, 'b> Fn((&'a str, &'b str)) -> (Opaque2<'a>, Opaque2<'a>) {
+   |    ^^^^^
    |
-LL |     |x| x
-   |      -  ^ closure was supposed to return data with lifetime `'2` but it is returning data with lifetime `'1`
-   |      |
-   |      has type `(&str, &'1 str)`
-   |      has type `(&'2 str, &str)`
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/overwrite-anon-late-param-regions.rs:10:15
+   |
+LL | fn test2() -> impl for<'a, 'b> Fn((&'a str, &'b str)) -> (Opaque2<'a>, Opaque2<'a>) {
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 2 previous errors
+error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0792`.

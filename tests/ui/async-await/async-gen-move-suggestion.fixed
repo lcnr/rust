@@ -14,7 +14,7 @@ use std::async_iter::AsyncIterator;
 fn moved() -> impl AsyncIterator<Item = u32> {
     let mut x = "foo".to_string();
 
-    async gen move { //~ ERROR
+    async gen { //~ ERROR
         x.clear();
         for x in 3..6 { yield x }
     }
@@ -25,7 +25,7 @@ fn check_with_whitespace_chars() -> impl AsyncIterator<Item = u32> {
     let mut x = "foo".to_string();
 
     async // Just to check that whitespace characters are correctly handled
-    gen move { //~^ ERROR
+    gen { //~^ ERROR
         x.clear();
         for x in 3..6 { yield x }
     }

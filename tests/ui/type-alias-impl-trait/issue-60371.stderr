@@ -8,19 +8,19 @@ LL |     type Item = impl Bug;
    = help: add `#![feature(impl_trait_in_assoc_type)]` to the crate attributes to enable
    = note: this compiler was built on YYYY-MM-DD; consider upgrading it if it is out of date
 
-error[E0277]: the trait bound `(): Bug` is not satisfied
-  --> $DIR/issue-60371.rs:10:40
+error[E0271]: type mismatch resolving `<&() as Bug>::Item == ()`
+  --> $DIR/issue-60371.rs:10:37
    |
 LL |     const FUN: fn() -> Self::Item = || ();
-   |                                        ^^ the trait `Bug` is not implemented for `()`
+   |                                     ^^^^^ type mismatch resolving `<&() as Bug>::Item == ()`
    |
-help: the trait `Bug` is implemented for `&()`
-  --> $DIR/issue-60371.rs:7:1
+note: types differ
+  --> $DIR/issue-60371.rs:8:17
    |
-LL | impl Bug for &() {
-   | ^^^^^^^^^^^^^^^^
+LL |     type Item = impl Bug;
+   |                 ^^^^^^^^
 
 error: aborting due to 2 previous errors
 
-Some errors have detailed explanations: E0277, E0658.
-For more information about an error, try `rustc --explain E0277`.
+Some errors have detailed explanations: E0271, E0658.
+For more information about an error, try `rustc --explain E0271`.

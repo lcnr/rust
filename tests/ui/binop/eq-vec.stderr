@@ -7,16 +7,10 @@ LL |     assert_eq!(vec1, vec2);
    |     Vec<Foo>
    |     Vec<Foo>
    |
-note: an implementation of `PartialEq` might be missing for `Foo`
-  --> $DIR/eq-vec.rs:3:5
+note: `Vec<Foo>` does not implement `PartialEq`
+  --> $SRC_DIR/alloc/src/vec/mod.rs:LL:COL
    |
-LL |     enum Foo {
-   |     ^^^^^^^^ must implement `PartialEq`
-help: consider annotating `Foo` with `#[derive(PartialEq)]`
-   |
-LL +     #[derive(PartialEq)]
-LL |     enum Foo {
-   |
+   = note: `Vec<Foo>` is defined in another crate
 
 error: aborting due to 1 previous error
 

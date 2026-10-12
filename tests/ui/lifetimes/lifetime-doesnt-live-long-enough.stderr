@@ -5,7 +5,7 @@ LL |     foo: &'static T
    |          ^^^^^^^^^^
    |          |
    |          the parameter type `T` must be valid for the static lifetime...
-   |          ...so that the reference type `&'static T` does not outlive the data it points at
+   |          ...so that the type `T` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |
@@ -16,7 +16,7 @@ error[E0309]: the parameter type `K` may not live long enough
   --> $DIR/lifetime-doesnt-live-long-enough.rs:41:33
    |
 LL |     fn generic_in_parent<'a, L: X<&'a Nested<K>>>() {
-   |                          --     ^^^^^^^^^^^^^^^^ ...so that the reference type `&'a Nested<K>` does not outlive the data it points at
+   |                          --     ^^^^^^^^^^^^^^^^ ...so that the type `Nested<K>` will meet its required lifetime bounds
    |                          |
    |                          the parameter type `K` must be valid for the lifetime `'a` as defined here...
    |
@@ -29,7 +29,7 @@ error[E0309]: the parameter type `M` may not live long enough
   --> $DIR/lifetime-doesnt-live-long-enough.rs:44:36
    |
 LL |     fn generic_in_child<'a, 'b, L: X<&'a Nested<M>>, M: 'b>() {
-   |                         --         ^^^^^^^^^^^^^^^^ ...so that the reference type `&'a Nested<M>` does not outlive the data it points at
+   |                         --         ^^^^^^^^^^^^^^^^ ...so that the type `Nested<M>` will meet its required lifetime bounds
    |                         |
    |                         the parameter type `M` must be valid for the lifetime `'a` as defined here...
    |
@@ -42,7 +42,7 @@ error[E0309]: the parameter type `K` may not live long enough
   --> $DIR/lifetime-doesnt-live-long-enough.rs:24:19
    |
 LL |     fn foo<'a, L: X<&'a Nested<K>>>();
-   |            --     ^^^^^^^^^^^^^^^^ ...so that the reference type `&'a Nested<K>` does not outlive the data it points at
+   |            --     ^^^^^^^^^^^^^^^^ ...so that the type `Nested<K>` will meet its required lifetime bounds
    |            |
    |            the parameter type `K` must be valid for the lifetime `'a` as defined here...
    |
@@ -55,7 +55,7 @@ error[E0309]: the parameter type `Self` may not live long enough
   --> $DIR/lifetime-doesnt-live-long-enough.rs:28:19
    |
 LL |     fn bar<'a, L: X<&'a Nested<Self>>>();
-   |            --     ^^^^^^^^^^^^^^^^^^^ ...so that the reference type `&'a Nested<Self>` does not outlive the data it points at
+   |            --     ^^^^^^^^^^^^^^^^^^^ ...so that the type `Nested<Self>` will meet its required lifetime bounds
    |            |
    |            the parameter type `Self` must be valid for the lifetime `'a` as defined here...
    |
@@ -68,7 +68,7 @@ error[E0309]: the parameter type `L` may not live long enough
   --> $DIR/lifetime-doesnt-live-long-enough.rs:32:22
    |
 LL |     fn baz<'a, L, M: X<&'a Nested<L>>>() {
-   |            --        ^^^^^^^^^^^^^^^^ ...so that the reference type `&'a Nested<L>` does not outlive the data it points at
+   |            --        ^^^^^^^^^^^^^^^^ ...so that the type `Nested<L>` will meet its required lifetime bounds
    |            |
    |            the parameter type `L` must be valid for the lifetime `'a` as defined here...
    |

@@ -1,12 +1,11 @@
 error[E0700]: hidden type for `impl Trait + 'static` captures lifetime that does not appear in bounds
-  --> $DIR/opaque-type-param.rs:7:5
+  --> $DIR/opaque-type-param.rs:6:1
    |
 LL | fn foo<'a>(s: &'a str) -> impl Trait + 'static {
-   |        --                 -------------------- opaque type defined here
-   |        |
+   | ^^^^^^^--^^^^^^^^^^^^^^^^^--------------------
+   |        |                  |
+   |        |                  opaque type defined here
    |        hidden type `impl Trait + 'static` captures the lifetime `'a` as defined here
-LL |     bar(s)
-   |     ^^^^^^
    |
 help: add a `use<...>` bound to explicitly capture `'a`
    |

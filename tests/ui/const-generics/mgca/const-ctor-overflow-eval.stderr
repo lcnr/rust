@@ -27,6 +27,24 @@ LL |     S<{ U }>:;
    |     ^^^^^^^^ required by this bound in `S`
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
+error[E0275]: overflow evaluating the requirement `S<N>: ConstParamTy_`
+  --> $DIR/const-ctor-overflow-eval.rs:10:8
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |          ------------ in this derive macro expansion
+LL |
+LL | struct S<const N: U>()
+   |        ^
+
+error[E0275]: overflow evaluating whether `S<N>` is well-formed
+  --> $DIR/const-ctor-overflow-eval.rs:10:8
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |          ------------ in this derive macro expansion
+LL |
+LL | struct S<const N: U>()
+   |        ^
+
 error[E0275]: overflow evaluating whether `S<U>` is well-formed
   --> $DIR/const-ctor-overflow-eval.rs:12:5
    |
@@ -42,19 +60,52 @@ LL |     S<{ U }>:;
    |     ^^^^^^^^ required by this bound in `S`
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
-error[E0275]: overflow evaluating whether `S<U>` is well-formed
+error[E0275]: overflow evaluating the requirement `S<N>: StructuralPartialEq`
+  --> $DIR/const-ctor-overflow-eval.rs:10:8
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |                        --------- in this derive macro expansion
+LL |
+LL | struct S<const N: U>()
+   |        ^
+
+error[E0275]: overflow evaluating whether `S<N>` is well-formed
+  --> $DIR/const-ctor-overflow-eval.rs:10:8
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |                        --------- in this derive macro expansion
+LL |
+LL | struct S<const N: U>()
+   |        ^
+
+error[E0275]: overflow evaluating whether `&S<N>` is well-formed
   --> $DIR/const-ctor-overflow-eval.rs:8:24
    |
 LL | #[derive(ConstParamTy, PartialEq, Eq)]
    |                        ^^^^^^^^^
    |
-note: required by a bound in `S`
-  --> $DIR/const-ctor-overflow-eval.rs:12:5
+note: the requirement `&S<N> well-formed` appears on the `impl`'s method `eq` but not on the corresponding trait's method
+  --> $SRC_DIR/core/src/cmp.rs:LL:COL
    |
-LL | struct S<const N: U>()
-LL | where
-LL |     S<{ U }>:;
-   |     ^^^^^^^^ required by this bound in `S`
+   = note: in this trait
+  ::: $SRC_DIR/core/src/cmp.rs:LL:COL
+   |
+   = note: this trait's method doesn't have the requirement `&S<N> well-formed`
+
+error[E0275]: overflow evaluating whether `&S<N>` is well-formed
+  --> $DIR/const-ctor-overflow-eval.rs:8:24
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |                        ^^^^^^^^^
+   |
+note: the requirement `&S<N> well-formed` appears on the `impl`'s method `eq` but not on the corresponding trait's method
+  --> $SRC_DIR/core/src/cmp.rs:LL:COL
+   |
+   = note: in this trait
+  ::: $SRC_DIR/core/src/cmp.rs:LL:COL
+   |
+   = note: this trait's method doesn't have the requirement `&S<N> well-formed`
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
 error[E0275]: overflow evaluating whether `S<U>` is well-formed
   --> $DIR/const-ctor-overflow-eval.rs:12:5
@@ -71,6 +122,94 @@ LL |     S<{ U }>:;
    |     ^^^^^^^^ required by this bound in `S`
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
-error: aborting due to 5 previous errors
+error[E0275]: overflow evaluating the requirement `S<N>: PartialEq`
+  --> $DIR/const-ctor-overflow-eval.rs:10:8
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |                        --------- in this derive macro expansion
+LL |
+LL | struct S<const N: U>()
+   |        ^
+
+error[E0275]: overflow evaluating whether `S<N>` is well-formed
+  --> $DIR/const-ctor-overflow-eval.rs:10:8
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |                        --------- in this derive macro expansion
+LL |
+LL | struct S<const N: U>()
+   |        ^
+   |
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error[E0275]: overflow evaluating whether `S<N>` is well-formed
+  --> $DIR/const-ctor-overflow-eval.rs:8:24
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |                        ^^^^^^^^^
+
+error[E0275]: overflow evaluating whether `S<U>` is well-formed
+  --> $DIR/const-ctor-overflow-eval.rs:12:5
+   |
+LL |     S<{ U }>:;
+   |     ^^^^^^^^
+   |
+note: required by a bound in `S`
+  --> $DIR/const-ctor-overflow-eval.rs:12:5
+   |
+LL | struct S<const N: U>()
+LL | where
+LL |     S<{ U }>:;
+   |     ^^^^^^^^ required by this bound in `S`
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error[E0275]: overflow evaluating the requirement `S<N>: Eq`
+  --> $DIR/const-ctor-overflow-eval.rs:10:8
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |                                   -- in this derive macro expansion
+LL |
+LL | struct S<const N: U>()
+   |        ^
+
+error[E0275]: overflow evaluating whether `S<N>` is well-formed
+  --> $DIR/const-ctor-overflow-eval.rs:10:8
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |                                   -- in this derive macro expansion
+LL |
+LL | struct S<const N: U>()
+   |        ^
+
+error[E0275]: overflow evaluating whether `S<U>` is well-formed
+  --> $DIR/const-ctor-overflow-eval.rs:12:5
+   |
+LL |     S<{ U }>:;
+   |     ^^^^^^^^
+   |
+note: required by a bound in `S`
+  --> $DIR/const-ctor-overflow-eval.rs:12:5
+   |
+LL | struct S<const N: U>()
+LL | where
+LL |     S<{ U }>:;
+   |     ^^^^^^^^ required by this bound in `S`
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error[E0275]: overflow evaluating whether `&S<N>` is well-formed
+  --> $DIR/const-ctor-overflow-eval.rs:8:24
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |                        ^^^^^^^^^
+
+error[E0275]: overflow evaluating whether `&S<N>` is well-formed
+  --> $DIR/const-ctor-overflow-eval.rs:8:24
+   |
+LL | #[derive(ConstParamTy, PartialEq, Eq)]
+   |                        ^^^^^^^^^
+   |
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error: aborting due to 19 previous errors
 
 For more information about this error, try `rustc --explain E0275`.

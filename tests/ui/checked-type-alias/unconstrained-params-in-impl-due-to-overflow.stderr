@@ -4,13 +4,11 @@ error[E0207]: the type parameter `T` is not constrained by the impl trait, self 
 LL | impl<T> Loop<T> {}
    |      ^ unconstrained type parameter
 
-error[E0275]: overflow normalizing the type alias `Loop<T>`
+error[E0275]: overflow evaluating the requirement `Loop<T> == _`
   --> $DIR/unconstrained-params-in-impl-due-to-overflow.rs:6:1
    |
 LL | type Loop<T> = Loop<T>;
    | ^^^^^^^^^^^^
-   |
-   = note: in case this is a recursive type alias, consider using a struct, enum, or union instead
 
 error: aborting due to 2 previous errors
 

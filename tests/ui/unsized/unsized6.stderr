@@ -1,3 +1,19 @@
+error[E0277]: the size for values of type `X` cannot be known at compilation time
+  --> $DIR/unsized6.rs:7:12
+   |
+LL | fn f1<W: ?Sized, X: ?Sized, Y: ?Sized, Z: ?Sized>(x: &X) {
+   |                  - this type parameter needs to be `Sized`
+LL |     let _: W; // <-- this is OK, no bindings created, no initializer.
+LL |     let _: (isize, (X, isize));
+   |            ^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
+   |
+   = note: only the last element of a tuple may have a dynamically sized type
+help: consider removing the `?Sized` bound to make the type parameter `Sized`
+   |
+LL - fn f1<W: ?Sized, X: ?Sized, Y: ?Sized, Z: ?Sized>(x: &X) {
+LL + fn f1<W: ?Sized, X, Y: ?Sized, Z: ?Sized>(x: &X) {
+   |
+
 error[E0277]: the size for values of type `Y` cannot be known at compilation time
   --> $DIR/unsized6.rs:9:9
    |
@@ -17,22 +33,6 @@ help: consider borrowing here
    |
 LL |     let y: &Y;
    |            +
-
-error[E0277]: the size for values of type `X` cannot be known at compilation time
-  --> $DIR/unsized6.rs:7:12
-   |
-LL | fn f1<W: ?Sized, X: ?Sized, Y: ?Sized, Z: ?Sized>(x: &X) {
-   |                  - this type parameter needs to be `Sized`
-LL |     let _: W; // <-- this is OK, no bindings created, no initializer.
-LL |     let _: (isize, (X, isize));
-   |            ^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
-   |
-   = note: only the last element of a tuple may have a dynamically sized type
-help: consider removing the `?Sized` bound to make the type parameter `Sized`
-   |
-LL - fn f1<W: ?Sized, X: ?Sized, Y: ?Sized, Z: ?Sized>(x: &X) {
-LL + fn f1<W: ?Sized, X, Y: ?Sized, Z: ?Sized>(x: &X) {
-   |
 
 error[E0277]: the size for values of type `Z` cannot be known at compilation time
   --> $DIR/unsized6.rs:11:12

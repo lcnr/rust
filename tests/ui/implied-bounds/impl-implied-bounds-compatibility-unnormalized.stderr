@@ -9,15 +9,13 @@ note: first, the lifetime cannot outlive the lifetime `'s` as defined here...
    |
 LL |     fn get<'s>(s: &'s str, _: ()) -> &'static str;
    |            ^^
-note: ...so that the method type is compatible with trait
+note: ...so that the declared lifetime parameter bounds are satisfied
   --> $DIR/impl-implied-bounds-compatibility-unnormalized.rs:11:5
    |
 LL |     fn get<'s>(s: &'s str, _: <&'static &'s () as Project>::Ty) -> &'static str {
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: expected `fn(&'s _, ()) -> &'static _`
-              found `fn(&_, ()) -> &'static _`
    = note: but, the lifetime must be valid for the static lifetime...
-note: ...so that the reference type `&'static &()` does not outlive the data it points at
+note: ...so that the type `&()` will meet its required lifetime bounds
   --> $DIR/impl-implied-bounds-compatibility-unnormalized.rs:11:5
    |
 LL |     fn get<'s>(s: &'s str, _: <&'static &'s () as Project>::Ty) -> &'static str {

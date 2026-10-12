@@ -28,28 +28,31 @@ error[E0277]: expected an `Fn(bool)` closure, found `Bar`
 LL |     let foo: Box<dyn Fn(bool) -> usize> = Box::new(Bar);
    |                                           ^^^^^^^^^^^^^ expected an `Fn(bool)` closure, found `Bar`
    |
-help: the trait `Fn(bool)` is not implemented for `Bar`
+help: within `Bar`, the trait `Fn(bool)` is not implemented for `Bar`
   --> $DIR/method-suggestion-trait-with-extra-generics-no-ice.rs:15:1
    |
 LL | struct Bar;
    | ^^^^^^^^^^
+note: required because it appears within the type `Bar`
+  --> $DIR/method-suggestion-trait-with-extra-generics-no-ice.rs:15:8
+   |
+LL | struct Bar;
+   |        ^^^
+   = note: required for `Box<Bar>` to implement `CoerceUnsized<Box<dyn Fn(bool) -> usize>>`
    = note: required for the cast from `Box<Bar>` to `Box<dyn Fn(bool) -> usize>`
 
-error[E0599]: `Box<dyn Fn(bool) -> usize>` is not an iterator
+error[E0599]: the method `take` exists for struct `Box<dyn Fn(bool) -> usize>`, but its trait bounds were not satisfied
   --> $DIR/method-suggestion-trait-with-extra-generics-no-ice.rs:22:9
    |
 LL |     foo.take()
-   |         ^^^^
-   |         |
-   |         this is an associated function, not a method
-   |         `Box<dyn Fn(bool) -> usize>` is not an iterator
+   |         ^^^^ this is an associated function, not a method
    |
    = note: found the following associated functions; to be used as methods, functions must have a `self` parameter
    = note: the candidate is defined in an impl for the type `Box<T, A>`
    = note: the following trait bounds were not satisfied:
            `dyn Fn(bool) -> usize: Iterator`
            which is required by `Box<dyn Fn(bool) -> usize>: Iterator`
-           `Box<dyn Fn(bool) -> usize>: Iterator`
+           `dyn Fn(bool) -> usize: Iterator`
            which is required by `&mut Box<dyn Fn(bool) -> usize>: Iterator`
            `dyn Fn(bool) -> usize: Iterator`
            which is required by `&mut dyn Fn(bool) -> usize: Iterator`

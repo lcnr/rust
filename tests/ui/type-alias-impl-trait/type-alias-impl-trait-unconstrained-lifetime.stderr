@@ -4,16 +4,15 @@ error[E0207]: the lifetime parameter `'a` is not constrained by the impl trait, 
 LL | impl<'a, I: Iterator<Item = i32>> Trait for (i32, I) {
    |      ^^ unconstrained lifetime parameter
 
-error[E0792]: expected generic lifetime parameter, found `'_`
-  --> $DIR/type-alias-impl-trait-unconstrained-lifetime.rs:14:9
+error[E0275]: overflow evaluating the requirement `<(i32, I) as Trait>::Associated == (i32, _)`
+  --> $DIR/type-alias-impl-trait-unconstrained-lifetime.rs:13:22
    |
-LL | impl<'a, I: Iterator<Item = i32>> Trait for (i32, I) {
-   |      -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |         (0_i32, [0_i32].iter().copied())
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     fn into(self) -> Self::Associated {
+   |                      ^^^^^^^^^^^^^^^^
+   |
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`type_alias_impl_trait_unconstrained_lifetime`)
 
 error: aborting due to 2 previous errors
 
-Some errors have detailed explanations: E0207, E0792.
+Some errors have detailed explanations: E0207, E0275.
 For more information about an error, try `rustc --explain E0207`.

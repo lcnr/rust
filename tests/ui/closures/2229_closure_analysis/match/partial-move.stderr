@@ -1,75 +1,51 @@
-error[E0373]: closure may outlive the current function, but it borrows `x.0`, which is owned by the current function
-  --> $DIR/partial-move.rs:35:5
+error[E0597]: `x.0` does not live long enough
+  --> $DIR/partial-move.rs:37:15
    |
+LL | pub fn test_enum1(x: Enum) -> impl FnOnce() {
+   |                   - binding `x` declared here
 LL |     || {
-   |     ^^ may outlive borrowed value `x.0`
+   |     -- value captured here
 LL |
 LL |         match x {
-   |               - `x.0` is borrowed here
-   |
-note: closure is returned here
-  --> $DIR/partial-move.rs:35:5
-   |
-LL | /     || {
-LL | |
-LL | |         match x {
-LL | |             Enum::A(a, b) => {
-...  |
-LL | |     }
-   | |_____^
-help: to force the closure to take ownership of `x.0` (and any other referenced variables), use the `move` keyword
-   |
-LL |     move || {
-   |     ++++
+   |               ^ borrowed value does not live long enough
+...
+LL | }
+   | -- borrow later used here
+   | |
+   | `x.0` dropped here while still borrowed
 
-error[E0373]: closure may outlive the current function, but it borrows `x.0`, which is owned by the current function
-  --> $DIR/partial-move.rs:47:5
+error[E0597]: `x.0` does not live long enough
+  --> $DIR/partial-move.rs:49:15
    |
+LL | pub fn test_enum2(x: Enum) -> impl FnOnce() {
+   |                   - binding `x` declared here
 LL |     || {
-   |     ^^ may outlive borrowed value `x.0`
+   |     -- value captured here
 LL |
 LL |         match x {
-   |               - `x.0` is borrowed here
-   |
-note: closure is returned here
-  --> $DIR/partial-move.rs:47:5
-   |
-LL | /     || {
-LL | |
-LL | |         match x {
-LL | |             Enum::A(a, b) => {
-...  |
-LL | |     }
-   | |_____^
-help: to force the closure to take ownership of `x.0` (and any other referenced variables), use the `move` keyword
-   |
-LL |     move || {
-   |     ++++
+   |               ^ borrowed value does not live long enough
+...
+LL | }
+   | -- borrow later used here
+   | |
+   | `x.0` dropped here while still borrowed
 
-error[E0373]: closure may outlive the current function, but it borrows `x.0`, which is owned by the current function
-  --> $DIR/partial-move.rs:59:5
+error[E0597]: `x.0` does not live long enough
+  --> $DIR/partial-move.rs:61:15
    |
+LL | pub fn test_struct(x: Struct) -> impl FnOnce() {
+   |                    - binding `x` declared here
 LL |     || {
-   |     ^^ may outlive borrowed value `x.0`
+   |     -- value captured here
 LL |
 LL |         match x {
-   |               - `x.0` is borrowed here
-   |
-note: closure is returned here
-  --> $DIR/partial-move.rs:59:5
-   |
-LL | /     || {
-LL | |
-LL | |         match x {
-LL | |             Struct(a, b) => {
-...  |
-LL | |     }
-   | |_____^
-help: to force the closure to take ownership of `x.0` (and any other referenced variables), use the `move` keyword
-   |
-LL |     move || {
-   |     ++++
+   |               ^ borrowed value does not live long enough
+...
+LL | }
+   | -- borrow later used here
+   | |
+   | `x.0` dropped here while still borrowed
 
 error: aborting due to 3 previous errors
 
-For more information about this error, try `rustc --explain E0373`.
+For more information about this error, try `rustc --explain E0597`.

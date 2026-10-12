@@ -1,11 +1,11 @@
 error: lifetime may not live long enough
-  --> $DIR/resume-arg-outlives.rs:17:5
+  --> $DIR/resume-arg-outlives.rs:8:1
    |
 LL | fn demo<'not_static>(s: &'not_static str) -> Pin<Box<impl Coroutine<&'not_static str> + 'static>> {
-   |         ----------- lifetime `'not_static` defined here
-...
-LL |     generator
-   |     ^^^^^^^^^ returning this value requires that `'not_static` must outlive `'static`
+   | ^^^^^^^^-----------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |       |
+   | |       lifetime `'not_static` defined here
+   | requires that `'not_static` must outlive `'static`
    |
 help: consider changing `impl Coroutine<&'not_static str> + 'static`'s explicit `'static` bound to the lifetime of argument `s`
    |

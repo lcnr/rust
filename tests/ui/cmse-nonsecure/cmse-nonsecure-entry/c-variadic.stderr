@@ -31,16 +31,12 @@ LL | async unsafe extern "cmse-nonsecure-entry" fn async_is_not_allowed() {
    |                                                                     ^
 
 error[E0700]: hidden type for `impl Future<Output = ()>` captures lifetime that does not appear in bounds
-  --> $DIR/c-variadic.rs:18:76
+  --> $DIR/c-variadic.rs:18:1
    |
-LL |   async unsafe extern "cmse-nonsecure-entry" fn async_and_c_variadic(_: ...) {
-   |  _---------------------------------------------------------------------------^
-   | | |                                                                         |
-   | | |                                                                         opaque type defined here
-   | | hidden type `{async fn body of async_and_c_variadic()}` captures the anonymous lifetime as defined here
-...  |
-LL | | }
-   | |_^
+LL | async unsafe extern "cmse-nonsecure-entry" fn async_and_c_variadic(_: ...) {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^- opaque type defined here
+   | |
+   | hidden type `{async fn body of async_and_c_variadic()}` captures the anonymous lifetime as defined here
 
 error: aborting due to 5 previous errors
 

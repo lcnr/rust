@@ -1,26 +1,20 @@
-error[E0373]: coroutine may outlive the current function, but it borrows `x`, which is owned by the current function
-  --> $DIR/static-move-suggestion.rs:10:5
+error[E0597]: `x` does not live long enough
+  --> $DIR/static-move-suggestion.rs:13:9
    |
+LL |     let x = 0;
+   |         - binding `x` declared here
+LL |     #[coroutine]
 LL |     static || {
-   |     ^^^^^^^^^ may outlive borrowed value `x`
+   |     --------- value captured here by coroutine
 ...
 LL |         x
-   |         - `x` is borrowed here
-   |
-note: coroutine is returned here
-  --> $DIR/static-move-suggestion.rs:10:5
-   |
-LL | /     static || {
-LL | |
-LL | |         yield;
-LL | |         x
-LL | |     }
-   | |_____^
-help: to force the coroutine to take ownership of `x` (and any other referenced variables), use the `move` keyword
-   |
-LL |     static move || {
-   |            ++++
+   |         ^ borrowed value does not live long enough
+LL |     }
+LL | }
+   | -- borrow later used here
+   | |
+   | `x` dropped here while still borrowed
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0373`.
+For more information about this error, try `rustc --explain E0597`.

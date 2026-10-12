@@ -9,22 +9,17 @@ note: first, the lifetime cannot outlive the lifetime `'a` as defined here...
    |
 LL | impl<'a, K, V, R> MapAssertion<'a, K, V, R> for Subject<'a, HashMap<K, V>, (), R> {
    |      ^^
-note: ...so that the reference type `&Subject<'a, HashMap<K, V>, (), R>` does not outlive the data it points at
+note: ...so that the type `Subject<'a, HashMap<K, V>, (), R>` will meet its required lifetime bounds
   --> $DIR/impl-trait-lifetime-conflict-hashmap-keys.rs:13:5
    |
 LL |     fn key_set(&self) -> Subject<'static, Keys<K, V>, (), R> {
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    = note: but, the lifetime must be valid for the static lifetime...
-note: ...so that the type `std::collections::hash_map::Keys<'_, K, V>` will meet its required lifetime bounds...
+note: ...so that the type `std::collections::hash_map::Keys<'_, K, V>` will meet its required lifetime bounds
   --> $DIR/impl-trait-lifetime-conflict-hashmap-keys.rs:13:5
    |
 LL |     fn key_set(&self) -> Subject<'static, Keys<K, V>, (), R> {
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-note: ...that is required by this bound
-  --> $DIR/impl-trait-lifetime-conflict-hashmap-keys.rs:10:29
-   |
-LL | struct Subject<'a, T, V, R>(PhantomData<(&'a T, V, R)>);
-   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error[E0308]: mismatched types
   --> $DIR/impl-trait-lifetime-conflict-hashmap-keys.rs:13:26

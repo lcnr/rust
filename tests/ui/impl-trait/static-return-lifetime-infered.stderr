@@ -1,12 +1,11 @@
 error[E0700]: hidden type for `impl Iterator<Item = u32>` captures lifetime that does not appear in bounds
-  --> $DIR/static-return-lifetime-infered.rs:7:9
+  --> $DIR/static-return-lifetime-infered.rs:6:5
    |
 LL |     fn iter_values_anon(&self) -> impl Iterator<Item=u32> {
-   |                         -----     ----------------------- opaque type defined here
-   |                         |
+   |     ^^^^^^^^^^^^^^^^^^^^-----^^^^^-----------------------
+   |                         |         |
+   |                         |         opaque type defined here
    |                         hidden type `Map<Iter<'_, _>, {closure@...}>` captures the anonymous lifetime defined here
-LL |         self.x.iter().map(|a| a.0)
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: add a `use<...>` bound to explicitly capture `'_`
    |
@@ -14,14 +13,13 @@ LL |     fn iter_values_anon(&self) -> impl Iterator<Item=u32> + use<'_> {
    |                                                           +++++++++
 
 error[E0700]: hidden type for `impl Iterator<Item = u32>` captures lifetime that does not appear in bounds
-  --> $DIR/static-return-lifetime-infered.rs:11:9
+  --> $DIR/static-return-lifetime-infered.rs:10:5
    |
 LL |     fn iter_values<'a>(&'a self) -> impl Iterator<Item=u32> {
-   |                    --               ----------------------- opaque type defined here
-   |                    |
+   |     ^^^^^^^^^^^^^^^--^^^^^^^^^^^^^^^-----------------------
+   |                    |                |
+   |                    |                opaque type defined here
    |                    hidden type `Map<Iter<'a, _>, {closure@...}>` captures the lifetime `'a` as defined here
-LL |         self.x.iter().map(|a| a.0)
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: add a `use<...>` bound to explicitly capture `'a`
    |

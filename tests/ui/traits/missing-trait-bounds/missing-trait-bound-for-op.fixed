@@ -1,6 +1,6 @@
 //@ run-rustfix
 
-pub fn foo<T: std::cmp::PartialEq>(s: &[T], t: &[T]) {
+pub fn foo<T>(s: &[T], t: &[T]) where &[T]: PartialEq<&[T]> {
     let _ = s == t; //~ ERROR binary operation `==` cannot be applied to type `&[T]`
 }
 

@@ -423,9 +423,6 @@ error[E0277]: expected an `Fn()` closure, found `unsafe extern "custom" fn()`
    |
 LL | fn no_promotion_to_fn_trait(f: unsafe extern "custom" fn()) -> impl Fn() {
    |                                                                ^^^^^^^^^ call the function in a closure: `|| unsafe { /* code */ }`
-LL |
-LL |     f
-   |     - return type was inferred to be `unsafe extern "custom" fn()` here
    |
    = help: the trait `Fn()` is not implemented for `unsafe extern "custom" fn()`
    = note: wrap the `unsafe extern "custom" fn()` in a closure with no arguments: `|| { /* code */ }`

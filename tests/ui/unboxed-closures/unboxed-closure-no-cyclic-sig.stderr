@@ -1,13 +1,16 @@
-error[E0644]: closure/coroutine type that references itself
+error[E0277]: expected an `FnOnce(Option<{closure@$DIR/unboxed-closure-no-cyclic-sig.rs:8:7: 8:10}>)` closure, found `{closure@$DIR/unboxed-closure-no-cyclic-sig.rs:8:7: 8:10}`
   --> $DIR/unboxed-closure-no-cyclic-sig.rs:8:7
    |
 LL |     g(|_| {  });
-   |       ^^^ recursive type with infinite-size name
+   |     - ^^^^^^^^ expected an `FnOnce(Option<{closure@$DIR/unboxed-closure-no-cyclic-sig.rs:8:7: 8:10}>)` closure, found `{closure@$DIR/unboxed-closure-no-cyclic-sig.rs:8:7: 8:10}`
+   |     |
+   |     required by a bound introduced by this call
    |
-   = note: closures cannot capture themselves or take themselves as argument;
-           this error may be the result of a recent compiler bug-fix,
-           see issue #46062 <https://github.com/rust-lang/rust/issues/46062>
-           for more information
+help: the trait `FnOnce(Option<{closure@$DIR/unboxed-closure-no-cyclic-sig.rs:8:7: 8:10}>)` is not implemented for closure `{closure@$DIR/unboxed-closure-no-cyclic-sig.rs:8:7: 8:10}`
+  --> $DIR/unboxed-closure-no-cyclic-sig.rs:8:7
+   |
+LL |     g(|_| {  });
+   |       ^^^
 note: required by a bound in `g`
   --> $DIR/unboxed-closure-no-cyclic-sig.rs:5:24
    |
@@ -16,4 +19,4 @@ LL | fn g<F>(_: F) where F: FnOnce(Option<F>) {}
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0644`.
+For more information about this error, try `rustc --explain E0277`.

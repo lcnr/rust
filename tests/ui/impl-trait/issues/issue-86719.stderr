@@ -19,6 +19,7 @@ error[E0282]: type annotations needed
 LL |         |_| true
    |          ^
    |
+   = note: cannot infer type of hidden type of opaque
 help: consider giving this closure parameter an explicit type
    |
 LL |         |_: /* Type */| true

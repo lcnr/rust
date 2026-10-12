@@ -1,9 +1,25 @@
-error[E0608]: cannot index into a value of type `Map<[usize; 1], {closure@$DIR/bad-index-modulo-higher-ranked-regions.rs:23:32: 23:45}>`
-  --> $DIR/bad-index-modulo-higher-ranked-regions.rs:23:55
+error[E0277]: expected an `FnOnce(&[usize; 1], usize)` closure, found `{closure@$DIR/bad-index-modulo-higher-ranked-regions.rs:23:32: 23:45}`
+  --> $DIR/bad-index-modulo-higher-ranked-regions.rs:23:5
    |
 LL |     Map { inner: [0_usize], f: |_, i: usize| 1_usize }[0];
-   |                                                       ^^^
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected an `FnOnce(&[usize; 1], usize)` closure, found `{closure@$DIR/bad-index-modulo-higher-ranked-regions.rs:23:32: 23:45}`
+   |
+help: the trait `for<'a> FnOnce(&'a [usize; 1], usize)` is not implemented for closure `{closure@$DIR/bad-index-modulo-higher-ranked-regions.rs:23:32: 23:45}`
+  --> $DIR/bad-index-modulo-higher-ranked-regions.rs:23:32
+   |
+LL |     Map { inner: [0_usize], f: |_, i: usize| 1_usize }[0];
+   |                                ^^^^^^^^^^^^^
+   = note: expected a closure with signature `for<'a> fn(&'a _, _)`
+              found a closure with signature `fn(&_, _)`
+note: required for `Map<[usize; 1], {closure@$DIR/bad-index-modulo-higher-ranked-regions.rs:23:32: 23:45}>` to implement `Index<usize>`
+  --> $DIR/bad-index-modulo-higher-ranked-regions.rs:10:17
+   |
+LL | impl<T, F, Idx> Index<Idx> for Map<T, F>
+   |                 ^^^^^^^^^^     ^^^^^^^^^
+...
+LL |     F: FnOnce(&T, Idx) -> Idx,
+   |                           --- unsatisfied trait bound introduced here
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0608`.
+For more information about this error, try `rustc --explain E0277`.

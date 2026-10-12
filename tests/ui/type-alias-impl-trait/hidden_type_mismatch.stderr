@@ -1,11 +1,14 @@
 error[E0271]: type mismatch resolving `<() as Proj>::Assoc == i32`
-  --> $DIR/hidden_type_mismatch.rs:45:9
+  --> $DIR/hidden_type_mismatch.rs:39:5
    |
-LL |     pub type Sep = impl Sized + std::fmt::Display;
-   |                    ------------------------------ the found opaque type
+LL |       pub type Sep = impl Sized + std::fmt::Display;
+   |                      ------------------------------ the found opaque type
 ...
-LL |         Bar { inner: 1i32, _marker: () }
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<() as Proj>::Assoc == i32`
+LL | /     pub fn define_tait() -> Tait
+LL | |     where
+...  |
+LL | |         (): Proj<Assoc = i32>,
+   | |______________________________^ type mismatch resolving `<() as Proj>::Assoc == i32`
    |
 note: expected this to be `i32`
   --> $DIR/hidden_type_mismatch.rs:21:22

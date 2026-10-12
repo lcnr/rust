@@ -1,18 +1,38 @@
-error[E0792]: expected generic type parameter, found `impl Sized`
+error[E0308]: mismatched types
   --> $DIR/fuzzer-ice-issue-112201.rs:11:5
    |
+LL | pub fn wrap<T>(x: T) -> impl Sized {
+   |                         ---------- the expected opaque type
+...
 LL | fn repeat_helper<T>(x: T) -> impl Sized {
-   |                  - this generic parameter must be used with a generic type parameter
+   |                  - found this type parameter
 LL |     return x;
 LL |     repeat_helper(wrap(x))
-   |     ^^^^^^^^^^^^^^^^^^^^^^
+   |     ^^^^^^^^^^^^^^^^^^^^^^ expected opaque type, found type parameter `T`
+   |
+   = note: expected opaque type `impl Sized`
+           found type parameter `T`
+   = help: type parameters must be constrained to match other types
+   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
 
-error: type parameter `T` is part of concrete type but not used in parameter list for the `impl Trait` type alias
+error[E0308]: mismatched types
   --> $DIR/fuzzer-ice-issue-112201.rs:11:5
    |
+LL | pub fn wrap<T>(x: T) -> impl Sized {
+   |                         ---------- the expected opaque type
+...
+LL | fn repeat_helper<T>(x: T) -> impl Sized {
+   |                  - found this type parameter
+LL |     return x;
 LL |     repeat_helper(wrap(x))
-   |     ^^^^^^^^^^^^^^^^^^^^^^
+   |     ^^^^^^^^^^^^^^^^^^^^^^ expected opaque type, found type parameter `T`
+   |
+   = note: expected opaque type `impl Sized`
+           found type parameter `T`
+   = help: type parameters must be constrained to match other types
+   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
 error: aborting due to 2 previous errors
 
-For more information about this error, try `rustc --explain E0792`.
+For more information about this error, try `rustc --explain E0308`.

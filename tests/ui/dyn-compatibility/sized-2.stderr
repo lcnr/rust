@@ -13,6 +13,43 @@ LL | trait Bar
 LL |     where Self : Sized
    |                  ^^^^^ ...because it requires `Self: Sized`
 
-error: aborting due to 1 previous error
+error[E0038]: the trait `Bar` is not dyn compatible
+  --> $DIR/sized-2.rs:10:35
+   |
+LL | fn make_bar<T:Bar>(t: &T) -> &dyn Bar {
+   |                                   ^^^ `Bar` is not dyn compatible
+   |
+note: for a trait to be dyn compatible it needs to allow building a vtable
+      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
+  --> $DIR/sized-2.rs:5:18
+   |
+LL | trait Bar
+   |       --- this trait is not dyn compatible...
+LL |     where Self : Sized
+   |                  ^^^^^ ...because it requires `Self: Sized`
+help: consider using an opaque type instead
+   |
+LL - fn make_bar<T:Bar>(t: &T) -> &dyn Bar {
+LL + fn make_bar<T:Bar>(t: &T) -> &impl Bar {
+   |
 
-For more information about this error, try `rustc --explain E0038`.
+error[E0308]: mismatched types
+  --> $DIR/sized-2.rs:12:5
+   |
+LL | fn make_bar<T:Bar>(t: &T) -> &dyn Bar {
+   |             -                -------- expected `&dyn Bar` because of return type
+   |             |
+   |             found this type parameter
+LL |
+LL |     t
+   |     ^ expected `&dyn Bar`, found `&T`
+   |
+   = note: expected reference `&dyn Bar`
+              found reference `&T`
+   = help: type parameters must be constrained to match other types
+   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
+
+error: aborting due to 3 previous errors
+
+Some errors have detailed explanations: E0038, E0308.
+For more information about an error, try `rustc --explain E0038`.

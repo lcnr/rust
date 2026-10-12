@@ -10,63 +10,23 @@ note: for a trait to be dyn compatible it needs to allow building a vtable
    |
    = note: the trait is not dyn compatible because it opted out of dyn-compatibility
 
-error[E0038]: the trait `std::ops::Receiver` is not dyn compatible
+error[E0307]: invalid `self` parameter type: `&dyn std::ops::Receiver<Target = Thing>`
   --> $DIR/arbitrary-self-types-dyn-receiver.rs:14:18
    |
 LL |     fn foo(self: &dyn Receiver<Target=Self>) {
-   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ `std::ops::Receiver` is not dyn compatible
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-note: for a trait to be dyn compatible it needs to allow building a vtable
-      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
-  --> $SRC_DIR/core/src/ops/deref.rs:LL:COL
-   |
-   = note: the trait is not dyn compatible because it opted out of dyn-compatibility
+   = note: type of `self` must be `Self` or some type implementing `Receiver`
+   = help: consider changing to `self`, `&self`, `&mut self`, or a type implementing `Receiver` such as `self: Box<Self>`, `self: Rc<Self>`, or `self: Arc<Self>`
 
-error[E0038]: the trait `std::ops::Receiver` is not dyn compatible
-  --> $DIR/arbitrary-self-types-dyn-receiver.rs:14:19
-   |
-LL |     fn foo(self: &dyn Receiver<Target=Self>) {
-   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^ `std::ops::Receiver` is not dyn compatible
-   |
-note: for a trait to be dyn compatible it needs to allow building a vtable
-      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
-  --> $SRC_DIR/core/src/ops/deref.rs:LL:COL
-   |
-   = note: the trait is not dyn compatible because it opted out of dyn-compatibility
-help: you might have meant to use `Self` to refer to the implementing type
-   |
-LL -     fn foo(self: &dyn Receiver<Target=Self>) {
-LL +     fn foo(self: &Self) {
-   |
-
-error[E0038]: the trait `std::ops::Receiver` is not dyn compatible
+error[E0307]: invalid `self` parameter type: `&dyn std::ops::Receiver<Target = Self>`
   --> $DIR/arbitrary-self-types-dyn-receiver.rs:7:18
    |
 LL |     fn foo(self: &dyn Receiver<Target=Self>);
-   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ `std::ops::Receiver` is not dyn compatible
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-note: for a trait to be dyn compatible it needs to allow building a vtable
-      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
-  --> $SRC_DIR/core/src/ops/deref.rs:LL:COL
-   |
-   = note: the trait is not dyn compatible because it opted out of dyn-compatibility
-
-error[E0038]: the trait `std::ops::Receiver` is not dyn compatible
-  --> $DIR/arbitrary-self-types-dyn-receiver.rs:7:19
-   |
-LL |     fn foo(self: &dyn Receiver<Target=Self>);
-   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^ `std::ops::Receiver` is not dyn compatible
-   |
-note: for a trait to be dyn compatible it needs to allow building a vtable
-      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
-  --> $SRC_DIR/core/src/ops/deref.rs:LL:COL
-   |
-   = note: the trait is not dyn compatible because it opted out of dyn-compatibility
-help: you might have meant to use `Self` to refer to the implementing type
-   |
-LL -     fn foo(self: &dyn Receiver<Target=Self>);
-LL +     fn foo(self: &Self);
-   |
+   = note: type of `self` must be `Self` or some type implementing `Receiver`
+   = help: consider changing to `self`, `&self`, `&mut self`, or a type implementing `Receiver` such as `self: Box<Self>`, `self: Rc<Self>`, or `self: Arc<Self>`
 
 error[E0038]: the trait `std::ops::Receiver` is not dyn compatible
   --> $DIR/arbitrary-self-types-dyn-receiver.rs:24:17
@@ -80,6 +40,7 @@ note: for a trait to be dyn compatible it needs to allow building a vtable
    |
    = note: the trait is not dyn compatible because it opted out of dyn-compatibility
 
-error: aborting due to 6 previous errors
+error: aborting due to 4 previous errors
 
-For more information about this error, try `rustc --explain E0038`.
+Some errors have detailed explanations: E0038, E0307.
+For more information about an error, try `rustc --explain E0038`.

@@ -1,3 +1,21 @@
+error[E0277]: the trait bound `for<'a> fn(&'a ()): X` is not satisfied
+  --> $DIR/hrtb-fn-ptr-impl-not-general-enough-57936.rs:26:16
+   |
+LL |     indirect::<fn(&())>();
+   |                ^^^^^^^ the trait `X` is not implemented for `for<'a> fn(&'a ())`
+   |
+help: the trait `X` is not implemented for `for<'a> fn(&'a ())`
+      but it is implemented for `fn(&())`
+  --> $DIR/hrtb-fn-ptr-impl-not-general-enough-57936.rs:13:1
+   |
+LL | impl<'a> X for fn(&'a ()) {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `indirect`
+  --> $DIR/hrtb-fn-ptr-impl-not-general-enough-57936.rs:21:16
+   |
+LL | fn indirect<T: X>() {
+   |                ^ required by this bound in `indirect`
+
 error[E0599]: no associated function or constant named `make_g` found for fn pointer `for<'a> fn(&'a ())` in the current scope
   --> $DIR/hrtb-fn-ptr-impl-not-general-enough-57936.rs:31:24
    |
@@ -11,19 +29,7 @@ note: `X` defines an item `make_g`, perhaps you need to implement it
 LL | trait X {
    | ^^^^^^^
 
-error: implementation of `X` is not general enough
-  --> $DIR/hrtb-fn-ptr-impl-not-general-enough-57936.rs:26:5
-   |
-LL |     indirect::<fn(&())>();
-   |     ^^^^^^^^^^^^^^^^^^^^^
-   |
-note: `X` would have to be implemented for the type `for<'a> fn(&'a ())`
-  --> $DIR/hrtb-fn-ptr-impl-not-general-enough-57936.rs:21:16
-   |
-LL | fn indirect<T: X>() {
-   |                ^ required by this bound in `indirect`
-   = note: ...but `X` is actually implemented for the type `fn(&'0 ())`, for some specific lifetime `'0`
-
 error: aborting due to 2 previous errors
 
-For more information about this error, try `rustc --explain E0599`.
+Some errors have detailed explanations: E0277, E0599.
+For more information about an error, try `rustc --explain E0277`.

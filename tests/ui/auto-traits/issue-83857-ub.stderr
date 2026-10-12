@@ -67,6 +67,29 @@ help: consider introducing a `where` clause, but there might be an alternative b
 LL | fn generic<T, U>(v: Foo<T, U>, f: fn(<Foo<T, U> as WithAssoc>::Output) -> i32) where Foo<T, U>: Send {
    |                                                                                +++++++++++++++++++++
 
-error: aborting due to 3 previous errors
+error[E0277]: `Foo<T, U>` cannot be sent between threads safely
+  --> $DIR/issue-83857-ub.rs:24:7
+   |
+LL |     f(foo(v));
+   |       ^^^^^^ `Foo<T, U>` cannot be sent between threads safely
+   |
+help: the trait `Send` is not implemented for `Foo<T, U>`
+  --> $DIR/issue-83857-ub.rs:6:1
+   |
+LL | struct Foo<T, U>(Always<T, U>);
+   | ^^^^^^^^^^^^^^^^
+note: required for `Foo<T, U>` to implement `WithAssoc`
+  --> $DIR/issue-83857-ub.rs:14:15
+   |
+LL | impl<T: Send> WithAssoc for T {
+   |         ----  ^^^^^^^^^     ^
+   |         |
+   |         unsatisfied trait bound introduced here
+help: consider introducing a `where` clause, but there might be an alternative better way to express this requirement
+   |
+LL | fn generic<T, U>(v: Foo<T, U>, f: fn(<Foo<T, U> as WithAssoc>::Output) -> i32) where Foo<T, U>: Send {
+   |                                                                                +++++++++++++++++++++
+
+error: aborting due to 4 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

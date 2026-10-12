@@ -41,6 +41,12 @@ help: the trait `Mirror` is implemented for `dyn A`
 LL | impl<T: ?Sized> Mirror for A {
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+error: the type `&'a <(dyn B + 'static) as Mirror>::Assoc` is not well-formed
+  --> $DIR/projection-dyn-associated-type.rs:23:6
+   |
+LL | ) -> &'a <dyn B + 'static as Mirror>::Assoc {
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 error[E0277]: the trait bound `(dyn B + 'static): Mirror` is not satisfied
   --> $DIR/projection-dyn-associated-type.rs:23:6
    |
@@ -54,7 +60,7 @@ LL | impl<T: ?Sized> Mirror for A {
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
-error: aborting due to 4 previous errors; 1 warning emitted
+error: aborting due to 5 previous errors; 1 warning emitted
 
 Some errors have detailed explanations: E0207, E0277.
 For more information about an error, try `rustc --explain E0207`.

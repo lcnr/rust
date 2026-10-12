@@ -10,6 +10,18 @@ help: consider `await`ing on the `Future`
 LL |     SadGirl {}.call().await?;
    |                      ++++++
 
-error: aborting due to 1 previous error
+error[E0277]: the `?` operator can only be used in an async function that returns `Result` or `Option` (or another type that implements `FromResidual`)
+  --> $DIR/issue-72766.rs:14:5
+   |
+LL |   async fn async_main() -> Result<(), ()> {
+   |  _________________________________________-
+LL | |     // should be `.call().await?`
+LL | |     SadGirl {}.call()?;
+   | |     ^^^^^^^^^^^^^^^^^^ cannot use the `?` operator in an async function that returns `impl Future<Output = Result<(), ()>>`
+LL | |     Ok(())
+LL | | }
+   | |_- this function should return `Result` or `Option` to accept `?`
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

@@ -1,4 +1,4 @@
-error[E0515]: cannot return reference to function parameter `a`
+error[E0597]: `a` does not live long enough
   --> $DIR/generator_returned_from_fn.rs:25:13
    |
 LL |       iter! { || {
@@ -8,35 +8,27 @@ LL | |         for x in 5..10 {
 LL | |             yield x * 2;
 LL | |         }
 LL | |     } }
-   | |_____^ returns a reference to data owned by the current function
+   | |_____^ borrowed value does not live long enough
+LL |   }
+   |    -
+   |    |
+   |    `a` dropped here while still borrowed
+   |    borrow later used here
 
 error: gen closure does not implement `Fn` because it captures state from its environment
   --> $DIR/generator_returned_from_fn.rs:34:13
    |
-LL |       iter! { move || {
-   |  _____________-^^^^^^
-LL | |         yield *a;
-LL | |         for x in 5..10 {
-LL | |             yield x * 2;
-LL | |         }
-LL | |     } }
-   | |_____- return type was inferred to be `{gen closure@$DIR/generator_returned_from_fn.rs:34:13: 34:20}` here
+LL |     iter! { move || {
+   |             ^^^^^^^
 
 error[E0700]: hidden type for `impl FnOnce() -> impl Iterator<Item = u32>` captures lifetime that does not appear in bounds
-  --> $DIR/generator_returned_from_fn.rs:43:13
+  --> $DIR/generator_returned_from_fn.rs:42:1
    |
-LL |   fn capture_move_once(a: &u32) -> impl FnOnce() -> impl Iterator<Item = u32> {
-   |                           ----     ------------------------------------------ opaque type defined here
-   |                           |
-   |                           hidden type `{gen closure@...}` captures the anonymous lifetime defined here
-LL |       iter! { move || {
-   |  _____________^
-LL | |
-LL | |
-LL | |         yield *a;
-...  |
-LL | |     } }
-   | |_____^
+LL | fn capture_move_once(a: &u32) -> impl FnOnce() -> impl Iterator<Item = u32> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^----^^^^^------------------------------------------
+   |                         |        |
+   |                         |        opaque type defined here
+   |                         hidden type `{gen closure@...}` captures the anonymous lifetime defined here
    |
 help: add a `use<...>` bound to explicitly capture `'_`
    |
@@ -44,20 +36,13 @@ LL | fn capture_move_once(a: &u32) -> impl FnOnce() -> impl Iterator<Item = u32>
    |                                                                             +++++++++
 
 error[E0700]: hidden type for `impl Iterator<Item = u32>` captures lifetime that does not appear in bounds
-  --> $DIR/generator_returned_from_fn.rs:43:13
+  --> $DIR/generator_returned_from_fn.rs:42:1
    |
-LL |   fn capture_move_once(a: &u32) -> impl FnOnce() -> impl Iterator<Item = u32> {
-   |                           ----                      ------------------------- opaque type defined here
-   |                           |
-   |                           hidden type `{gen closure body@...}` captures the anonymous lifetime defined here
-LL |       iter! { move || {
-   |  _____________^
-LL | |
-LL | |
-LL | |         yield *a;
-...  |
-LL | |     } }
-   | |_____^
+LL | fn capture_move_once(a: &u32) -> impl FnOnce() -> impl Iterator<Item = u32> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^----^^^^^^^^^^^^^^^^^^^^^^-------------------------
+   |                         |                         |
+   |                         |                         opaque type defined here
+   |                         hidden type `{gen closure body@...}` captures the anonymous lifetime defined here
    |
 help: add a `use<...>` bound to explicitly capture `'_`
    |
@@ -66,5 +51,5 @@ LL | fn capture_move_once(a: &u32) -> impl FnOnce() -> impl Iterator<Item = u32>
 
 error: aborting due to 4 previous errors
 
-Some errors have detailed explanations: E0515, E0700.
-For more information about an error, try `rustc --explain E0515`.
+Some errors have detailed explanations: E0597, E0700.
+For more information about an error, try `rustc --explain E0597`.

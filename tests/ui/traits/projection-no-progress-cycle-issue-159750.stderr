@@ -14,9 +14,6 @@ error[E0277]: the trait bound `!: Queryable` is not satisfied
    |
 LL | fn follow<E>() -> impl Queryable<Container = Option<E>> {
    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Queryable` is not implemented for `!`
-LL |
-LL |     loop {}
-   |     ------- return type was inferred to be `!` here
    |
 help: this trait has no implementations, consider adding one
   --> $DIR/projection-no-progress-cycle-issue-159750.rs:14:1
@@ -24,15 +21,19 @@ help: this trait has no implementations, consider adding one
 LL | trait Queryable {
    | ^^^^^^^^^^^^^^^
 
-error[E0284]: type annotations needed
+error[E0277]: the trait bound `Option<_>: Container<<impl Queryable<Container = Option<_>> as Queryable>::Output>` is not satisfied
   --> $DIR/projection-no-progress-cycle-issue-159750.rs:28:14
    |
 LL |     follow().finish();
-   |              ^^^^^^
+   |              ^^^^^^ the trait `Container<<impl Queryable<Container = Option<_>> as Queryable>::Output>` is not implemented for `Option<_>`
    |
-   = note: cannot satisfy `<impl Queryable<Container = Option<_>> as Queryable>::Output == _`
+help: the trait `Container<<impl Queryable<Container = Option<_>> as Queryable>::Output>` is not implemented for `Option<_>`
+      but trait `Container<_>` is implemented for it
+  --> $DIR/projection-no-progress-cycle-issue-159750.rs:10:1
+   |
+LL | impl<T> Container<T> for Option<T> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 3 previous errors
 
-Some errors have detailed explanations: E0277, E0284.
-For more information about an error, try `rustc --explain E0277`.
+For more information about this error, try `rustc --explain E0277`.

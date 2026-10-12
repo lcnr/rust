@@ -14,6 +14,32 @@ help: consider restricting type parameter `K` with trait `Tr`
 LL | struct Hoge<K: Tr> {
    |              ++++
 
-error: aborting due to 1 previous error
+error[E0277]: the size for values of type `S<K>` cannot be known at compilation time
+  --> $DIR/issue-96810.rs:8:8
+   |
+LL |     s: S<K>,
+   |        ^^^^ doesn't have a size known at compile-time
+   |
+help: the trait `Sized` is not implemented for `S<K>`
+  --> $DIR/issue-96810.rs:1:1
+   |
+LL | struct S<T: Tr>(T::Assoc);
+   | ^^^^^^^^^^^^^^^
+   = note: only the last field of a struct may have a dynamically sized type
+   = help: change the field's type to have a statically known size
+help: consider introducing a `where` clause, but there might be an alternative better way to express this requirement
+   |
+LL | struct Hoge<K> where S<K>: Sized {
+   |                +++++++++++++++++
+help: borrowed types always have a statically known size
+   |
+LL |     s: &S<K>,
+   |        +
+help: the `Box` type always has a statically known size and allocates its contents in the heap
+   |
+LL |     s: Box<S<K>>,
+   |        ++++    +
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

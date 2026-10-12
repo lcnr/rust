@@ -1,8 +1,8 @@
-error[E0277]: the trait bound `u32: Trait` is not satisfied
+error[E0277]: the trait bound `&u32: CoerceUnsized<&dyn Trait>` is not satisfied in `u32`
   --> $DIR/trait_objects_fail.rs:26:9
    |
 LL |     foo(&10_u32);
-   |         ^^^^^^^ the trait `Trait` is not implemented for `u32`
+   |         ^^^^^^^ within `u32`, the trait `Trait` is not implemented for `u32`
    |
 help: the trait `Trait<12>` is not implemented for `u32`
       but trait `Trait<2>` is implemented for it
@@ -10,13 +10,15 @@ help: the trait `Trait<12>` is not implemented for `u32`
    |
 LL | impl Trait<2> for u32 {}
    | ^^^^^^^^^^^^^^^^^^^^^
+   = note: required because it appears within the type `u32`
+   = note: required for `&u32` to implement `CoerceUnsized<&dyn Trait>`
    = note: required for the cast from `&u32` to `&dyn Trait`
 
-error[E0277]: the trait bound `bool: Traitor<_>` is not satisfied
+error[E0277]: the trait bound `&bool: CoerceUnsized<&dyn Traitor<_>>` is not satisfied in `bool`
   --> $DIR/trait_objects_fail.rs:28:9
    |
 LL |     bar(&true);
-   |         ^^^^^ the trait `Traitor<_>` is not implemented for `bool`
+   |         ^^^^^ within `bool`, the trait `Traitor<_>` is not implemented for `bool`
    |
 help: the trait `Traitor<_, _>` is not implemented for `bool`
       but trait `Traitor<2, 3>` is implemented for it
@@ -24,6 +26,8 @@ help: the trait `Traitor<_, _>` is not implemented for `bool`
    |
 LL | impl Traitor<2, 3> for bool {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required because it appears within the type `bool`
+   = note: required for `&bool` to implement `CoerceUnsized<&dyn Traitor<_>>`
    = note: required for the cast from `&bool` to `&dyn Traitor<_>`
 
 error: aborting due to 2 previous errors

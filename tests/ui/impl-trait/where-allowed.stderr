@@ -346,50 +346,45 @@ LL |     let _in_return_in_local_variable = || -> impl Fn() { || {} };
    = note: `impl Trait` is only allowed in arguments and return types of functions and methods
 
 error[E0053]: method `in_trait_impl_return` has an incompatible type for trait
-  --> $DIR/where-allowed.rs:129:34
+  --> $DIR/where-allowed.rs:129:5
    |
 LL |     type Out = impl Debug;
    |                ---------- the expected opaque type
 ...
 LL |     fn in_trait_impl_return() -> impl Debug { () }
-   |                                  ^^^^^^^^^^ expected opaque type, found a different opaque type
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `<() as DummyTrait>::Out::{opaque#0}`, found `<() as DummyTrait>::in_trait_impl_return::{opaque#0}`
    |
 note: type in trait
-  --> $DIR/where-allowed.rs:119:34
+  --> $DIR/where-allowed.rs:119:5
    |
 LL |     fn in_trait_impl_return() -> Self::Out;
-   |                                  ^^^^^^^^^
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    = note: expected signature `fn() -> <() as DummyTrait>::Out`
               found signature `fn() -> impl Debug`
-   = note: distinct uses of `impl Trait` result in different opaque types
-help: change the output type to match the trait
-   |
-LL -     fn in_trait_impl_return() -> impl Debug { () }
-LL +     fn in_trait_impl_return() -> <() as DummyTrait>::Out { () }
-   |
 
-error[E0283]: type annotations needed
-  --> $DIR/where-allowed.rs:47:57
+error[E0282]: type annotations needed
+  --> $DIR/where-allowed.rs:47:36
    |
 LL | fn in_dyn_Fn_return_in_return() -> &'static dyn Fn() -> impl Debug { panic!() }
-   |                                                         ^^^^^^^^^^ cannot infer type
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type
    |
-   = note: the type must implement `Debug`
+   = note: cannot infer type of hidden type of opaque
 
-error[E0283]: type annotations needed
-  --> $DIR/where-allowed.rs:65:46
+error[E0282]: type annotations needed
+  --> $DIR/where-allowed.rs:60:40
+   |
+LL | fn in_impl_Fn_parameter_in_return() -> &'static impl Fn(impl Debug) { panic!() }
+   |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type
+   |
+   = note: cannot infer type of hidden type of opaque
+
+error[E0282]: type annotations needed
+  --> $DIR/where-allowed.rs:65:37
    |
 LL | fn in_impl_Fn_return_in_return() -> &'static impl Fn() -> impl Debug { panic!() }
-   |                                              ^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type
+   |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type
    |
-   = note: multiple `impl`s satisfying `_: Fn()` found in the following crates: `alloc`, `core`:
-           - impl<A, F> Fn<A> for &F
-             where A: std::marker::Tuple, F: Fn<A>, F: ?Sized;
-           - impl<Args, F, A> Fn<Args> for Box<F, A>
-             where Args: std::marker::Tuple, F: Fn<Args>, A: Allocator, F: ?Sized;
-           - impl<F, Args> Fn<Args> for SyncView<F>
-             where F: Sync, F: Fn<Args>, Args: std::marker::Tuple;
-   = note: cannot satisfy `<_ as FnOnce<()>>::Output == impl Debug`
+   = note: cannot infer type of hidden type of opaque
 
 error: unconstrained opaque type
   --> $DIR/where-allowed.rs:122:16
@@ -415,9 +410,9 @@ LL | impl<T = impl Debug> T {}
    |
    = note: either implement a trait on it or create a newtype to wrap it instead
 
-error: aborting due to 48 previous errors
+error: aborting due to 49 previous errors
 
-Some errors have detailed explanations: E0053, E0118, E0283, E0562, E0658, E0666.
+Some errors have detailed explanations: E0053, E0118, E0282, E0562, E0658, E0666.
 For more information about an error, try `rustc --explain E0053`.
 Future incompatibility report: Future breakage diagnostic:
 warning: defaults for generic parameters are not allowed here

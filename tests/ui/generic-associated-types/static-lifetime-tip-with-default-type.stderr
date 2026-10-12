@@ -5,7 +5,7 @@ LL | struct Foo<T, K = i32>(&'static T, &'static K);
    |                        ^^^^^^^^^^
    |                        |
    |                        the parameter type `T` must be valid for the static lifetime...
-   |                        ...so that the reference type `&'static T` does not outlive the data it points at
+   |                        ...so that the type `T` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |
@@ -19,7 +19,7 @@ LL | struct Foo<T, K = i32>(&'static T, &'static K);
    |                                    ^^^^^^^^^^
    |                                    |
    |                                    the parameter type `K` must be valid for the static lifetime...
-   |                                    ...so that the reference type `&'static K` does not outlive the data it points at
+   |                                    ...so that the type `K` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |
@@ -33,7 +33,7 @@ LL | struct Bar<r#T, r#K = i32>(&'static r#T, &'static r#K);
    |                            ^^^^^^^^^^^^
    |                            |
    |                            the parameter type `T` must be valid for the static lifetime...
-   |                            ...so that the reference type `&'static T` does not outlive the data it points at
+   |                            ...so that the type `T` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |
@@ -47,7 +47,7 @@ LL | struct Bar<r#T, r#K = i32>(&'static r#T, &'static r#K);
    |                                          ^^^^^^^^^^^^
    |                                          |
    |                                          the parameter type `K` must be valid for the static lifetime...
-   |                                          ...so that the reference type `&'static K` does not outlive the data it points at
+   |                                          ...so that the type `K` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |
@@ -61,7 +61,7 @@ LL | struct Boo<T= i32>(&'static T);
    |                    ^^^^^^^^^^
    |                    |
    |                    the parameter type `T` must be valid for the static lifetime...
-   |                    ...so that the reference type `&'static T` does not outlive the data it points at
+   |                    ...so that the type `T` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |
@@ -75,7 +75,7 @@ LL | = i32>(&'static T);
    |        ^^^^^^^^^^
    |        |
    |        the parameter type `T` must be valid for the static lifetime...
-   |        ...so that the reference type `&'static T` does not outlive the data it points at
+   |        ...so that the type `T` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |
@@ -97,7 +97,7 @@ LL | struct S<'a, K: 'a = i32>(&'static K);
    |                           ^^^^^^^^^^
    |                           |
    |                           the parameter type `K` must be valid for the static lifetime...
-   |                           ...so that the reference type `&'static K` does not outlive the data it points at
+   |                           ...so that the type `K` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |

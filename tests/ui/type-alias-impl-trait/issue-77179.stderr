@@ -1,9 +1,18 @@
-error[E0792]: expected generic type parameter, found `i32`
-  --> $DIR/issue-77179.rs:8:14
+error: item does not constrain `Pointer::{opaque#0}`
+  --> $DIR/issue-77179.rs:8:4
+   |
+LL | fn test() -> Pointer<_> {
+   |    ^^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/issue-77179.rs:5:19
    |
 LL | type Pointer<T> = impl std::ops::Deref<Target = T>;
-   |              - this generic parameter must be used with a generic type parameter
-...
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: this use of `Pointer<i32>` does not have unique universal generic arguments
+  --> $DIR/issue-77179.rs:8:14
+   |
 LL | fn test() -> Pointer<_> {
    |              ^^^^^^^^^^
 
@@ -16,7 +25,7 @@ LL | fn test() -> Pointer<_> {
 help: replace with the correct return type
    |
 LL - fn test() -> Pointer<_> {
-LL + fn test() -> Pointer<i32> {
+LL + fn test() -> Box<i32> {
    |
 
 error[E0121]: the placeholder `_` is not allowed within types on item signatures for functions
@@ -27,5 +36,4 @@ LL |     fn bar() -> Pointer<_>;
 
 error: aborting due to 3 previous errors
 
-Some errors have detailed explanations: E0121, E0792.
-For more information about an error, try `rustc --explain E0121`.
+For more information about this error, try `rustc --explain E0121`.

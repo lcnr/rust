@@ -1,8 +1,8 @@
 error[E0277]: the trait bound `B: Bar` is not satisfied
-  --> $DIR/issue-90400-2.rs:25:9
+  --> $DIR/issue-90400-2.rs:24:5
    |
-LL |         MyBaz(bar)
-   |         ^^^^^^^^^^ the trait `Bar` is not implemented for `B`
+LL |     fn foo<B: Bar>(&self, bar: B) -> Self::FooFn<B> {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Bar` is not implemented for `B`
    |
 note: required for `MyBaz<B>` to implement `Baz`
   --> $DIR/issue-90400-2.rs:30:14

@@ -25,14 +25,14 @@ error: failed to resolve delegation callee
 LL | reuse a as b {
    |       ^
 
-error[E0277]: `fn() {b}` doesn't implement `Debug`
+error[E0277]: `&fn() {b}` doesn't implement `Debug`
   --> $DIR/ice-line-bounds-issue-148732.rs:4:5
    |
 LL | reuse a as b {
    |            - consider calling this function
 ...
 LL |     dbg!(b);
-   |     ^^^^^^^ the trait `Debug` is not implemented for fn item `fn() {b}`
+   |     ^^^^^^^ within `&fn() {b}`, the trait `Debug` is not implemented for `&fn() {b}`
    |
    = help: use parentheses to call this function: `b()`
 

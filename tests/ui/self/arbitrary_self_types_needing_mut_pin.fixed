@@ -8,6 +8,5 @@ impl S {
 }
 
 fn main() {
-    let mut pinned = std::pin::pin!(S);
-    pinned.as_mut().x(); //~ ERROR no method named `x` found
+    Pin::new(&mut S).x(); //~ ERROR no method named `x` found
 }

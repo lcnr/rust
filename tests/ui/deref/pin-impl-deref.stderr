@@ -31,28 +31,6 @@ LL | fn impl_deref_mut(_: impl DerefMut) {}
    |                           ^^^^^^^^ required by this bound in `impl_deref_mut`
 
 error[E0277]: `PhantomPinned` cannot be unpinned
-  --> $DIR/pin-impl-deref.rs:31:20
-   |
-LL |     impl_deref_mut(r_pin)
-   |     -------------- ^^^^^ within `MyPinType`, the trait `Unpin` is not implemented for `PhantomPinned`
-   |     |
-   |     required by a bound introduced by this call
-   |
-   = note: consider using the `pin!` macro
-           consider using `Box::pin` if you need to access the pinned value outside of the current scope
-note: required because it appears within the type `MyPinType`
-  --> $DIR/pin-impl-deref.rs:15:18
-   |
-LL | struct MyPinType(core::marker::PhantomPinned);
-   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this field
-   = note: required for `Pin<&MyPinType>` to implement `DerefMut`
-note: required by a bound in `impl_deref_mut`
-  --> $DIR/pin-impl-deref.rs:22:27
-   |
-LL | fn impl_deref_mut(_: impl DerefMut) {}
-   |                           ^^^^^^^^ required by this bound in `impl_deref_mut`
-
-error[E0277]: `PhantomPinned` cannot be unpinned
   --> $DIR/pin-impl-deref.rs:36:20
    |
 LL |     impl_deref_mut(r_pin)
@@ -74,6 +52,6 @@ note: required by a bound in `impl_deref_mut`
 LL | fn impl_deref_mut(_: impl DerefMut) {}
    |                           ^^^^^^^^ required by this bound in `impl_deref_mut`
 
-error: aborting due to 4 previous errors
+error: aborting due to 3 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

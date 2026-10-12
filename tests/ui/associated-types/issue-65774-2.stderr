@@ -21,13 +21,13 @@ LL | trait MPU {
 LL |     type MpuConfig: MyDisplay = T;
    |                     ^^^^^^^^^ required by this bound in `MPU::MpuConfig`
 
-error[E0277]: the trait bound `T: MyDisplay` is not satisfied
+error[E0277]: the trait bound `&T: CoerceUnsized<&dyn MyDisplay>` is not satisfied in `T`
   --> $DIR/issue-65774-2.rs:39:25
    |
 LL |         writer.my_write(valref)
    |                         ^^^^^^ unsatisfied trait bound
    |
-help: the trait `MyDisplay` is not implemented for `T`
+help: within `T`, the trait `MyDisplay` is not implemented for `T`
   --> $DIR/issue-65774-2.rs:7:1
    |
 LL | struct T;
@@ -37,6 +37,12 @@ help: the trait `MyDisplay` is implemented for `&'a mut T`
    |
 LL | impl<'a, T: MyDisplay> MyDisplay for &'a mut T { }
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `T`
+  --> $DIR/issue-65774-2.rs:7:8
+   |
+LL | struct T;
+   |        ^
+   = note: required for `&T` to implement `CoerceUnsized<&dyn MyDisplay>`
    = note: required for the cast from `&mut T` to `&dyn MyDisplay`
 
 error: aborting due to 2 previous errors

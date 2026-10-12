@@ -170,6 +170,98 @@ help: the `Box` type always has a statically known size and allocates its conten
 LL |     VH{u: isize, x: Box<[u32]>},
    |                     ++++     +
 
+error[E0277]: the size for values of type `(dyn PathHelper1 + 'static)` cannot be known at compilation time
+  --> $DIR/unsized-enum2.rs:43:8
+   |
+LL |     VI(Path1),
+   |        ^^^^^ doesn't have a size known at compile-time
+   |
+   = help: within `Path1`, the trait `Sized` is not implemented for `(dyn PathHelper1 + 'static)`
+note: required because it appears within the type `Path1`
+  --> $DIR/unsized-enum2.rs:16:14
+   |
+LL | struct Path1(dyn PathHelper1);
+   |              ^^^^^^^^^^^^^^^ required by this field
+   = note: no field of an enum variant may have a dynamically sized type
+   = help: change the field's type to have a statically known size
+help: borrowed types always have a statically known size
+   |
+LL |     VI(&Path1),
+   |        +
+help: the `Box` type always has a statically known size and allocates its contents in the heap
+   |
+LL |     VI(Box<Path1>),
+   |        ++++     +
+
+error[E0277]: the size for values of type `(dyn PathHelper2 + 'static)` cannot be known at compilation time
+  --> $DIR/unsized-enum2.rs:45:11
+   |
+LL |     VJ{x: Path2},
+   |           ^^^^^ doesn't have a size known at compile-time
+   |
+   = help: within `Path2`, the trait `Sized` is not implemented for `(dyn PathHelper2 + 'static)`
+note: required because it appears within the type `Path2`
+  --> $DIR/unsized-enum2.rs:17:14
+   |
+LL | struct Path2(dyn PathHelper2);
+   |              ^^^^^^^^^^^^^^^ required by this field
+   = note: no field of an enum variant may have a dynamically sized type
+   = help: change the field's type to have a statically known size
+help: borrowed types always have a statically known size
+   |
+LL |     VJ{x: &Path2},
+   |           +
+help: the `Box` type always has a statically known size and allocates its contents in the heap
+   |
+LL |     VJ{x: Box<Path2>},
+   |           ++++     +
+
+error[E0277]: the size for values of type `(dyn PathHelper3 + 'static)` cannot be known at compilation time
+  --> $DIR/unsized-enum2.rs:47:15
+   |
+LL |     VK(isize, Path3),
+   |               ^^^^^ doesn't have a size known at compile-time
+   |
+   = help: within `Path3`, the trait `Sized` is not implemented for `(dyn PathHelper3 + 'static)`
+note: required because it appears within the type `Path3`
+  --> $DIR/unsized-enum2.rs:18:14
+   |
+LL | struct Path3(dyn PathHelper3);
+   |              ^^^^^^^^^^^^^^^ required by this field
+   = note: no field of an enum variant may have a dynamically sized type
+   = help: change the field's type to have a statically known size
+help: borrowed types always have a statically known size
+   |
+LL |     VK(isize, &Path3),
+   |               +
+help: the `Box` type always has a statically known size and allocates its contents in the heap
+   |
+LL |     VK(isize, Box<Path3>),
+   |               ++++     +
+
+error[E0277]: the size for values of type `(dyn PathHelper4 + 'static)` cannot be known at compilation time
+  --> $DIR/unsized-enum2.rs:49:21
+   |
+LL |     VL{u: isize, x: Path4},
+   |                     ^^^^^ doesn't have a size known at compile-time
+   |
+   = help: within `Path4`, the trait `Sized` is not implemented for `(dyn PathHelper4 + 'static)`
+note: required because it appears within the type `Path4`
+  --> $DIR/unsized-enum2.rs:19:14
+   |
+LL | struct Path4(dyn PathHelper4);
+   |              ^^^^^^^^^^^^^^^ required by this field
+   = note: no field of an enum variant may have a dynamically sized type
+   = help: change the field's type to have a statically known size
+help: borrowed types always have a statically known size
+   |
+LL |     VL{u: isize, x: &Path4},
+   |                     +
+help: the `Box` type always has a statically known size and allocates its contents in the heap
+   |
+LL |     VL{u: isize, x: Box<Path4>},
+   |                     ++++     +
+
 error[E0277]: the size for values of type `(dyn Foo + 'static)` cannot be known at compilation time
   --> $DIR/unsized-enum2.rs:53:8
    |
@@ -313,98 +405,6 @@ help: the `Box` type always has a statically known size and allocates its conten
    |
 LL |     VT{u: isize, x: Box<<&'static [i32] as Deref>::Target>},
    |                     ++++                                 +
-
-error[E0277]: the size for values of type `(dyn PathHelper1 + 'static)` cannot be known at compilation time
-  --> $DIR/unsized-enum2.rs:43:8
-   |
-LL |     VI(Path1),
-   |        ^^^^^ doesn't have a size known at compile-time
-   |
-   = help: within `Path1`, the trait `Sized` is not implemented for `(dyn PathHelper1 + 'static)`
-note: required because it appears within the type `Path1`
-  --> $DIR/unsized-enum2.rs:16:14
-   |
-LL | struct Path1(dyn PathHelper1);
-   |              ^^^^^^^^^^^^^^^ required by this field
-   = note: no field of an enum variant may have a dynamically sized type
-   = help: change the field's type to have a statically known size
-help: borrowed types always have a statically known size
-   |
-LL |     VI(&Path1),
-   |        +
-help: the `Box` type always has a statically known size and allocates its contents in the heap
-   |
-LL |     VI(Box<Path1>),
-   |        ++++     +
-
-error[E0277]: the size for values of type `(dyn PathHelper2 + 'static)` cannot be known at compilation time
-  --> $DIR/unsized-enum2.rs:45:11
-   |
-LL |     VJ{x: Path2},
-   |           ^^^^^ doesn't have a size known at compile-time
-   |
-   = help: within `Path2`, the trait `Sized` is not implemented for `(dyn PathHelper2 + 'static)`
-note: required because it appears within the type `Path2`
-  --> $DIR/unsized-enum2.rs:17:14
-   |
-LL | struct Path2(dyn PathHelper2);
-   |              ^^^^^^^^^^^^^^^ required by this field
-   = note: no field of an enum variant may have a dynamically sized type
-   = help: change the field's type to have a statically known size
-help: borrowed types always have a statically known size
-   |
-LL |     VJ{x: &Path2},
-   |           +
-help: the `Box` type always has a statically known size and allocates its contents in the heap
-   |
-LL |     VJ{x: Box<Path2>},
-   |           ++++     +
-
-error[E0277]: the size for values of type `(dyn PathHelper3 + 'static)` cannot be known at compilation time
-  --> $DIR/unsized-enum2.rs:47:15
-   |
-LL |     VK(isize, Path3),
-   |               ^^^^^ doesn't have a size known at compile-time
-   |
-   = help: within `Path3`, the trait `Sized` is not implemented for `(dyn PathHelper3 + 'static)`
-note: required because it appears within the type `Path3`
-  --> $DIR/unsized-enum2.rs:18:14
-   |
-LL | struct Path3(dyn PathHelper3);
-   |              ^^^^^^^^^^^^^^^ required by this field
-   = note: no field of an enum variant may have a dynamically sized type
-   = help: change the field's type to have a statically known size
-help: borrowed types always have a statically known size
-   |
-LL |     VK(isize, &Path3),
-   |               +
-help: the `Box` type always has a statically known size and allocates its contents in the heap
-   |
-LL |     VK(isize, Box<Path3>),
-   |               ++++     +
-
-error[E0277]: the size for values of type `(dyn PathHelper4 + 'static)` cannot be known at compilation time
-  --> $DIR/unsized-enum2.rs:49:21
-   |
-LL |     VL{u: isize, x: Path4},
-   |                     ^^^^^ doesn't have a size known at compile-time
-   |
-   = help: within `Path4`, the trait `Sized` is not implemented for `(dyn PathHelper4 + 'static)`
-note: required because it appears within the type `Path4`
-  --> $DIR/unsized-enum2.rs:19:14
-   |
-LL | struct Path4(dyn PathHelper4);
-   |              ^^^^^^^^^^^^^^^ required by this field
-   = note: no field of an enum variant may have a dynamically sized type
-   = help: change the field's type to have a statically known size
-help: borrowed types always have a statically known size
-   |
-LL |     VL{u: isize, x: &Path4},
-   |                     +
-help: the `Box` type always has a statically known size and allocates its contents in the heap
-   |
-LL |     VL{u: isize, x: Box<Path4>},
-   |                     ++++     +
 
 error: aborting due to 20 previous errors
 

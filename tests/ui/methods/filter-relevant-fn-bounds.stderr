@@ -12,13 +12,11 @@ help: consider further restricting type parameter `F` with trait `Output`
 LL |         F: for<'a> FnOnce(<F as Output<'a>>::Type) + for<'a> Output<'a>,
    |                                                    ++++++++++++++++++++
 
-error[E0277]: expected an `FnOnce(<{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41} as Output<'a>>::Type)` closure, found `{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41}`
-  --> $DIR/filter-relevant-fn-bounds.rs:18:34
+error[E0277]: the trait bound `for<'a> {closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41}: Output<'a>` is not satisfied
+  --> $DIR/filter-relevant-fn-bounds.rs:18:5
    |
 LL |     wrapper.do_something_wrapper(|value| ());
-   |             -------------------- ^^^^^^^^^^ expected an `FnOnce(<{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41} as Output<'a>>::Type)` closure, found `{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41}`
-   |             |
-   |             required by a bound introduced by this call
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
    |
 help: the trait `for<'a> Output<'a>` is not implemented for closure `{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41}`
   --> $DIR/filter-relevant-fn-bounds.rs:18:34
@@ -30,6 +28,20 @@ help: this trait has no implementations, consider adding one
    |
 LL | trait Output<'a> {
    | ^^^^^^^^^^^^^^^^
+
+error[E0277]: expected an `FnOnce(<{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41} as Output<'a>>::Type)` closure, found `{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41}`
+  --> $DIR/filter-relevant-fn-bounds.rs:18:34
+   |
+LL |     wrapper.do_something_wrapper(|value| ());
+   |             -------------------- ^^^^^^^^^^ expected an `FnOnce(<{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41} as Output<'a>>::Type)` closure, found `{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41}`
+   |             |
+   |             required by a bound introduced by this call
+   |
+help: the trait `for<'a> FnOnce(<{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41} as Output<'a>>::Type)` is not implemented for closure `{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41}`
+  --> $DIR/filter-relevant-fn-bounds.rs:18:34
+   |
+LL |     wrapper.do_something_wrapper(|value| ());
+   |                                  ^^^^^^^
 note: required by a bound in `Wrapper::do_something_wrapper`
   --> $DIR/filter-relevant-fn-bounds.rs:11:12
    |
@@ -39,6 +51,42 @@ LL |     fn do_something_wrapper<O, F>(self, _: F)
 LL |         F: for<'a> FnOnce(<F as Output<'a>>::Type),
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Wrapper::do_something_wrapper`
 
-error: aborting due to 2 previous errors
+error[E0271]: type mismatch resolving `<{closure@filter-relevant-fn-bounds.rs:18:34} as FnOnce<(<{closure@filter-relevant-fn-bounds.rs:18:34} as Output<'a>>::Type,)>>::Output == ()`
+  --> $DIR/filter-relevant-fn-bounds.rs:18:42
+   |
+LL |     wrapper.do_something_wrapper(|value| ());
+   |             -------------------- ------- ^^ types differ
+   |             |                    |
+   |             |                    this closure
+   |             required by a bound introduced by this call
+   |
+note: required by a bound in `Wrapper::do_something_wrapper`
+  --> $DIR/filter-relevant-fn-bounds.rs:11:20
+   |
+LL | impl Wrapper {
+LL |     fn do_something_wrapper<O, F>(self, _: F)
+...
+LL |         F: for<'a> FnOnce(<F as Output<'a>>::Type),
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Wrapper::do_something_wrapper`
 
-For more information about this error, try `rustc --explain E0277`.
+error[E0277]: the trait bound `for<'a> {closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41}: Output<'a>` is not satisfied
+  --> $DIR/filter-relevant-fn-bounds.rs:18:13
+   |
+LL |     wrapper.do_something_wrapper(|value| ());
+   |             ^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `for<'a> Output<'a>` is not implemented for closure `{closure@$DIR/filter-relevant-fn-bounds.rs:18:34: 18:41}`
+  --> $DIR/filter-relevant-fn-bounds.rs:18:34
+   |
+LL |     wrapper.do_something_wrapper(|value| ());
+   |                                  ^^^^^^^
+help: this trait has no implementations, consider adding one
+  --> $DIR/filter-relevant-fn-bounds.rs:1:1
+   |
+LL | trait Output<'a> {
+   | ^^^^^^^^^^^^^^^^
+
+error: aborting due to 5 previous errors
+
+Some errors have detailed explanations: E0271, E0277.
+For more information about an error, try `rustc --explain E0271`.

@@ -72,6 +72,11 @@ LL |     }
 LL |     1u32
    |     ^^^^ expected `i32`, found `u32`
    |
+note: return type inferred to be `i32` here
+  --> $DIR/point-to-type-err-cause-on-impl-trait-return.rs:3:16
+   |
+LL |         return 0i32;
+   |                ^^^^
 help: you could change the return type to be a boxed trait object
    |
 LL - fn foo() -> impl std::fmt::Display {
@@ -101,6 +106,11 @@ LL |     } else {
 LL |         return 1u32;
    |                ^^^^ expected `i32`, found `u32`
    |
+note: return type inferred to be `i32` here
+  --> $DIR/point-to-type-err-cause-on-impl-trait-return.rs:10:16
+   |
+LL |         return 0i32;
+   |                ^^^^
 help: you could change the return type to be a boxed trait object
    |
 LL - fn bar() -> impl std::fmt::Display {
@@ -130,6 +140,11 @@ LL |     } else {
 LL |         1u32
    |         ^^^^ expected `i32`, found `u32`
    |
+note: return type inferred to be `i32` here
+  --> $DIR/point-to-type-err-cause-on-impl-trait-return.rs:18:16
+   |
+LL |         return 0i32;
+   |                ^^^^
 help: you could change the return type to be a boxed trait object
    |
 LL - fn baz() -> impl std::fmt::Display {
@@ -158,17 +173,6 @@ LL | |         1u32
 LL | |     }
    | |_____- `if` and `else` have incompatible types
    |
-help: you could change the return type to be a boxed trait object
-   |
-LL - fn qux() -> impl std::fmt::Display {
-LL + fn qux() -> Box<dyn std::fmt::Display> {
-   |
-help: if you change the return type to expect trait objects, box the returned expressions
-   |
-LL ~         Box::new(0i32)
-LL |     } else {
-LL ~         Box::new(1u32)
-   |
 help: change the type of the numeric literal from `u32` to `i32`
    |
 LL -         1u32
@@ -186,6 +190,11 @@ LL |         0 => return 0i32,
 LL |         _ => 1u32,
    |              ^^^^ expected `i32`, found `u32`
    |
+note: return type inferred to be `i32` here
+  --> $DIR/point-to-type-err-cause-on-impl-trait-return.rs:34:21
+   |
+LL |         0 => return 0i32,
+   |                     ^^^^
 help: you could change the return type to be a boxed trait object
    |
 LL - fn bat() -> impl std::fmt::Display {
@@ -214,6 +223,11 @@ LL | |         _ => 2u32,
 LL | |     }
    | |_____^ expected `i32`, found `u32`
    |
+note: return type inferred to be `i32` here
+  --> $DIR/point-to-type-err-cause-on-impl-trait-return.rs:41:21
+   |
+LL |         0 => return 0i32,
+   |                     ^^^^
 help: you could change the return type to be a boxed trait object
    |
 LL - fn can() -> impl std::fmt::Display {
@@ -242,6 +256,11 @@ LL |             return 0i32;
 LL |             1u32
    |             ^^^^ expected `i32`, found `u32`
    |
+note: return type inferred to be `i32` here
+  --> $DIR/point-to-type-err-cause-on-impl-trait-return.rs:50:20
+   |
+LL |             return 0i32;
+   |                    ^^^^
 help: you could change the return type to be a boxed trait object
    |
 LL - fn cat() -> impl std::fmt::Display {
@@ -271,16 +290,6 @@ LL | |         _ => 2u32,
 LL | |     }
    | |_____- `match` arms have incompatible types
    |
-help: you could change the return type to be a boxed trait object
-   |
-LL - fn dog() -> impl std::fmt::Display {
-LL + fn dog() -> Box<dyn std::fmt::Display> {
-   |
-help: if you change the return type to expect trait objects, box the returned expressions
-   |
-LL ~         0 => Box::new(0i32),
-LL ~         1 => Box::new(1u32),
-   |
 help: change the type of the numeric literal from `u32` to `i32`
    |
 LL -         1 => 1u32,
@@ -298,17 +307,6 @@ LL | |         1u32
    | |         ^^^^ expected `i32`, found `u32`
 LL | |     }
    | |_____- `if` and `else` have incompatible types
-   |
-help: you could change the return type to be a boxed trait object
-   |
-LL - fn apt() -> impl std::fmt::Display {
-LL + fn apt() -> Box<dyn std::fmt::Display> {
-   |
-help: if you change the return type to expect trait objects, box the returned expressions
-   |
-LL ~         Box::new(0i32)
-LL |     } else {
-LL ~         Box::new(1u32)
    |
 help: change the type of the numeric literal from `u32` to `i32`
    |

@@ -52,6 +52,15 @@ LL |     F: Fn<i32, Output = i32>,
 note: required by a bound in `Fn`
   --> $SRC_DIR/core/src/ops/function.rs:LL:COL
 
+error[E0059]: type parameter to bare `FnOnce` trait must be a tuple
+  --> $DIR/fn-trait-notation.rs:4:16
+   |
+LL |     F: Fn<i32, Output = i32>,
+   |                ^^^^^^^^^^^^ the nightly-only, unstable trait `std::marker::Tuple` is not implemented for `i32`
+   |
+note: required by a bound in `FnOnce`
+  --> $SRC_DIR/core/src/ops/function.rs:LL:COL
+
 error[E0059]: cannot use call notation; the first type parameter for the function trait is neither a tuple nor unit
   --> $DIR/fn-trait-notation.rs:9:5
    |
@@ -64,18 +73,19 @@ error[E0277]: `i32` is not a tuple
 LL |     f(3);
    |     ^^^^ the nightly-only, unstable trait `std::marker::Tuple` is not implemented for `i32`
 
-error[E0308]: mismatched types
-  --> $DIR/fn-trait-notation.rs:17:5
+error[E0277]: expected an `Fn<i32>` closure, found `{closure@$DIR/fn-trait-notation.rs:18:9: 18:12}`
+  --> $DIR/fn-trait-notation.rs:18:9
    |
-LL | /     e0658(
-LL | |         |a| a,
-LL | |         |a, b| (b, a),
-LL | |         |a| a,
-LL | |     );
-   | |_____^ types differ
+LL |     e0658(
+   |     ----- required by a bound introduced by this call
+LL |         |a| a,
+   |         ^^^^^ expected an `Fn<i32>` closure, found `{closure@$DIR/fn-trait-notation.rs:18:9: 18:12}`
    |
-   = note: expected trait `Fn<i32>`
-              found trait `Fn(_)`
+help: the trait `Fn<i32>` is not implemented for closure `{closure@$DIR/fn-trait-notation.rs:18:9: 18:12}`
+  --> $DIR/fn-trait-notation.rs:18:9
+   |
+LL |         |a| a,
+   |         ^^^
 note: required by a bound in `e0658`
   --> $DIR/fn-trait-notation.rs:4:8
    |
@@ -84,7 +94,7 @@ LL | where
 LL |     F: Fn<i32, Output = i32>,
    |        ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `e0658`
 
-error: aborting due to 7 previous errors
+error: aborting due to 8 previous errors
 
-Some errors have detailed explanations: E0059, E0277, E0308, E0658.
+Some errors have detailed explanations: E0059, E0277, E0658.
 For more information about an error, try `rustc --explain E0059`.

@@ -11,29 +11,16 @@ LL | impl<T: Send + Copy + 'static> Gettable<T> for S<T> {}
    |         ----                   ^^^^^^^^^^^     ^^^^
    |         |
    |         unsatisfied trait bound introduced here
+note: required because it appears within the type `S<T>`
+  --> $DIR/copy-bounds-impl-type-params.rs:6:8
+   |
+LL | struct S<T>(marker::PhantomData<T>);
+   |        ^
+   = note: required for `&S<T>` to implement `CoerceUnsized<&dyn Gettable<T>>`
    = note: required for the cast from `&S<T>` to `&dyn Gettable<T>`
 help: consider restricting type parameter `T` with trait `Send`
    |
 LL | fn f<T: std::marker::Send>(val: T) {
-   |       +++++++++++++++++++
-
-error[E0277]: the trait bound `T: Copy` is not satisfied
-  --> $DIR/copy-bounds-impl-type-params.rs:18:13
-   |
-LL |     let a = &t as &dyn Gettable<T>;
-   |             ^^ the trait `Copy` is not implemented for `T`
-   |
-note: required for `S<T>` to implement `Gettable<T>`
-  --> $DIR/copy-bounds-impl-type-params.rs:14:32
-   |
-LL | impl<T: Send + Copy + 'static> Gettable<T> for S<T> {}
-   |                ----            ^^^^^^^^^^^     ^^^^
-   |                |
-   |                unsatisfied trait bound introduced here
-   = note: required for the cast from `&S<T>` to `&dyn Gettable<T>`
-help: consider restricting type parameter `T` with trait `Copy`
-   |
-LL | fn f<T: std::marker::Copy>(val: T) {
    |       +++++++++++++++++++
 
 error[E0277]: `T` cannot be sent between threads safely
@@ -49,29 +36,16 @@ LL | impl<T: Send + Copy + 'static> Gettable<T> for S<T> {}
    |         ----                   ^^^^^^^^^^^     ^^^^
    |         |
    |         unsatisfied trait bound introduced here
+note: required because it appears within the type `S<T>`
+  --> $DIR/copy-bounds-impl-type-params.rs:6:8
+   |
+LL | struct S<T>(marker::PhantomData<T>);
+   |        ^
+   = note: required for `&S<T>` to implement `CoerceUnsized<&dyn Gettable<T>>`
    = note: required for the cast from `&S<T>` to `&dyn Gettable<T>`
 help: consider restricting type parameter `T` with trait `Send`
    |
 LL | fn g<T: std::marker::Send>(val: T) {
-   |       +++++++++++++++++++
-
-error[E0277]: the trait bound `T: Copy` is not satisfied
-  --> $DIR/copy-bounds-impl-type-params.rs:25:31
-   |
-LL |     let a: &dyn Gettable<T> = &t;
-   |                               ^^ the trait `Copy` is not implemented for `T`
-   |
-note: required for `S<T>` to implement `Gettable<T>`
-  --> $DIR/copy-bounds-impl-type-params.rs:14:32
-   |
-LL | impl<T: Send + Copy + 'static> Gettable<T> for S<T> {}
-   |                ----            ^^^^^^^^^^^     ^^^^
-   |                |
-   |                unsatisfied trait bound introduced here
-   = note: required for the cast from `&S<T>` to `&dyn Gettable<T>`
-help: consider restricting type parameter `T` with trait `Copy`
-   |
-LL | fn g<T: std::marker::Copy>(val: T) {
    |       +++++++++++++++++++
 
 error[E0277]: the trait bound `String: Copy` is not satisfied
@@ -80,13 +54,6 @@ error[E0277]: the trait bound `String: Copy` is not satisfied
 LL |     let a = t as Box<dyn Gettable<String>>;
    |             ^ the trait `Copy` is not implemented for `String`
    |
-help: the trait `Gettable<T>` is conditionally implemented for `S<T>`
-  --> $DIR/copy-bounds-impl-type-params.rs:14:1
-   |
-LL | impl<T: Send + Copy + 'static> Gettable<T> for S<T> {}
-   | ^^^^^^^^^^^^^^^----^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |                |
-   |                unsatisfied requirement introduced here: `String: Copy`
 note: required for `S<String>` to implement `Gettable<String>`
   --> $DIR/copy-bounds-impl-type-params.rs:14:32
    |
@@ -94,6 +61,12 @@ LL | impl<T: Send + Copy + 'static> Gettable<T> for S<T> {}
    |                ----            ^^^^^^^^^^^     ^^^^
    |                |
    |                unsatisfied trait bound introduced here
+note: required because it appears within the type `S<String>`
+  --> $DIR/copy-bounds-impl-type-params.rs:6:8
+   |
+LL | struct S<T>(marker::PhantomData<T>);
+   |        ^
+   = note: required for `Box<S<String>>` to implement `CoerceUnsized<Box<dyn Gettable<String>>>`
    = note: required for the cast from `Box<S<String>>` to `Box<dyn Gettable<String>>`
 
 error[E0277]: the trait bound `Foo: Copy` is not satisfied
@@ -102,13 +75,6 @@ error[E0277]: the trait bound `Foo: Copy` is not satisfied
 LL |     let a: Box<dyn Gettable<Foo>> = t;
    |                                     ^ the trait `Copy` is not implemented for `Foo`
    |
-help: the trait `Gettable<T>` is conditionally implemented for `S<T>`
-  --> $DIR/copy-bounds-impl-type-params.rs:14:1
-   |
-LL | impl<T: Send + Copy + 'static> Gettable<T> for S<T> {}
-   | ^^^^^^^^^^^^^^^----^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |                |
-   |                unsatisfied requirement introduced here: `Foo: Copy`
 note: required for `S<Foo>` to implement `Gettable<Foo>`
   --> $DIR/copy-bounds-impl-type-params.rs:14:32
    |
@@ -116,6 +82,12 @@ LL | impl<T: Send + Copy + 'static> Gettable<T> for S<T> {}
    |                ----            ^^^^^^^^^^^     ^^^^
    |                |
    |                unsatisfied trait bound introduced here
+note: required because it appears within the type `S<Foo>`
+  --> $DIR/copy-bounds-impl-type-params.rs:6:8
+   |
+LL | struct S<T>(marker::PhantomData<T>);
+   |        ^
+   = note: required for `Box<S<Foo>>` to implement `CoerceUnsized<Box<dyn Gettable<Foo>>>`
    = note: required for the cast from `Box<S<Foo>>` to `Box<dyn Gettable<Foo>>`
 help: consider annotating `Foo` with `#[derive(Copy)]`
    |
@@ -132,6 +104,6 @@ LL |     let t: S<&'a isize> = S(marker::PhantomData);
 LL |     let a = &t as &dyn Gettable<&'a isize>;
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cast requires that `'a` must outlive `'static`
 
-error: aborting due to 7 previous errors
+error: aborting due to 5 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

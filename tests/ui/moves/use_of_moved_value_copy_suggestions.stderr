@@ -65,10 +65,10 @@ LL |     (t, t)
    |      |
    |      value moved here
    |
-help: consider restricting type parameters
+help: consider restricting type parameter `A` with trait `Copy`
    |
-LL | fn duplicate_tup2<A: Copy, B: Copy>(t: (A, B)) -> ((A, B), (A, B)) {
-   |                    ++++++   ++++++
+LL | fn duplicate_tup2<A: Copy, B>(t: (A, B)) -> ((A, B), (A, B)) {
+   |                    ++++++
 
 error[E0382]: use of moved value: `t`
   --> $DIR/use_of_moved_value_copy_suggestions.rs:27:9
@@ -81,10 +81,10 @@ LL |     (t, t)
    |      |
    |      value moved here
    |
-help: consider restricting type parameter `T` with traits `Copy` and `Trait`
+help: consider restricting type parameter `T` with trait `Trait`
    |
-LL | fn duplicate_custom<T: Copy + Trait>(t: S<T>) -> (S<T>, S<T>) {
-   |                      ++++++++++++++
+LL | fn duplicate_custom<T: Trait>(t: S<T>) -> (S<T>, S<T>) {
+   |                      +++++++
 
 error[E0382]: use of moved value: `t`
   --> $DIR/use_of_moved_value_copy_suggestions.rs:45:9
@@ -97,10 +97,10 @@ LL |     (t, t)
    |      |
    |      value moved here
    |
-help: consider restricting type parameter `T` with traits `Copy` and `Trait`
+help: consider restricting type parameter `T` with trait `Trait`
    |
-LL | fn duplicate_custom_1<T: Copy + Trait>(t: S<T>) -> (S<T>, S<T>) where {
-   |                        ++++++++++++++
+LL | fn duplicate_custom_1<T: Trait>(t: S<T>) -> (S<T>, S<T>) where {
+   |                        +++++++
 
 error[E0382]: use of moved value: `t`
   --> $DIR/use_of_moved_value_copy_suggestions.rs:53:9
@@ -113,10 +113,10 @@ LL |     (t, t)
    |      |
    |      value moved here
    |
-help: consider further restricting type parameter `T` with traits `Copy` and `Trait`
+help: consider further restricting type parameter `T` with trait `Trait`
    |
-LL |     T: A + Copy + Trait,
-   |          ++++++++++++++
+LL |     T: A + Trait,
+   |          +++++++
 
 error[E0382]: use of moved value: `t`
   --> $DIR/use_of_moved_value_copy_suggestions.rs:62:9
@@ -129,10 +129,10 @@ LL |     (t, t)
    |      |
    |      value moved here
    |
-help: consider further restricting type parameter `T` with traits `Copy` and `Trait`
+help: consider further restricting type parameter `T` with trait `Trait`
    |
-LL |     T: A + Copy + Trait,
-   |          ++++++++++++++
+LL |     T: A + Trait,
+   |          +++++++
 
 error[E0382]: use of moved value: `t`
   --> $DIR/use_of_moved_value_copy_suggestions.rs:70:9
@@ -145,10 +145,10 @@ LL |     (t, t)
    |      |
    |      value moved here
    |
-help: consider further restricting type parameter `T` with traits `Copy` and `Trait`
+help: consider further restricting type parameter `T` with trait `Trait`
    |
-LL | fn duplicate_custom_4<T: A + Copy + Trait>(t: S<T>) -> (S<T>, S<T>)
-   |                            ++++++++++++++
+LL | fn duplicate_custom_4<T: A + Trait>(t: S<T>) -> (S<T>, S<T>)
+   |                            +++++++
 
 error[E0382]: use of moved value: `t`
   --> $DIR/use_of_moved_value_copy_suggestions.rs:77:9

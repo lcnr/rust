@@ -13,21 +13,34 @@ LL |       recurse(IteratorOfWrapped(elements).map(|t| t.0))
    = help: a `loop` may express intention better if this is on purpose
    = note: `#[warn(unconditional_recursion)]` on by default
 
-error[E0275]: overflow evaluating the requirement `<std::iter::Empty<()> as Iterator>::Item == ()`
+warning: overflow evaluating the requirement `IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), _>, {closure@...}>>, {closure@...}>>, {closure@...}>>, {closure@...}>>, {closure@...}>>: Iterator`
    |
-   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "512"]` attribute to your crate (`issue_91949_hangs_on_recursion`)
-note: required for `IteratorOfWrapped<(), std::iter::Empty<()>>` to implement `Iterator`
-  --> $DIR/issue-91949-hangs-on-recursion.rs:14:32
+   = note: which requires `Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<_, {closure@...}>>, {closure@...}>>, {closure@...}>>, {closure@...}>>, {closure@...}>>, {closure@...}>: Iterator`
+   = note: which requires `<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), Map<IteratorOfWrapped<(), _>, {closure@...}>>, {closure@...}>>, {closure@...}>>, {closure@...}>>, {closure@...}>> as Iterator>::Item == Wrapped<()>`
+   = note: and so on...
+   = help: consider adding a manual `impl` of auto traits like `Send` for intermediate types, if auto traits are involved
+   = help: or consider increasing the recursion limit by adding a `#![recursion_limit = "512"]` attribute to your crate (`issue_91949_hangs_on_recursion`)
+   = note: this lint is attached to the whole crate and can't be disabled on a per-function basis
+   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+   = note: for more information, see issue #159228 <https://github.com/rust-lang/rust/issues/159228>
+   = note: `#[warn(recursion_depth_exceeding_limit)]` (part of `#[warn(future_incompatible)]`) on by default
+
+error: reached the recursion limit while instantiating `recurse::<Map<IteratorOfWrapped<(), _>, {closure@...}>>`
+  --> $DIR/issue-91949-hangs-on-recursion.rs:26:5
    |
-LL | impl<T, I: Iterator<Item = T>> Iterator for IteratorOfWrapped<T, I> {
-   |                     --------   ^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^
-   |                     |
-   |                     unsatisfied trait bound introduced here
-   = note: 256 redundant requirements hidden
-   = note: required for `IteratorOfWrapped<(), Map<IteratorOfWrapped<(), _>, {closure@...}>>` to implement `Iterator`
+LL |     recurse(IteratorOfWrapped(elements).map(|t| t.0))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: `recurse` defined here
+  --> $DIR/issue-91949-hangs-on-recursion.rs:21:1
+   |
+LL | / fn recurse<T>(elements: T) -> Vec<char>
+LL | |
+LL | | where
+LL | |     T: Iterator<Item = ()>,
+   | |___________________________^
    = note: the full name for the type has been written to '$TEST_BUILD_DIR/issue-91949-hangs-on-recursion.long-type-$LONG_TYPE_HASH.txt'
    = note: consider using `--verbose` to print the full type name to the console
 
-error: aborting due to 1 previous error; 1 warning emitted
+error: aborting due to 1 previous error; 2 warnings emitted
 
-For more information about this error, try `rustc --explain E0275`.

@@ -10,11 +10,11 @@ error: the constant `5` is not of type `u32`
 LL | const FREE2: isize = gca!(FREE);
    | ^^^^^^^^^^^^^^^^^^ expected `u32`, found `usize`
 
-error: the constant `5` is not of type `isize`
+error: the constant `FREE` is not of type `isize`
   --> $DIR/type_const-mismatched-types.rs:9:1
    |
 LL | const FREE2: isize = gca!(FREE);
-   | ^^^^^^^^^^^^^^^^^^ expected `isize`, found `usize`
+   | ^^^^^^^^^^^^^^^^^^ expected `isize`, found `u32`
 
 error: the constant `false` is not of type `usize`
   --> $DIR/type_const-mismatched-types.rs:19:5

@@ -235,6 +235,15 @@ LL |     let _ = fat_v as *const dyn Foo;
    |             ^^^^^ doesn't have a size known at compile-time
    |
    = help: the trait `Sized` is not implemented for `[u8]`
+note: required for `[u8]` to implement `Foo`
+  --> $DIR/cast-rfc0401-fail.rs:12:9
+   |
+LL | impl<T> Foo for T {}
+   |      -  ^^^     ^
+   |      |
+   |      unsatisfied trait bound implicitly introduced here
+   = note: required because it appears within the type `[u8]`
+   = note: required for `*const [u8]` to implement `CoerceUnsized<*const dyn Foo>`
    = note: required for the cast from `*const [u8]` to `*const dyn Foo`
 
 error[E0277]: the size for values of type `str` cannot be known at compilation time
@@ -244,6 +253,15 @@ LL |     let _ = a as *const dyn Foo;
    |             ^ doesn't have a size known at compile-time
    |
    = help: the trait `Sized` is not implemented for `str`
+note: required for `str` to implement `Foo`
+  --> $DIR/cast-rfc0401-fail.rs:12:9
+   |
+LL | impl<T> Foo for T {}
+   |      -  ^^^     ^
+   |      |
+   |      unsatisfied trait bound implicitly introduced here
+   = note: `str` is considered to contain a `[u8]` slice for auto trait purposes
+   = note: required for `*const str` to implement `CoerceUnsized<*const dyn Foo>`
    = note: required for the cast from `*const str` to `*const dyn Foo`
 
 error[E0606]: casting `&{float}` as `f32` is invalid

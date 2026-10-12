@@ -16,10 +16,10 @@ LL | impl<T: Magic + std::marker::Sync> Magic for T {
    |               +++++++++++++++++++
 
 error[E0275]: overflow evaluating the requirement `*mut (): Magic`
-  --> $DIR/two-traits.rs:20:5
+  --> $DIR/two-traits.rs:20:14
    |
 LL |     wizard::<*mut ()>();
-   |     ^^^^^^^^^^^^^^^^^^^
+   |              ^^^^^^^
    |
 note: required by a bound in `wizard`
   --> $DIR/two-traits.rs:17:14

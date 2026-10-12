@@ -16,6 +16,21 @@ LL | trait Iterate<'a> {
 LL |     type Ty: Valid;
    |              ^^^^^ required by this bound in `Iterate::Ty`
 
-error: aborting due to 1 previous error
+error[E0275]: overflow evaluating the requirement `<T as Iterate<'a>>::Ty == _`
+  --> $DIR/issue-38091.rs:17:1
+   |
+LL | impl<'a, T> Check for T where <T as Iterate<'a>>::Ty: Valid {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For more information about this error, try `rustc --explain E0277`.
+error[E0275]: overflow evaluating the requirement `i32: Iterate<'_>`
+  --> $DIR/issue-38091.rs:22:22
+   |
+LL |     Iterate::iterate(0);
+   |     ---------------- ^
+   |     |
+   |     required by a bound introduced by this call
+
+error: aborting due to 3 previous errors
+
+Some errors have detailed explanations: E0275, E0277.
+For more information about an error, try `rustc --explain E0275`.

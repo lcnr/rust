@@ -3,9 +3,6 @@ error[E0271]: type mismatch resolving `<(A, <impl Pair<Left = A> as Pair>::Right
    |
 LL | fn frob<A, B>(pair: impl Pair<Left = A>) -> impl Pair<Left = A, Right = B> {
    |            - expected this type parameter   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<(A, <impl Pair<Left = A> as Pair>::Right) as Pair>::Right == B`
-...
-LL |     (left, right)
-   |     ------------- return type was inferred to be `(A, <impl Pair<Left = A> as Pair>::Right)` here
    |
 note: expected this to be `B`
   --> $DIR/restrict-bound-already-has-generic-args.rs:12:18

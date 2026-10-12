@@ -9,6 +9,57 @@ LL |     let _: for<'a> fn(&'a str) -> Str<'a> = Str;
    = note:      expected fn pointer `for<'a> fn(&'a _) -> Str<'a>`
            found struct constructor `fn(&_) -> Str<'_> {Str::<'_>}`
 
-error: aborting due to 1 previous error
+error[E0277]: expected an `FnOnce(&'x str)` closure, found `fn(&str) -> Str<'_> {Str::<'_>}`
+  --> $DIR/fn-traits-hrtb-coercion.rs:34:10
+   |
+LL |     test(Str);
+   |     ---- ^^^ the trait `for<'x> FnOnce(&'x str)` is not implemented for `fn(&str) -> Str<'_> {Str::<'_>}`
+   |     |
+   |     required by a bound introduced by this call
+   |
+   = note: the trait bound `for<'x> fn(&str) -> Str<'_> {Str::<'_>}: FnOnce(&'x str)` is not satisfied
+note: required by a bound in `test`
+  --> $DIR/fn-traits-hrtb-coercion.rs:6:12
+   |
+LL | fn test<F: for<'x> FnOnce<(&'x str,)>>(_: F) {}
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `test`
+help: consider borrowing here
+   |
+LL |     test(&Str);
+   |          +
+LL |     test(&mut Str);
+   |          ++++
 
-For more information about this error, try `rustc --explain E0308`.
+error[E0277]: expected an `FnOnce(&'x str)` closure, found `Compose<for<'a> fn(&'a str) -> Str<'a> {mk_str}, {closure@$DIR/fn-traits-hrtb-coercion.rs:37:26: 37:29}>`
+  --> $DIR/fn-traits-hrtb-coercion.rs:37:10
+   |
+LL |     test(Compose(mk_str, |_| {}));
+   |     ---- ^^^^^^^^^^^^^^^^^^^^^^^ expected an `FnOnce(&'x str)` closure, found `Compose<for<'a> fn(&'a str) -> Str<'a> {mk_str}, {closure@$DIR/fn-traits-hrtb-coercion.rs:37:26: 37:29}>`
+   |     |
+   |     required by a bound introduced by this call
+   |
+help: the trait `for<'x> FnOnce(&'x str)` is not implemented for `Compose<for<'a> fn(&'a str) -> Str<'a> {mk_str}, {closure@$DIR/fn-traits-hrtb-coercion.rs:37:26: 37:29}>`
+  --> $DIR/fn-traits-hrtb-coercion.rs:8:1
+   |
+LL | struct Compose<F, G>(F, G);
+   | ^^^^^^^^^^^^^^^^^^^^
+   = note: expected a closure with signature `for<'x> fn(&'x _)`
+              found a closure with signature `fn(&_)`
+note: this is a known limitation of the trait solver that will be lifted in the future
+  --> $DIR/fn-traits-hrtb-coercion.rs:37:10
+   |
+LL |     test(Compose(mk_str, |_| {}));
+   |     -----^^^^^^^^^^^^^^^^^^^^^^^-
+   |     |    |
+   |     |    the trait solver is unable to infer the generic types that should be inferred from this argument
+   |     add turbofish arguments to this call to specify the types manually, even if it's redundant
+note: required by a bound in `test`
+  --> $DIR/fn-traits-hrtb-coercion.rs:6:12
+   |
+LL | fn test<F: for<'x> FnOnce<(&'x str,)>>(_: F) {}
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `test`
+
+error: aborting due to 3 previous errors
+
+Some errors have detailed explanations: E0277, E0308.
+For more information about an error, try `rustc --explain E0277`.

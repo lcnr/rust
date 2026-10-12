@@ -1,15 +1,25 @@
-error: item does not constrain `Helper::{opaque#0}`
-  --> $DIR/issue-87258_b.rs:21:8
+warning: trait `Trait1` is more private than the item `Trait2::FooFuture`
+  --> $DIR/issue-87258_b.rs:12:5
    |
-LL |     fn foo<'a>() -> Self::FooFuture<'a> {
-   |        ^^^
+LL |     type FooFuture<'a>: Trait1;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ associated type `Trait2::FooFuture` is reachable at visibility `pub`
    |
-   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
-note: this opaque type is supposed to be constrained
-  --> $DIR/issue-87258_b.rs:16:49
+note: but trait `Trait1` is only usable at visibility `pub(crate)`
+  --> $DIR/issue-87258_b.rs:5:1
+   |
+LL | trait Trait1 {}
+   | ^^^^^^^^^^^^
+   = note: `#[warn(private_bounds)]` on by default
+
+error[E0446]: private type alias `Helper` in public interface
+  --> $DIR/issue-87258_b.rs:19:5
    |
 LL | type Helper<'xenon, 'yttrium, KABOOM: Trait2> = impl Trait1;
-   |                                                 ^^^^^^^^^^^
+   | --------------------------------------------- `Helper` declared as private
+...
+LL |     type FooFuture<'a> = Helper<'c, 'a, S>;
+   |     ^^^^^^^^^^^^^^^^^^ can't leak private type alias
 
-error: aborting due to 1 previous error
+error: aborting due to 1 previous error; 1 warning emitted
 
+For more information about this error, try `rustc --explain E0446`.

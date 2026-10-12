@@ -21,7 +21,7 @@ LL | trait MPU {
 LL |     type MpuConfig: MyDisplay = T;
    |                     ^^^^^^^^^ required by this bound in `MPU::MpuConfig`
 
-error[E0277]: the trait bound `T: MyDisplay` is not satisfied
+error[E0277]: the trait bound `&&mut T: CoerceUnsized<&dyn MyDisplay>` is not satisfied
   --> $DIR/issue-65774-1.rs:44:76
    |
 LL |         let closure = |config: &mut <S as MPU>::MpuConfig| writer.my_write(&config);
@@ -44,6 +44,8 @@ LL | impl<'a, T: MyDisplay> MyDisplay for &'a mut T { }
    |             ---------  ^^^^^^^^^     ^^^^^^^^^
    |             |
    |             unsatisfied trait bound introduced here
+   = note: required because it appears within the type `&mut T`
+   = note: required for `&&mut T` to implement `CoerceUnsized<&dyn MyDisplay>`
    = note: required for the cast from `&&mut T` to `&dyn MyDisplay`
 
 error: aborting due to 2 previous errors

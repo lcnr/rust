@@ -12,6 +12,12 @@ help: this trait has no implementations, consider adding one
 LL | trait LendingIterator {
    | ^^^^^^^^^^^^^^^^^^^^^
 
+error: the type `Box<for<'a> fn(<() as LendingIterator>::Item<'a>)>` is not well-formed
+  --> $DIR/hr_alias_normalization_leaking_vars.rs:34:36
+   |
+LL |     LendingIterator::for_each(&(), f);
+   |                                    ^
+
 error[E0308]: mismatched types
   --> $DIR/hr_alias_normalization_leaking_vars.rs:34:36
    |
@@ -40,7 +46,7 @@ help: this trait has no implementations, consider adding one
 LL | trait LendingIterator {
    | ^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 3 previous errors
+error: aborting due to 4 previous errors
 
 Some errors have detailed explanations: E0277, E0308.
 For more information about an error, try `rustc --explain E0277`.

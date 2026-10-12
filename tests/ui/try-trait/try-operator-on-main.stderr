@@ -25,6 +25,15 @@ LL |     ()?;
    = help: the nightly-only, unstable trait `Try` is not implemented for `()`
 
 error[E0277]: the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)
+  --> $DIR/try-operator-on-main.rs:10:5
+   |
+LL | fn main() {
+   | --------- this function should return `Result` or `Option` to accept `?`
+...
+LL |     ()?;
+   |     ^^^ cannot use the `?` operator in a function that returns `()`
+
+error[E0277]: the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)
   --> $DIR/try-operator-on-main.rs:10:7
    |
 LL | fn main() {
@@ -53,6 +62,15 @@ LL |     ()?;
    |
    = help: the nightly-only, unstable trait `Try` is not implemented for `()`
 
-error: aborting due to 5 previous errors
+error[E0277]: the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)
+  --> $DIR/try-operator-on-main.rs:19:5
+   |
+LL | fn try_trait_generic<T: Try>() -> T {
+   | ----------------------------------- this function should return `Result` or `Option` to accept `?`
+LL |     // and a non-`Try` object on a `Try` fn.
+LL |     ()?;
+   |     ^^^ cannot use the `?` operator in a function that returns `()`
+
+error: aborting due to 7 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

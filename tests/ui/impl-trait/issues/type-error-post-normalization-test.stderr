@@ -5,10 +5,10 @@ LL | fn other_define() -> Tait {
    |                      ^^^^ expected `&isize`, got `()`
    |
 note: previous use here
-  --> $DIR/type-error-post-normalization-test.rs:16:9
+  --> $DIR/type-error-post-normalization-test.rs:15:9
    |
-LL |     set(x);
-   |         ^
+LL | fn d(x: Tait) {
+   |         ^^^^
 
 error: aborting due to 1 previous error
 

@@ -1,17 +1,55 @@
-error: implementation of `Trait` is not general enough
+error[E0277]: the trait bound `for<'a> fn(&'a ()): Trait` is not satisfied
+  --> $DIR/do-not-blame-outlives-static-ice.rs:8:20
+   |
+LL | fn f(_: for<'a> fn(<fn(&'a ()) as Trait>::Assoc)) {}
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `for<'a> Trait` is not implemented for `for<'a> fn(&'a ())`
+   |
+help: the trait `Trait` is not implemented for `for<'a> fn(&'a ())`
+      but trait `Trait` is implemented for it
+  --> $DIR/do-not-blame-outlives-static-ice.rs:6:1
+   |
+LL | impl Trait for fn(&()) { type Assoc = (); }
+   | ^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `for<'a> fn(&'a ()): Trait` is not satisfied
   --> $DIR/do-not-blame-outlives-static-ice.rs:8:9
    |
 LL | fn f(_: for<'a> fn(<fn(&'a ()) as Trait>::Assoc)) {}
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ implementation of `Trait` is not general enough
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `for<'a> Trait` is not implemented for `for<'a> fn(&'a ())`
    |
-   = note: `for<'a> fn(&'a ())` must implement `Trait`, for any lifetime `'0`...
-   = note: ...but `Trait` is actually implemented for the type `for<'a> fn(&'a ())`
+help: the trait `Trait` is not implemented for `for<'a> fn(&'a ())`
+      but trait `Trait` is implemented for it
+  --> $DIR/do-not-blame-outlives-static-ice.rs:6:1
+   |
+LL | impl Trait for fn(&()) { type Assoc = (); }
+   | ^^^^^^^^^^^^^^^^^^^^^^
 
-error: higher-ranked subtype error
+error[E0277]: the trait bound `for<'a> fn(&'a ()): Trait` is not satisfied
+  --> $DIR/do-not-blame-outlives-static-ice.rs:8:6
+   |
+LL | fn f(_: for<'a> fn(<fn(&'a ()) as Trait>::Assoc)) {}
+   |      ^ the trait `for<'a> Trait` is not implemented for `for<'a> fn(&'a ())`
+   |
+help: the trait `Trait` is not implemented for `for<'a> fn(&'a ())`
+      but trait `Trait` is implemented for it
+  --> $DIR/do-not-blame-outlives-static-ice.rs:6:1
+   |
+LL | impl Trait for fn(&()) { type Assoc = (); }
+   | ^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `for<'a> fn(&'a ()): Trait` is not satisfied
   --> $DIR/do-not-blame-outlives-static-ice.rs:8:1
    |
 LL | fn f(_: for<'a> fn(<fn(&'a ()) as Trait>::Assoc)) {}
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `for<'a> Trait` is not implemented for `for<'a> fn(&'a ())`
+   |
+help: the trait `Trait` is not implemented for `for<'a> fn(&'a ())`
+      but trait `Trait` is implemented for it
+  --> $DIR/do-not-blame-outlives-static-ice.rs:6:1
+   |
+LL | impl Trait for fn(&()) { type Assoc = (); }
+   | ^^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 2 previous errors
+error: aborting due to 4 previous errors
 
+For more information about this error, try `rustc --explain E0277`.

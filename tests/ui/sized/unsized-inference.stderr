@@ -17,13 +17,6 @@ LL |     let y: Vec<dyn Display> = x.into_iter().collect();
    = help: the trait `FromIterator<{integer}>` is not implemented for `Vec<dyn std::fmt::Display>`
 help: the trait `FromIterator<T>` is implemented for `Vec<T>`
   --> $SRC_DIR/alloc/src/vec/mod.rs:LL:COL
-note: the method call chain might not have had the expected associated types
-  --> $DIR/unsized-inference.rs:6:33
-   |
-LL |     let x = vec![1, 2, 3];
-   |             ------------- this expression has type `Vec<{integer}>`
-LL |     let y: Vec<dyn Display> = x.into_iter().collect();
-   |                                 ^^^^^^^^^^^ `Iterator::Item` is `{integer}` here
 note: required by a bound in `collect`
   --> $SRC_DIR/core/src/iter/traits/iterator.rs:LL:COL
 

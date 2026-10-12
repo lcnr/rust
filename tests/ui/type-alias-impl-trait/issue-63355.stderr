@@ -1,15 +1,11 @@
-error: item does not constrain `FooImpl::{opaque#0}`
-  --> $DIR/issue-63355.rs:43:8
+error[E0282]: type annotations needed
+  --> $DIR/issue-63355.rs:43:17
    |
 LL |     fn bar() -> Self::Bar {
-   |        ^^^
+   |                 ^^^^^^^^^ cannot infer type
    |
-   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
-note: this opaque type is supposed to be constrained
-  --> $DIR/issue-63355.rs:30:20
-   |
-LL | pub type FooImpl = impl Foo;
-   |                    ^^^^^^^^
+   = note: cannot infer type of hidden type of opaque
 
 error: aborting due to 1 previous error
 
+For more information about this error, try `rustc --explain E0282`.

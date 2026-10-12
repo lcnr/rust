@@ -1,28 +1,27 @@
-error[E0275]: overflow evaluating the requirement `<T as B>::Type == <T as B>::Type`
+error[E0277]: the trait bound `T: B` is not satisfied
   --> $DIR/impl-wf-cycle-3.rs:7:1
    |
 LL | / impl<T> B for T
 LL | | where
 LL | |     T: A<Self::Type>,
-   | |_____________________^
-LL |   {
-LL |       type Type = bool;
-   |       --------- associated type `<T as B>::Type` is specified here
+   | |_____________________^ the trait `B` is not implemented for `T`
    |
-note: required for `T` to implement `B`
-  --> $DIR/impl-wf-cycle-3.rs:7:9
+help: consider further restricting type parameter `T` with trait `B`
    |
-LL | impl<T> B for T
-   |         ^     ^
-LL | where
-LL |     T: A<Self::Type>,
-   |        ------------- unsatisfied trait bound introduced here
-help: replace the associated type with the type specified in this `impl`
-   |
-LL -     T: A<Self::Type>,
-LL +     T: A<bool>,
-   |
+LL |     T: A<Self::Type> + B,
+   |                      +++
 
-error: aborting due to 1 previous error
+error[E0277]: the trait bound `T: B` is not satisfied
+  --> $DIR/impl-wf-cycle-3.rs:11:5
+   |
+LL |     type Type = bool;
+   |     ^^^^^^^^^ the trait `B` is not implemented for `T`
+   |
+help: consider further restricting type parameter `T` with trait `B`
+   |
+LL |     T: A<Self::Type> + B,
+   |                      +++
 
-For more information about this error, try `rustc --explain E0275`.
+error: aborting due to 2 previous errors
+
+For more information about this error, try `rustc --explain E0277`.
