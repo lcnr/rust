@@ -10,12 +10,21 @@ note: for this opaque type
 LL |     type Bar<T> = impl Sized;
    |                   ^^^^^^^^^^
 
-error[E0792]: expected generic type parameter, found `u32`
-  --> $DIR/multi-error.rs:17:17
+error: item does not constrain `<() as Foo>::Bar::{opaque#0}`
+  --> $DIR/multi-error.rs:17:8
+   |
+LL |     fn foo() -> (Self::Bar<u32>, Self::Baz) {
+   |        ^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/multi-error.rs:15:19
    |
 LL |     type Bar<T> = impl Sized;
-   |              - this generic parameter must be used with a generic type parameter
-LL |     type Baz = impl Sized;
+   |                   ^^^^^^^^^^
+note: this use of `<() as Foo>::Bar<u32>` does not have unique universal generic arguments
+  --> $DIR/multi-error.rs:17:17
+   |
 LL |     fn foo() -> (Self::Bar<u32>, Self::Baz) {
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

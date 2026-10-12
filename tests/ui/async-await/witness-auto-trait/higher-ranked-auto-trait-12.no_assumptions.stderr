@@ -1,4 +1,4 @@
-error: implementation of `Robot` is not general enough
+error: higher-ranked lifetime error
   --> $DIR/higher-ranked-auto-trait-12.rs:31:20
    |
 LL |       let _my_task = this_is_send(async move {
@@ -11,12 +11,7 @@ LL | |         yield_now().await;
 LL | |     });
    | |______^
    |
-note: `Box<(dyn Robot<Id = u32> + Send + '0)>` must implement `Robot`, for any lifetime `'0`...
-  --> $DIR/higher-ranked-auto-trait-12.rs:24:20
-   |
-LL | fn this_is_send<T: Send>(value: T) -> T {
-   |                    ^^^^ required by this bound in `this_is_send`
-   = note: ...but `Robot` is actually implemented for the type `Box<(dyn Robot<Id = u32> + Send + 'static)>`
+   = note: could not prove `{async block@$DIR/higher-ranked-auto-trait-12.rs:31:33: 31:43}: Send`
 
 error: aborting due to 1 previous error
 

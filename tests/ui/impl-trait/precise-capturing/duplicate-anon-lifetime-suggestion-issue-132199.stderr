@@ -1,17 +1,17 @@
 error[E0700]: hidden type for `impl Sized` captures lifetime that does not appear in bounds
-  --> $DIR/duplicate-anon-lifetime-suggestion-issue-132199.rs:12:52
+  --> $DIR/duplicate-anon-lifetime-suggestion-issue-132199.rs:12:5
    |
 LL |     fn dup(&self, t: &T) -> impl Sized + use<'_> { (self, t) }
-   |                      --     --------------------   ^^^^^^^^^
+   |     ^^^^^^^^^^^^^^^^^--^^^^^--------------------
    |                      |      |
    |                      |      opaque type defined here
    |                      hidden type `(&T, &T)` captures the anonymous lifetime defined here
 
 error[E0700]: hidden type for `impl Sized` captures lifetime that does not appear in bounds
-  --> $DIR/duplicate-anon-lifetime-suggestion-issue-132199.rs:16:51
+  --> $DIR/duplicate-anon-lifetime-suggestion-issue-132199.rs:16:5
    |
 LL |     fn single_anon(&self) -> impl Sized + use<> { self }
-   |                    -----     ------------------   ^^^^
+   |     ^^^^^^^^^^^^^^^-----^^^^^------------------
    |                    |         |
    |                    |         opaque type defined here
    |                    hidden type `&T` captures the anonymous lifetime defined here
@@ -22,10 +22,10 @@ LL |     fn single_anon(&self) -> impl Sized + use<'_> { self }
    |                                               ++
 
 error[E0700]: hidden type for `impl Sized` captures lifetime that does not appear in bounds
-  --> $DIR/duplicate-anon-lifetime-suggestion-issue-132199.rs:20:62
+  --> $DIR/duplicate-anon-lifetime-suggestion-issue-132199.rs:20:5
    |
 LL |     fn named<'a>(&'a self, t: &'a T) -> impl Sized + use<> { (self, t) }
-   |              --                         ------------------   ^^^^^^^^^
+   |     ^^^^^^^^^--^^^^^^^^^^^^^^^^^^^^^^^^^------------------
    |              |                          |
    |              |                          opaque type defined here
    |              hidden type `(&'a T, &'a T)` captures the lifetime `'a` as defined here

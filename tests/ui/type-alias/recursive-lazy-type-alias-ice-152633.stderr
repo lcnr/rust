@@ -1,11 +1,15 @@
-error[E0275]: overflow normalizing the type alias `Arr2`
+error[E0275]: overflow evaluating the requirement `Arr2 == _`
   --> $DIR/recursive-lazy-type-alias-ice-152633.rs:12:1
    |
 LL | type Arr2 = [usize; <Arr2 as Trait>::ASSOC];
    | ^^^^^^^^^
-   |
-   = note: in case this is a recursive type alias, consider using a struct, enum, or union instead
 
-error: aborting due to 1 previous error
+error[E0275]: overflow evaluating whether `[usize; <Arr2 as Trait>::ASSOC]` is well-formed
+  --> $DIR/recursive-lazy-type-alias-ice-152633.rs:12:1
+   |
+LL | type Arr2 = [usize; <Arr2 as Trait>::ASSOC];
+   | ^^^^^^^^^
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0275`.

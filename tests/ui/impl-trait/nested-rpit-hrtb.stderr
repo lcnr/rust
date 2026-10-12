@@ -81,48 +81,79 @@ note: lifetime declared here
 LL | fn one_hrtb_trait_param_uses() -> impl for<'a> Bar<'a, Assoc = impl Qux<'a>> {}
    |                                            ^^
 
-error[E0277]: the trait bound `for<'a> &'a (): Qux<'b>` is not satisfied
-  --> $DIR/nested-rpit-hrtb.rs:45:79
+error[E0271]: type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
+  --> $DIR/nested-rpit-hrtb.rs:32:32
+   |
+LL | fn one_hrtb_outlives_uses() -> impl for<'a> Bar<'a, Assoc = impl Sized + 'a> {}
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
+   |
+note: types differ
+  --> $DIR/nested-rpit-hrtb.rs:17:18
+   |
+LL |     type Assoc = &'a ();
+   |                  ^^^^^^
+
+error[E0271]: type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
+  --> $DIR/nested-rpit-hrtb.rs:35:35
+   |
+LL | fn one_hrtb_trait_param_uses() -> impl for<'a> Bar<'a, Assoc = impl Qux<'a>> {}
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
+   |
+note: types differ
+  --> $DIR/nested-rpit-hrtb.rs:17:18
+   |
+LL |     type Assoc = &'a ();
+   |                  ^^^^^^
+
+error[E0271]: type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
+  --> $DIR/nested-rpit-hrtb.rs:45:50
    |
 LL | fn one_hrtb_mention_fn_trait_param_uses<'b>() -> impl for<'a> Bar<'a, Assoc = impl Qux<'b>> {}
-   |                                                                               ^^^^^^^^^^^^ the trait `for<'a> Qux<'b>` is not implemented for `&'a ()`
+   |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
    |
-help: the trait `Qux<'b>` is not implemented for `&'a ()`
-      but trait `Qux<'_>` is implemented for `()`
-  --> $DIR/nested-rpit-hrtb.rs:22:1
+note: types differ
+  --> $DIR/nested-rpit-hrtb.rs:17:18
    |
-LL | impl Qux<'_> for () {}
-   | ^^^^^^^^^^^^^^^^^^^
-   = help: for that trait implementation, expected `()`, found `&'a ()`
+LL |     type Assoc = &'a ();
+   |                  ^^^^^^
 
-error: implementation of `Bar` is not general enough
-  --> $DIR/nested-rpit-hrtb.rs:49:93
+error[E0271]: type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
+  --> $DIR/nested-rpit-hrtb.rs:49:47
    |
 LL | fn one_hrtb_mention_fn_outlives_uses<'b>() -> impl for<'a> Bar<'a, Assoc = impl Sized + 'b> {}
-   |                                                                                             ^^ implementation of `Bar` is not general enough
+   |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
    |
-   = note: `()` must implement `Bar<'a>`
-note: ...but it actually implements `Bar<'0>`, for some specific lifetime `'0`
-  --> $DIR/nested-rpit-hrtb.rs:16:1
+note: types differ
+  --> $DIR/nested-rpit-hrtb.rs:17:18
    |
-LL | impl<'a> Bar<'a> for () {
-   | ^^^^^^^^^^^^^^^^^^^^^^^
+LL |     type Assoc = &'a ();
+   |                  ^^^^^^
 
-error[E0277]: the trait bound `for<'a, 'b> &'a (): Qux<'b>` is not satisfied
-  --> $DIR/nested-rpit-hrtb.rs:60:64
+error[E0271]: type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
+  --> $DIR/nested-rpit-hrtb.rs:60:35
    |
 LL | fn two_htrb_trait_param_uses() -> impl for<'a> Bar<'a, Assoc = impl for<'b> Qux<'b>> {}
-   |                                                                ^^^^^^^^^^^^^^^^^^^^ the trait `for<'a, 'b> Qux<'b>` is not implemented for `&'a ()`
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
    |
-help: the trait `Qux<'b>` is not implemented for `&'a ()`
-      but trait `Qux<'_>` is implemented for `()`
-  --> $DIR/nested-rpit-hrtb.rs:22:1
+note: types differ
+  --> $DIR/nested-rpit-hrtb.rs:17:18
    |
-LL | impl Qux<'_> for () {}
-   | ^^^^^^^^^^^^^^^^^^^
-   = help: for that trait implementation, expected `()`, found `&'a ()`
+LL |     type Assoc = &'a ();
+   |                  ^^^^^^
 
-error: aborting due to 9 previous errors
+error[E0271]: type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
+  --> $DIR/nested-rpit-hrtb.rs:64:32
+   |
+LL | fn two_htrb_outlives_uses() -> impl for<'a> Bar<'a, Assoc = impl for<'b> Sized + 'b> {}
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<() as Bar<'a>>::Assoc == &()`
+   |
+note: types differ
+  --> $DIR/nested-rpit-hrtb.rs:17:18
+   |
+LL |     type Assoc = &'a ();
+   |                  ^^^^^^
 
-Some errors have detailed explanations: E0261, E0277, E0657.
+error: aborting due to 12 previous errors
+
+Some errors have detailed explanations: E0261, E0271, E0657.
 For more information about an error, try `rustc --explain E0261`.

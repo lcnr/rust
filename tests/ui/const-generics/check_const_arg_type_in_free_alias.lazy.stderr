@@ -63,12 +63,6 @@ error: the constant `B` is not of type `usize`
    |
 LL | type UseFree<const B: bool> = Free<B>;
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `usize`, found `bool`
-   |
-note: required by a bound on the type alias `Free`
-  --> $DIR/check_const_arg_type_in_free_alias.rs:37:11
-   |
-LL | type Free<const N: usize> = [(); N];
-   |           ^^^^^^^^^^^^^^ required by this bound
 
 error[E0308]: mismatched types
   --> $DIR/check_const_arg_type_in_free_alias.rs:40:25
@@ -87,12 +81,6 @@ error: the constant `N` is not of type `bool`
    |
 LL | type UseFreeIndirectlyCorrect<const N: usize> = UseFree<N>;
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `bool`, found `usize`
-   |
-note: required by a bound on the type alias `UseFree`
-  --> $DIR/check_const_arg_type_in_free_alias.rs:38:14
-   |
-LL | type UseFree<const B: bool> = Free<B>;
-   |              ^^^^^^^^^^^^^ required by this bound
 
 error[E0308]: mismatched types
   --> $DIR/check_const_arg_type_in_free_alias.rs:53:45

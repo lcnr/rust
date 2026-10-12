@@ -15,6 +15,19 @@ note: required by a bound in `Struct`
 LL | struct Struct<T: Trait> {
    |                  ^^^^^ required by this bound in `Struct`
 
-error: aborting due to 1 previous error
+error[E0277]: the size for values of type `Struct<i8>` cannot be known at compilation time
+  --> $DIR/extern-static-normalization-failure-issue-148161.rs:17:5
+   |
+LL |     static VAR: Struct<i8>;
+   |     ^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
+   |
+help: the trait `Sized` is not implemented for `Struct<i8>`
+  --> $DIR/extern-static-normalization-failure-issue-148161.rs:10:1
+   |
+LL | struct Struct<T: Trait> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+   = note: statics and constants must have a statically known size
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

@@ -8,10 +8,10 @@ LL | fn lifetime_in_bounds<'a>(x: &'a ()) -> impl Into<&'a ()> + use<> { x }
    |                       this lifetime parameter is captured
 
 error[E0700]: hidden type for `impl Sized` captures lifetime that does not appear in bounds
-  --> $DIR/forgot-to-capture-lifetime.rs:4:62
+  --> $DIR/forgot-to-capture-lifetime.rs:4:1
    |
 LL | fn lifetime_in_hidden<'a>(x: &'a ()) -> impl Sized + use<> { x }
-   |                       --                ------------------   ^
+   | ^^^^^^^^^^^^^^^^^^^^^^--^^^^^^^^^^^^^^^^------------------
    |                       |                 |
    |                       |                 opaque type defined here
    |                       hidden type `&'a ()` captures the lifetime `'a` as defined here

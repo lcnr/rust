@@ -14,13 +14,22 @@ error[E0207]: the type parameter `U` is not constrained by the impl trait, self 
 LL | impl<U> Trait for () where (U,): AssocConst<A = 0> {}
    |      ^ unconstrained type parameter
 
-error[E0282]: type annotations needed
-  --> $DIR/unconstrained_impl_param.rs:21:5
+error[E0283]: type annotations needed: cannot satisfy `(): Trait`
+  --> $DIR/unconstrained_impl_param.rs:21:9
    |
 LL |     (): Trait,
-   |     ^^^^^^^^^ cannot infer type for type parameter `U`
+   |         ^^^^^
+   |
+note: multiple `impl`s or `where` clauses satisfying `(): Trait` found
+  --> $DIR/unconstrained_impl_param.rs:15:1
+   |
+LL | impl<U> Trait for () where (U,): AssocConst<A = 0> {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+LL |     (): Trait,
+   |         ^^^^^
 
 error: aborting due to 3 previous errors
 
-Some errors have detailed explanations: E0207, E0282, E0658.
+Some errors have detailed explanations: E0207, E0283, E0658.
 For more information about an error, try `rustc --explain E0207`.

@@ -10,6 +10,14 @@ error[E0308]: mismatched types
 LL | impl<'a, T: std::fmt::Debug, const N: usize> Iterator for ConstChunksExact<'a, T, {}> {
    |                                                                                   ^^ expected `usize`, found `()`
 
+error[E0284]: type annotations needed
+  --> $DIR/normalizing_with_unconstrained_impl_params.rs:6:5
+   |
+LL |     fn next(&mut self) -> Option<Self::Item> {}
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type
+   |
+   = note: cannot satisfy `<ConstChunksExact<'a, T, N> as Iterator>::Item == _`
+
 error[E0046]: not all trait items implemented, missing: `Item`
   --> $DIR/normalizing_with_unconstrained_impl_params.rs:4:1
    |
@@ -17,6 +25,21 @@ LL | impl<'a, T: std::fmt::Debug, const N: usize> Iterator for ConstChunksExact<
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `Item` in implementation
    |
    = help: implement the missing item: `type Item = /* Type */;`
+
+error[E0283]: type annotations needed: cannot satisfy `ConstChunksExact<'a, T, N>: Iterator`
+  --> $DIR/normalizing_with_unconstrained_impl_params.rs:4:59
+   |
+LL | impl<'a, T: std::fmt::Debug, const N: usize> Iterator for ConstChunksExact<'a, T, { N }> {
+   |                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: multiple `impl`s satisfying `ConstChunksExact<'a, T, N>: Iterator` found
+  --> $DIR/normalizing_with_unconstrained_impl_params.rs:4:1
+   |
+LL | impl<'a, T: std::fmt::Debug, const N: usize> Iterator for ConstChunksExact<'a, T, { N }> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+LL | impl<'a, T: std::fmt::Debug, const N: usize> Iterator for ConstChunksExact<'a, T, {}> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error[E0392]: lifetime parameter `'a` is never used
   --> $DIR/normalizing_with_unconstrained_impl_params.rs:9:25
@@ -62,6 +85,14 @@ LL |
 LL ~ impl<'a, T: std::fmt::Debug, const N: usize> Iterator for ConstChunksExact<'a, T, {}, N> {
    |
 
+error[E0284]: type annotations needed
+  --> $DIR/normalizing_with_unconstrained_impl_params.rs:6:27
+   |
+LL |     fn next(&mut self) -> Option<Self::Item> {}
+   |                           ^^^^^^^^^^^^^^^^^^ cannot infer type
+   |
+   = note: cannot satisfy `<ConstChunksExact<'a, T, N> as Iterator>::Item == _`
+
 error[E0308]: mismatched types
   --> $DIR/normalizing_with_unconstrained_impl_params.rs:6:27
    |
@@ -73,7 +104,7 @@ LL |     fn next(&mut self) -> Option<Self::Item> {}
    = note:   expected enum `Option<_>`
            found unit type `()`
 
-error: aborting due to 8 previous errors
+error: aborting due to 11 previous errors
 
-Some errors have detailed explanations: E0046, E0207, E0308, E0392, E0520, E0637.
+Some errors have detailed explanations: E0046, E0207, E0283, E0284, E0308, E0392, E0520, E0637.
 For more information about an error, try `rustc --explain E0046`.

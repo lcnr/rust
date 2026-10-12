@@ -10,28 +10,41 @@ LL |     Thunk::new(|cont| cont)
    = note: expected struct `Thunk<_>`
            found unit type `()`
 
-error[E0277]: expected an `FnOnce()` closure, found `()`
-  --> $DIR/lazy_subtyping_of_opaques.rs:12:23
+error[E0271]: type mismatch resolving `Tait == ()`
+  --> $DIR/lazy_subtyping_of_opaques.rs:10:29
    |
-LL |     Thunk::new(|cont| cont)
-   |                       ^^^^ expected an `FnOnce()` closure, found `()`
-   |
-   = help: the trait `FnOnce()` is not implemented for `()`
-   = note: wrap the `()` in a closure with no arguments: `|| { /* code */ }`
+LL | fn reify_as_tait() -> Thunk<Tait> {
+   |                             ^^^^ types differ
 
-error[E0277]: expected an `FnOnce()` closure, found `()`
+error[E0271]: type mismatch resolving `Tait == ()`
   --> $DIR/lazy_subtyping_of_opaques.rs:10:23
    |
 LL | fn reify_as_tait() -> Thunk<Tait> {
-   |                       ^^^^^^^^^^^ expected an `FnOnce()` closure, found `()`
-LL |
-LL |     Thunk::new(|cont| cont)
-   |     ----------------------- return type was inferred to be `{type error}` here
+   |                       ^^^^^^^^^^^ types differ
+
+error[E0277]: the trait bound `{closure@$DIR/lazy_subtyping_of_opaques.rs:12:16: 12:22}: ContFn` is not satisfied
+  --> $DIR/lazy_subtyping_of_opaques.rs:12:16
    |
-   = help: the trait `FnOnce()` is not implemented for `()`
-   = note: wrap the `()` in a closure with no arguments: `|| { /* code */ }`
+LL |     Thunk::new(|cont| cont)
+   |     ---------- ^^^^^^^^^^^ unsatisfied trait bound
+   |     |
+   |     required by a bound introduced by this call
+   |
+help: the trait `ContFn` is not implemented for closure `{closure@$DIR/lazy_subtyping_of_opaques.rs:12:16: 12:22}`
+  --> $DIR/lazy_subtyping_of_opaques.rs:12:16
+   |
+LL |     Thunk::new(|cont| cont)
+   |                ^^^^^^
+note: required by a bound in `Thunk::<F>::new`
+  --> $DIR/lazy_subtyping_of_opaques.rs:22:12
+   |
+LL | impl<F> Thunk<F> {
+LL |     fn new(f: F)
+LL |     where
+LL |         F: ContFn,
+   |            ^^^^^^ required by this bound in `Thunk::<F>::new`
 
-error: aborting due to 3 previous errors
+error: aborting due to 4 previous errors
 
-Some errors have detailed explanations: E0277, E0308.
-For more information about an error, try `rustc --explain E0277`.
+Some errors have detailed explanations: E0271, E0277, E0308.
+For more information about an error, try `rustc --explain E0271`.

@@ -1,19 +1,29 @@
-error: `impl` item signature doesn't match `trait` item signature
+error[E0803]: cannot infer an appropriate lifetime for lifetime parameter '_ in generic type due to conflicting requirements
   --> $DIR/no-shadow-pin-self.rs:10:5
    |
-LL | trait Trait {
-LL |     fn method<'a>(self: Pin<&Self>, f: &'a u32) -> &'a u32 {
-   |     ------------------------------------------------------ expected `fn(Pin<&'1 Pin<P>>, &'a u32) -> &'a u32`
-...
-LL | impl<P> Trait for Pin<P> {
-LL |     // This should not hide `&Self`, which would cause this to compile.
 LL |     fn method(self: Pin<&Self>, f: &u32) -> &u32 {
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ found `fn(Pin<&'1 Pin<P>>, &'2 u32) -> &'1 u32`
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: expected signature `fn(Pin<&'1 Pin<P>>, &'a u32) -> &'a u32`
-              found signature `fn(Pin<&'1 Pin<P>>, &'2 u32) -> &'1 u32`
-   = help: the lifetime requirements from the `impl` do not correspond to the requirements in the `trait`
-   = help: verify the lifetime relationships in the `trait` and `impl` between the `self` argument, the other inputs and its output
+note: first, the lifetime cannot outlive the anonymous lifetime defined here...
+  --> $DIR/no-shadow-pin-self.rs:3:29
+   |
+LL |     fn method<'a>(self: Pin<&Self>, f: &'a u32) -> &'a u32 {
+   |                             ^^^^^
+note: ...so that the declared lifetime parameter bounds are satisfied
+  --> $DIR/no-shadow-pin-self.rs:10:5
+   |
+LL |     fn method(self: Pin<&Self>, f: &u32) -> &u32 {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: but, the lifetime must be valid for the lifetime `'a` as defined here...
+  --> $DIR/no-shadow-pin-self.rs:3:15
+   |
+LL |     fn method<'a>(self: Pin<&Self>, f: &'a u32) -> &'a u32 {
+   |               ^^
+note: ...so that the declared lifetime parameter bounds are satisfied
+  --> $DIR/no-shadow-pin-self.rs:10:5
+   |
+LL |     fn method(self: Pin<&Self>, f: &u32) -> &u32 {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: lifetime may not live long enough
   --> $DIR/no-shadow-pin-self.rs:12:9
@@ -33,3 +43,4 @@ LL |     fn method<'a>(self: Pin<&Self>, f: &'a u32) -> &'a u32 {
 
 error: aborting due to 2 previous errors
 
+For more information about this error, try `rustc --explain E0803`.

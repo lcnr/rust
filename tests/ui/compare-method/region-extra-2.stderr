@@ -1,18 +1,20 @@
-error[E0276]: impl has stricter requirements than trait
+error[E0478]: lifetime bound not satisfied
   --> $DIR/region-extra-2.rs:9:53
    |
-LL |     fn renew<'b: 'a>(self) -> &'b mut [T];
-   |     -------------------------------------- definition of `renew` from trait
-...
 LL |     fn renew<'b: 'a>(self) -> &'b mut [T] where 'a: 'b {
-   |                                                     ^^ impl has extra requirement `'a: 'b`
+   |                                                     ^^
    |
-help: copy the `where` clause predicates from the trait
+note: lifetime parameter instantiated with the lifetime `'a` as defined here
+  --> $DIR/region-extra-2.rs:8:6
    |
-LL -     fn renew<'b: 'a>(self) -> &'b mut [T] where 'a: 'b {
-LL +     fn renew<'b: 'a>(self) -> &'b mut [T] where 'b: 'a {
+LL | impl<'a, T> Tr<'a, T> for &'a mut [T] {
+   |      ^^
+note: but lifetime parameter must outlive the lifetime `'b` as defined here
+  --> $DIR/region-extra-2.rs:9:14
    |
+LL |     fn renew<'b: 'a>(self) -> &'b mut [T] where 'a: 'b {
+   |              ^^
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0276`.
+For more information about this error, try `rustc --explain E0478`.

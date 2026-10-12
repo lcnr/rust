@@ -252,22 +252,6 @@ note: the late bound lifetime parameter is introduced here
 LL | const fn faz<'a>(_: &'a ()) -> usize { 13 }
    |              ^^
 
-error: constant expression depends on a generic parameter
-  --> $DIR/const-arg-in-const-arg.rs:24:17
-   |
-LL |     let _ = [0; foo::<T>()];
-   |                 ^^^^^^^^^^
-   |
-   = note: this may fail depending on what value the parameter takes
-
-error: constant expression depends on a generic parameter
-  --> $DIR/const-arg-in-const-arg.rs:24:13
-   |
-LL |     let _ = [0; foo::<T>()];
-   |             ^^^^^^^^^^^^^^^
-   |
-   = note: this may fail depending on what value the parameter takes
-
 error[E0794]: cannot specify lifetime arguments explicitly if late bound lifetime parameters are present
   --> $DIR/const-arg-in-const-arg.rs:27:23
    |
@@ -340,6 +324,6 @@ note: the late bound lifetime parameter is introduced here
 LL | const fn faz<'a>(_: &'a ()) -> usize { 13 }
    |              ^^
 
-error: aborting due to 33 previous errors
+error: aborting due to 31 previous errors
 
 For more information about this error, try `rustc --explain E0794`.

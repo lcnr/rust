@@ -4,7 +4,7 @@ error[E0477]: the type `impl Future<Output = Vec<u8>>` does not fulfill the requ
 LL |     ) -> impl Future<Output = Vec<u8>> {
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-note: type must outlive the lifetime `'a` as defined here as required by this binding
+note: type must outlive the lifetime `'a` as defined here
   --> $DIR/signature-mismatch.rs:73:32
    |
 LL |     fn async_fn_reduce_outlive<'a, 'b, T>(

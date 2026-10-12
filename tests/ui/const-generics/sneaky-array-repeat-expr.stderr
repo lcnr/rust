@@ -1,34 +1,25 @@
-error: constant expression depends on a generic parameter
-  --> $DIR/sneaky-array-repeat-expr.rs:11:20
+error[E0282]: type annotations needed for `[(); _]`
+  --> $DIR/sneaky-array-repeat-expr.rs:11:9
    |
 LL |     let bar = [(); <()>::Assoc];
-   |                    ^^^^^^^^^^^
+   |         ^^^    -- type must be known at this point
    |
-   = note: this may fail depending on what value the parameter takes
+help: consider giving `bar` an explicit type, where the placeholders `_` are specified
+   |
+LL |     let bar: [_; _] = [(); <()>::Assoc];
+   |            ++++++++
 
-error: constant expression depends on a generic parameter
-  --> $DIR/sneaky-array-repeat-expr.rs:11:15
-   |
-LL |     let bar = [(); <()>::Assoc];
-   |               ^^^^^^^^^^^^^^^^^
-   |
-   = note: this may fail depending on what value the parameter takes
-
-error: constant expression depends on a generic parameter
-  --> $DIR/sneaky-array-repeat-expr.rs:26:21
+error[E0282]: type annotations needed for `[(); _]`
+  --> $DIR/sneaky-array-repeat-expr.rs:26:9
    |
 LL |     let bar2 = [(); <()>::Assoc2];
-   |                     ^^^^^^^^^^^^
+   |         ^^^^    -- type must be known at this point
    |
-   = note: this may fail depending on what value the parameter takes
-
-error: constant expression depends on a generic parameter
-  --> $DIR/sneaky-array-repeat-expr.rs:26:16
+help: consider giving `bar2` an explicit type, where the placeholders `_` are specified
    |
-LL |     let bar2 = [(); <()>::Assoc2];
-   |                ^^^^^^^^^^^^^^^^^^
-   |
-   = note: this may fail depending on what value the parameter takes
+LL |     let bar2: [_; _] = [(); <()>::Assoc2];
+   |             ++++++++
 
-error: aborting due to 4 previous errors
+error: aborting due to 2 previous errors
 
+For more information about this error, try `rustc --explain E0282`.

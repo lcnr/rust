@@ -1,9 +1,27 @@
-error[E0282]: type annotations needed
+error[E0283]: type annotations needed
   --> $DIR/send-with-unspecified-type.rs:13:27
    |
+LL |     spawn(move || {
+   |     ----- required by a bound introduced by this call
 LL |         tx.send(Foo{ foo: PhantomData });
    |                           ^^^^^^^^^^^ cannot infer type of the type parameter `T` declared on the struct `PhantomData`
    |
+   = note: the type must implement `Send`
+note: required because it appears within the type `PhantomData<_>`
+  --> $SRC_DIR/core/src/marker.rs:LL:COL
+note: required because it appears within the type `Foo<_>`
+  --> $DIR/send-with-unspecified-type.rs:7:16
+   |
+LL | struct Foo<T> {foo: PhantomData<T>}
+   |                ^^^^^^^^^^^^^^^^^^^ required by this field
+   = note: required for `std::sync::mpsc::Sender<Foo<_>>` to implement `Send`
+note: required because `tx` is used within this closure
+  --> $DIR/send-with-unspecified-type.rs:13:9
+   |
+LL |         tx.send(Foo{ foo: PhantomData });
+   |         ^^
+note: required by a bound in `spawn`
+  --> $SRC_DIR/std/src/thread/functions.rs:LL:COL
 help: consider specifying a concrete type for the type parameter `T`
    |
 LL |         tx.send(Foo{ foo: PhantomData::</* Type */> });
@@ -11,4 +29,4 @@ LL |         tx.send(Foo{ foo: PhantomData::</* Type */> });
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0282`.
+For more information about this error, try `rustc --explain E0283`.

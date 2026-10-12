@@ -1,37 +1,24 @@
-error: implementation of `FnOnce` is not general enough
-  --> $DIR/issue-79187.rs:5:5
+error[E0277]: expected an `FnOnce(&u32)` closure, found `{closure@$DIR/issue-79187.rs:4:13: 4:16}`
+  --> $DIR/issue-79187.rs:5:11
    |
 LL |     thing(f);
-   |     ^^^^^^^^
+   |     ----- ^ expected an `FnOnce(&u32)` closure, found `{closure@$DIR/issue-79187.rs:4:13: 4:16}`
+   |     |
+   |     required by a bound introduced by this call
    |
-note: closure with signature `fn(&'2 u32)` must implement `FnOnce<(&'1 u32,)>`, for any lifetime `'1`...
+help: the trait `for<'a> FnOnce(&'a u32)` is not implemented for closure `{closure@$DIR/issue-79187.rs:4:13: 4:16}`
+  --> $DIR/issue-79187.rs:4:13
+   |
+LL |     let f = |_| ();
+   |             ^^^
+   = note: expected a closure with signature `for<'a> fn(&'a _)`
+              found a closure with signature `fn(&_)`
+note: required by a bound in `thing`
   --> $DIR/issue-79187.rs:1:18
    |
 LL | fn thing(x: impl FnOnce(&u32)) {}
    |                  ^^^^^^^^^^^^ required by this bound in `thing`
-   = note: ...but it actually implements `FnOnce<(&'2 u32,)>`, for some specific lifetime `'2`
-help: consider adding an explicit type annotation to the closure's argument
-   |
-LL |     let f = |_: &u32| ();
-   |               ++++++
 
-error: implementation of `FnOnce` is not general enough
-  --> $DIR/issue-79187.rs:5:5
-   |
-LL |     thing(f);
-   |     ^^^^^^^^
-   |
-note: closure with signature `fn(&'2 u32)` must implement `FnOnce<(&'1 u32,)>`, for any lifetime `'1`...
-  --> $DIR/issue-79187.rs:1:18
-   |
-LL | fn thing(x: impl FnOnce(&u32)) {}
-   |                  ^^^^^^^^^^^^ required by this bound in `thing`
-   = note: ...but it actually implements `FnOnce<(&'2 u32,)>`, for some specific lifetime `'2`
-   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
-help: consider adding an explicit type annotation to the closure's argument
-   |
-LL |     let f = |_: &u32| ();
-   |               ++++++
+error: aborting due to 1 previous error
 
-error: aborting due to 2 previous errors
-
+For more information about this error, try `rustc --explain E0277`.

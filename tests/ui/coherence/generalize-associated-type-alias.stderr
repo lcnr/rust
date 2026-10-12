@@ -9,20 +9,38 @@ help: consider introducing a `where` clause, but there might be an alternative b
 LL | impl<'a, T> Overlap<(&'a (), Assoc<'a, T>)> for T where *const T: ToUnit<'a> {}
    |                                                   ++++++++++++++++++++++++++
 
-error[E0277]: the trait bound `T: Overlap<(&'a (), _)>` is not satisfied
+error[E0277]: the trait bound `T: Overlap<(&'a (), <*const T as ToUnit<'a>>::Unit)>` is not satisfied
   --> $DIR/generalize-associated-type-alias.rs:18:49
    |
 LL | impl<'a, T> Overlap<(&'a (), Assoc<'a, T>)> for T {}
-   |                                                 ^ the trait `Overlap<(&'a (), _)>` is not implemented for `T`
+   |                                                 ^ the trait `Overlap<(&'a (), <*const T as ToUnit<'a>>::Unit)>` is not implemented for `T`
    |
-help: the trait `Overlap<(&'a (), _)>` is not implemented for `T`
-      but trait `Overlap<(&(), ())>` is implemented for `u32`
-  --> $DIR/generalize-associated-type-alias.rs:18:1
+help: consider restricting type parameter `T` with trait `Overlap`
+   |
+LL | impl<'a, T: Overlap<(&'a (), <*const T as ToUnit<'a>>::Unit)>> Overlap<(&'a (), Assoc<'a, T>)> for T {}
+   |           +++++++++++++++++++++++++++++++++++++++++++++++++++
+
+error[E0277]: the size for values of type `(&'a (), <*const T as ToUnit<'a>>::Unit)` cannot be known at compilation time
+  --> $DIR/generalize-associated-type-alias.rs:18:13
    |
 LL | impl<'a, T> Overlap<(&'a (), Assoc<'a, T>)> for T {}
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = help: for that trait implementation, expected `u32`, found `T`
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
+   |
+   = help: the trait `Sized` is not implemented for `(&'a (), <*const T as ToUnit<'a>>::Unit)`
+note: required by an implicit `Sized` bound in `Overlap`
+  --> $DIR/generalize-associated-type-alias.rs:12:15
+   |
+LL | trait Overlap<T> {}
+   |               ^ required by the implicit `Sized` requirement on this type parameter in `Overlap`
+help: consider introducing a `where` clause, but there might be an alternative better way to express this requirement
+   |
+LL | impl<'a, T> Overlap<(&'a (), Assoc<'a, T>)> for T where (&'a (), <*const T as ToUnit<'a>>::Unit): Sized {}
+   |                                                   +++++++++++++++++++++++++++++++++++++++++++++++++++++
+help: consider relaxing the implicit `Sized` restriction
+   |
+LL | trait Overlap<T: ?Sized> {}
+   |                ++++++++
 
-error: aborting due to 2 previous errors
+error: aborting due to 3 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

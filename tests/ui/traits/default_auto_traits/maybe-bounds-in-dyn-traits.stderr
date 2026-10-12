@@ -1,10 +1,10 @@
-error[E0277]: the trait bound `NonLeakS: bounds_check::LeakTr` is not satisfied
+error[E0277]: the trait bound `&NonLeakS: CoerceUnsized<&dyn bounds_check::LeakTr + Leak>` is not satisfied in `NonLeakS`
   --> $DIR/maybe-bounds-in-dyn-traits.rs:65:26
    |
 LL |     let _: &dyn LeakTr = &NonLeakS;
    |                          ^^^^^^^^^ unsatisfied trait bound
    |
-help: the trait `bounds_check::LeakTr` is not implemented for `NonLeakS`
+help: within `NonLeakS`, the trait `bounds_check::LeakTr` is not implemented for `NonLeakS`
   --> $DIR/maybe-bounds-in-dyn-traits.rs:51:1
    |
 LL | struct NonLeakS;
@@ -14,7 +14,74 @@ help: the trait `bounds_check::LeakTr` is implemented for `LeakS`
    |
 LL |     impl LeakTr for LeakS {}
    |     ^^^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `NonLeakS`
+  --> $DIR/maybe-bounds-in-dyn-traits.rs:51:8
+   |
+LL | struct NonLeakS;
+   |        ^^^^^^^^
+note: required for `&NonLeakS` to implement `CoerceUnsized<&dyn bounds_check::LeakTr + Leak>`
+  --> $DIR/maybe-bounds-in-dyn-traits.rs:38:68
+   |
+LL | impl<'a, 'b: 'a, T: ?Sized + ?Leak + Unsize<U>, U: ?Sized + ?Leak> CoerceUnsized<&'a U> for &'b T {}
+   |                                      ---------                     ^^^^^^^^^^^^^^^^^^^^     ^^^^^
+   |                                      |
+   |                                      unsatisfied trait bound introduced here
    = note: required for the cast from `&NonLeakS` to `&dyn bounds_check::LeakTr + Leak`
+
+error[E0277]: the trait bound `&NonLeakS: CoerceUnsized<&dyn bounds_check::LeakTr>` is not satisfied in `NonLeakS`
+  --> $DIR/maybe-bounds-in-dyn-traits.rs:69:36
+   |
+LL |     let _: &(dyn LeakTr + ?Leak) = &NonLeakS;
+   |                                    ^^^^^^^^^ unsatisfied trait bound
+   |
+help: within `NonLeakS`, the trait `bounds_check::LeakTr` is not implemented for `NonLeakS`
+  --> $DIR/maybe-bounds-in-dyn-traits.rs:51:1
+   |
+LL | struct NonLeakS;
+   | ^^^^^^^^^^^^^^^
+help: the trait `bounds_check::LeakTr` is implemented for `LeakS`
+  --> $DIR/maybe-bounds-in-dyn-traits.rs:62:5
+   |
+LL |     impl LeakTr for LeakS {}
+   |     ^^^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `NonLeakS`
+  --> $DIR/maybe-bounds-in-dyn-traits.rs:51:8
+   |
+LL | struct NonLeakS;
+   |        ^^^^^^^^
+note: required for `&NonLeakS` to implement `CoerceUnsized<&dyn bounds_check::LeakTr>`
+  --> $DIR/maybe-bounds-in-dyn-traits.rs:38:68
+   |
+LL | impl<'a, 'b: 'a, T: ?Sized + ?Leak + Unsize<U>, U: ?Sized + ?Leak> CoerceUnsized<&'a U> for &'b T {}
+   |                                      ---------                     ^^^^^^^^^^^^^^^^^^^^     ^^^^^
+   |                                      |
+   |                                      unsatisfied trait bound introduced here
+   = note: required for the cast from `&NonLeakS` to `&dyn bounds_check::LeakTr`
+
+error[E0277]: the trait bound `&NonLeakS: CoerceUnsized<&dyn MaybeLeakTr + Leak>` is not satisfied in `NonLeakS`
+  --> $DIR/maybe-bounds-in-dyn-traits.rs:72:31
+   |
+LL |     let _: &dyn MaybeLeakTr = &NonLeakS;
+   |                               ^^^^^^^^^ unsatisfied trait bound
+   |
+help: within `NonLeakS`, the trait `Leak` is not implemented for `NonLeakS`
+  --> $DIR/maybe-bounds-in-dyn-traits.rs:51:1
+   |
+LL | struct NonLeakS;
+   | ^^^^^^^^^^^^^^^
+note: required because it appears within the type `NonLeakS`
+  --> $DIR/maybe-bounds-in-dyn-traits.rs:51:8
+   |
+LL | struct NonLeakS;
+   |        ^^^^^^^^
+note: required for `&NonLeakS` to implement `CoerceUnsized<&dyn MaybeLeakTr + Leak>`
+  --> $DIR/maybe-bounds-in-dyn-traits.rs:38:68
+   |
+LL | impl<'a, 'b: 'a, T: ?Sized + ?Leak + Unsize<U>, U: ?Sized + ?Leak> CoerceUnsized<&'a U> for &'b T {}
+   |                                      ---------                     ^^^^^^^^^^^^^^^^^^^^     ^^^^^
+   |                                      |
+   |                                      unsatisfied trait bound introduced here
+   = note: required for the cast from `&NonLeakS` to `&dyn MaybeLeakTr + Leak`
 
 error[E0038]: the trait `DynCompatCheck2` is not dyn compatible
   --> $DIR/maybe-bounds-in-dyn-traits.rs:90:17
@@ -57,7 +124,7 @@ error[E0220]: associated type `Undefined` not found for `Leak`
 LL |     let _: dyn LeakTr + ?Leak<(), Undefined = ()>;
    |                                   ^^^^^^^^^ associated type `Undefined` not found
 
-error: aborting due to 4 previous errors
+error: aborting due to 6 previous errors
 
 Some errors have detailed explanations: E0038, E0107, E0220, E0277.
 For more information about an error, try `rustc --explain E0038`.

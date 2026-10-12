@@ -31,6 +31,20 @@ LL |     let res: () = try { };
    |
    = help: the nightly-only, unstable trait `Try` is not implemented for `()`
 
+error[E0277]: the trait bound `(): FromResidual<_>` is not satisfied
+  --> $DIR/try-block-bad-type.rs:17:25
+   |
+LL |     let res: () = try { };
+   |                         ^ the nightly-only, unstable trait `FromResidual<_>` is not implemented for `()`
+
+error[E0277]: a `try` block must return `Result` or `Option` (or another type that implements `Try`)
+  --> $DIR/try-block-bad-type.rs:17:25
+   |
+LL |     let res: () = try { };
+   |                         ^ could not wrap the final value of the block as `()` doesn't implement `Try`
+   |
+   = help: the nightly-only, unstable trait `Try` is not implemented for `()`
+
 error[E0277]: a `try` block must return `Result` or `Option` (or another type that implements `Try`)
   --> $DIR/try-block-bad-type.rs:20:26
    |
@@ -39,7 +53,13 @@ LL |     let res: i32 = try { 5 };
    |
    = help: the nightly-only, unstable trait `Try` is not implemented for `i32`
 
-error: aborting due to 5 previous errors
+error[E0277]: the trait bound `i32: FromResidual<_>` is not satisfied
+  --> $DIR/try-block-bad-type.rs:20:26
+   |
+LL |     let res: i32 = try { 5 };
+   |                          ^ the nightly-only, unstable trait `FromResidual<_>` is not implemented for `i32`
+
+error: aborting due to 8 previous errors
 
 Some errors have detailed explanations: E0271, E0277, E0308.
 For more information about an error, try `rustc --explain E0271`.

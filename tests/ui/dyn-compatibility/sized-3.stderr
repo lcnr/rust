@@ -34,6 +34,37 @@ LL | fn unsize_subtrait(x: Box<dyn Foo>) -> Box<dyn Sized> {
            for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
 
 error[E0038]: the trait `Sized` is not dyn compatible
+  --> $DIR/sized-3.rs:8:51
+   |
+LL | fn unsize_sized<T: 'static>(x: Box<T>) -> Box<dyn Sized> {
+   |                                                   ^^^^^ `Sized` is not dyn compatible
+   |
+   = note: the trait is not dyn compatible because it requires `Self: Sized`
+   = note: for a trait to be dyn compatible it needs to allow building a vtable
+           for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
+help: consider using an opaque type instead
+   |
+LL - fn unsize_sized<T: 'static>(x: Box<T>) -> Box<dyn Sized> {
+LL + fn unsize_sized<T: 'static>(x: Box<T>) -> Box<impl Sized> {
+   |
+
+error[E0308]: mismatched types
+  --> $DIR/sized-3.rs:10:5
+   |
+LL | fn unsize_sized<T: 'static>(x: Box<T>) -> Box<dyn Sized> {
+   |                 -                         -------------- expected `Box<(dyn Sized + 'static)>` because of return type
+   |                 |
+   |                 found this type parameter
+LL |
+LL |     x
+   |     ^ expected `Box<dyn Sized>`, found `Box<T>`
+   |
+   = note: expected struct `Box<(dyn Sized + 'static)>`
+              found struct `Box<T>`
+   = help: type parameters must be constrained to match other types
+   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
+
+error[E0038]: the trait `Sized` is not dyn compatible
   --> $DIR/sized-3.rs:20:15
    |
 LL |     let _bx = unsize_sized(Box::new(vec![1, 2, 3]));
@@ -83,6 +114,7 @@ LL |     let _bx = unsize_subtrait(bx);
    = note: for a trait to be dyn compatible it needs to allow building a vtable
            for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
 
-error: aborting due to 7 previous errors
+error: aborting due to 9 previous errors
 
-For more information about this error, try `rustc --explain E0038`.
+Some errors have detailed explanations: E0038, E0308.
+For more information about an error, try `rustc --explain E0038`.

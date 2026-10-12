@@ -10,6 +10,17 @@ help: consider restricting type parameter `T` with trait `ToUnit`
 LL | impl<T: for<'a> ToUnit<'a>> Overlap<for<'a> fn(&'a (), Assoc<'a, T>)> for T {}
    |       ++++++++++++++++++++
 
-error: aborting due to 1 previous error
+error[E0277]: the trait bound `T: Overlap<for<'a> fn(&'a (), <T as ToUnit<'a>>::Unit)>` is not satisfied
+  --> $DIR/structually-relate-aliases.rs:13:55
+   |
+LL | impl<T> Overlap<for<'a> fn(&'a (), Assoc<'a, T>)> for T {}
+   |                                                       ^ the trait `Overlap<for<'a> fn(&'a (), <T as ToUnit<'a>>::Unit)>` is not implemented for `T`
+   |
+help: consider restricting type parameter `T` with trait `Overlap`
+   |
+LL | impl<T: Overlap<for<'a> fn(&'a (), <T as ToUnit<'a>>::Unit)>> Overlap<for<'a> fn(&'a (), Assoc<'a, T>)> for T {}
+   |       ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

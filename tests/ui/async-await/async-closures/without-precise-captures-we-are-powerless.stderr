@@ -28,12 +28,6 @@ LL |     outlives::<'a>(c());
 LL |     outlives::<'a>(call_once(c));
 LL | }
    | - `c` dropped here while still borrowed
-   |
-note: requirement that the value outlives `'a` introduced here
-  --> $DIR/without-precise-captures-we-are-powerless.rs:7:33
-   |
-LL | fn outlives<'a>(_: impl Sized + 'a) {}
-   |                                 ^^
 
 error[E0597]: `x` does not live long enough
   --> $DIR/without-precise-captures-we-are-powerless.rs:26:13
@@ -79,12 +73,6 @@ LL |     outlives::<'a>(c());
 LL |     outlives::<'a>(call_once(c));
 LL | }
    | - `c` dropped here while still borrowed
-   |
-note: requirement that the value outlives `'a` introduced here
-  --> $DIR/without-precise-captures-we-are-powerless.rs:7:33
-   |
-LL | fn outlives<'a>(_: impl Sized + 'a) {}
-   |                                 ^^
 
 error[E0505]: cannot move out of `c` because it is borrowed
   --> $DIR/without-precise-captures-we-are-powerless.rs:32:30
@@ -101,12 +89,6 @@ LL |     outlives::<'a>(c());
    |     argument requires that `c` is borrowed for `'a`
 LL |     outlives::<'a>(call_once(c));
    |                              ^ move out of `c` occurs here
-   |
-note: requirement that the value outlives `'a` introduced here
-  --> $DIR/without-precise-captures-we-are-powerless.rs:7:33
-   |
-LL | fn outlives<'a>(_: impl Sized + 'a) {}
-   |                                 ^^
 
 error[E0597]: `x` does not live long enough
   --> $DIR/without-precise-captures-we-are-powerless.rs:36:13
@@ -147,12 +129,6 @@ LL |     outlives::<'a>(c());
 LL |     outlives::<'a>(call_once(c));
 LL | }
    | - `c` dropped here while still borrowed
-   |
-note: requirement that the value outlives `'a` introduced here
-  --> $DIR/without-precise-captures-we-are-powerless.rs:7:33
-   |
-LL | fn outlives<'a>(_: impl Sized + 'a) {}
-   |                                 ^^
 
 error[E0621]: explicit lifetime required in the type of `x`
   --> $DIR/without-precise-captures-we-are-powerless.rs:44:5
@@ -195,12 +171,6 @@ LL |     T.outlives::<'a>(c());
 LL |     T.outlives::<'a>(call_once(c));
 LL | }
    | - `c` dropped here while still borrowed
-   |
-note: requirement that the value outlives `'a` introduced here
-  --> $DIR/without-precise-captures-we-are-powerless.rs:49:47
-   |
-LL |     fn outlives<'a>(&'a self, _: impl Sized + 'a) {}
-   |                                               ^^
 
 error: aborting due to 12 previous errors
 

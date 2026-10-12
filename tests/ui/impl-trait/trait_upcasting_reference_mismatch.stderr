@@ -1,8 +1,14 @@
-error[E0282]: type annotations needed
-  --> $DIR/trait_upcasting_reference_mismatch.rs:7:35
+error[E0282]: type annotations needed for `&dyn Trait<_> + Send`
+  --> $DIR/trait_upcasting_reference_mismatch.rs:10:13
    |
-LL | fn hello() -> &'static (dyn Trait<impl Sized> + Send) {
-   |                                   ^^^^^^^^^^ cannot infer type
+LL |         let x = hello();
+   |             ^
+   |
+   = note: cannot infer type of hidden type of opaque
+help: consider giving `x` an explicit type, where the placeholder `_` is specified
+   |
+LL |         let x: &dyn Trait<_> + Send = hello();
+   |              ++++++++++++++++++++++
 
 error: aborting due to 1 previous error
 

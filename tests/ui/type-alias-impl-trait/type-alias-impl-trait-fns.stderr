@@ -1,15 +1,11 @@
-error: item does not constrain `TE::{opaque#0}`
-  --> $DIR/type-alias-impl-trait-fns.rs:20:4
+error[E0282]: type annotations needed
+  --> $DIR/type-alias-impl-trait-fns.rs:20:14
    |
 LL | fn bla2() -> TE {
-   |    ^^^^
+   |              ^^ cannot infer type
    |
-   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
-note: this opaque type is supposed to be constrained
-  --> $DIR/type-alias-impl-trait-fns.rs:25:11
-   |
-LL | type TE = impl MyTrait;
-   |           ^^^^^^^^^^^^
+   = note: cannot infer type of hidden type of opaque
 
 error: aborting due to 1 previous error
 
+For more information about this error, try `rustc --explain E0282`.

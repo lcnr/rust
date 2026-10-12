@@ -1,23 +1,26 @@
-error: `impl` item signature doesn't match `trait` item signature
+error[E0803]: cannot infer an appropriate lifetime for lifetime parameter '_ in generic type due to conflicting requirements
   --> $DIR/issue-75361-mismatched-impl.rs:18:3
    |
-LL | pub trait Graph {
-...
-LL |   fn adjacent_edges(&self) -> Box<dyn MyTrait<Item = &Self::EdgeType>>;
-   |   --------------------------------------------------------------------- expected `fn(&'1 T) -> Box<(dyn MyTrait<Item = &'1 T> + 'static)>`
-...
-LL | impl<T> Graph for T {
-...
 LL |   fn adjacent_edges(&self) -> Box<dyn MyTrait<Item = &Self::EdgeType> + '_> {
-   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ found `fn(&'1 T) -> Box<(dyn MyTrait<Item = &'1 T> + '1)>`
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: expected signature `fn(&'1 T) -> Box<(dyn MyTrait<Item = &'1 T> + 'static)>`
-              found signature `fn(&'1 T) -> Box<(dyn MyTrait<Item = &'1 T> + '1)>`
-help: the lifetime requirements from the `impl` do not correspond to the requirements in the `trait`
-  --> $DIR/issue-75361-mismatched-impl.rs:12:55
+note: first, the lifetime cannot outlive the anonymous lifetime defined here...
+  --> $DIR/issue-75361-mismatched-impl.rs:12:21
    |
 LL |   fn adjacent_edges(&self) -> Box<dyn MyTrait<Item = &Self::EdgeType>>;
-   |                                                       ^^^^ consider borrowing this type parameter in the trait
+   |                     ^^^^^
+note: ...so that the declared lifetime parameter bounds are satisfied
+  --> $DIR/issue-75361-mismatched-impl.rs:18:3
+   |
+LL |   fn adjacent_edges(&self) -> Box<dyn MyTrait<Item = &Self::EdgeType> + '_> {
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: but, the lifetime must be valid for the static lifetime...
+note: ...so that the declared lifetime parameter bounds are satisfied
+  --> $DIR/issue-75361-mismatched-impl.rs:18:3
+   |
+LL |   fn adjacent_edges(&self) -> Box<dyn MyTrait<Item = &Self::EdgeType> + '_> {
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 
+For more information about this error, try `rustc --explain E0803`.

@@ -45,6 +45,12 @@ note: required by a const generic parameter in `foo`
 LL | fn foo<const N: Foo>() {}
    |        ^^^^^^^^^^^^ required by this const generic parameter in `foo`
 
+error: the type `Option::<u32>::Some(<T as Trait>::ASSOC)` is not well-formed
+  --> $DIR/printing_valtrees_supports_non_values.rs:29:13
+   |
+LL |     foo::<{ Option::Some::<u32> { 0: <T as Trait>::ASSOC } }>();
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 error: the constant `Option::<u32>::Some(_)` is not of type `Foo`
   --> $DIR/printing_valtrees_supports_non_values.rs:35:13
    |
@@ -57,6 +63,6 @@ note: required by a const generic parameter in `foo`
 LL | fn foo<const N: Foo>() {}
    |        ^^^^^^^^^^^^ required by this const generic parameter in `foo`
 
-error: aborting due to 5 previous errors
+error: aborting due to 6 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

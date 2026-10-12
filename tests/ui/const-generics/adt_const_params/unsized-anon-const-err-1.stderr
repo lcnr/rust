@@ -15,6 +15,8 @@ LL |     pub struct Walk<const CURRENT: usize, const REMAINING: Matrix> {
    |
    = help: add `#![feature(unsized_const_params)]` to the crate attributes to enable
    = note: this compiler was built on YYYY-MM-DD; consider upgrading it if it is out of date
+   = note: required for `&'static u32` to implement `ConstParamTy_`
+   = note: 1 redundant requirement hidden
    = note: required for `[&'static u32]` to implement `ConstParamTy_`
 
 error[E0277]: the size for values of type `[&'static u32]` cannot be known at compilation time

@@ -14,5 +14,30 @@ LL | impl<const F: fn() -> u32> Wrapper<F> {
    |
    = note: the only supported types are integers, `bool`, and `char`
 
-error: aborting due to 2 previous errors
+error[E0284]: type annotations needed
+  --> $DIR/fn-const-param-call.rs:23:16
+   |
+LL |     assert_eq!(Wrapper::<function>::call(), 17);
+   |                ^^^^^^^^^^^^^^^^^^^ cannot infer the value of the constant `_`
+   |
+   = note: cannot satisfy `main::{constant#0} == _`
 
+error[E0284]: type annotations needed
+  --> $DIR/fn-const-param-call.rs:23:16
+   |
+LL |     assert_eq!(Wrapper::<function>::call(), 17);
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^ cannot infer the value of the const parameter `F` declared on the struct `Wrapper`
+   |
+   = note: cannot satisfy `main::{constant#0} == _`
+note: required by a const generic parameter in `Wrapper::<F>::call`
+  --> $DIR/fn-const-param-call.rs:15:6
+   |
+LL | impl<const F: fn() -> u32> Wrapper<F> {
+   |      ^^^^^^^^^^^^^^^^^^^^ required by this const generic parameter in `Wrapper::<F>::call`
+LL |
+LL |     fn call() -> u32 {
+   |
+
+error: aborting due to 4 previous errors
+
+For more information about this error, try `rustc --explain E0284`.

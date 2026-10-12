@@ -1,14 +1,17 @@
-error[E0277]: the trait bound `fn() {main}: Foo` is not satisfied
+error[E0277]: the trait bound `&fn() {main}: CoerceUnsized<&dyn Foo>` is not satisfied in `fn() {main}`
   --> $DIR/suggest-wrap-parens.rs:8:24
    |
 LL |     let _x: &dyn Foo = &main;
-   |                        ^^^^^ the trait `Foo` is not implemented for fn item `fn() {main}`
+   |                        ^^^^^ within `fn() {main}`, the trait `Foo` is not implemented for fn item `fn() {main}`
    |
+help: the trait `Foo` is implemented for fn pointer `fn()`, cast using `as`
+  --> $DIR/suggest-wrap-parens.rs:5:1
+   |
+LL | impl Foo for fn() {}
+   | ^^^^^^^^^^^^^^^^^
+   = note: required because it appears within the type `fn() {main}`
+   = note: required for `&fn() {main}` to implement `CoerceUnsized<&dyn Foo>`
    = note: required for the cast from `&fn() {main}` to `&dyn Foo`
-help: the trait `Foo` is implemented for fn pointer `fn()`, try casting using `as`
-   |
-LL |     let _x: &dyn Foo = &(main as fn());
-   |                         +     ++++++++
 
 error: aborting due to 1 previous error
 

@@ -1,4 +1,4 @@
-error: implementation of `AsyncFnOnce` is not general enough
+error: lifetime bound not satisfied
   --> $DIR/higher-ranked-auto-trait-16.rs:18:5
    |
 LL | /     assert_send(async {
@@ -6,14 +6,9 @@ LL | |         commit_if_ok(&mut ctxt, async |_| todo!()).await;
 LL | |     });
    | |______^
    |
-note: `{async closure@...}` must implement `AsyncFnOnce<(&mut Ctxt<'1>,)>`, for any two lifetimes `'0` and `'1`...
-  --> $DIR/higher-ranked-auto-trait-16.rs:8:19
-   |
-LL | fn assert_send<T: Send>(_: T) {}
-   |                   ^^^^ required by this bound in `assert_send`
-   = note: ...but it actually implements `AsyncFnOnce<(&mut Ctxt<'_>,)>`
+   = note: this is a known limitation that will be removed in the future (see issue #100013 <https://github.com/rust-lang/rust/issues/100013> for more information)
 
-error: implementation of `AsyncFnOnce` is not general enough
+error: lifetime bound not satisfied
   --> $DIR/higher-ranked-auto-trait-16.rs:18:5
    |
 LL | /     assert_send(async {
@@ -21,12 +16,7 @@ LL | |         commit_if_ok(&mut ctxt, async |_| todo!()).await;
 LL | |     });
    | |______^
    |
-note: `{async closure@...}` must implement `AsyncFnOnce<(&mut Ctxt<'1>,)>`, for any two lifetimes `'0` and `'1`...
-  --> $DIR/higher-ranked-auto-trait-16.rs:8:19
-   |
-LL | fn assert_send<T: Send>(_: T) {}
-   |                   ^^^^ required by this bound in `assert_send`
-   = note: ...but it actually implements `AsyncFnOnce<(&mut Ctxt<'_>,)>`
+   = note: this is a known limitation that will be removed in the future (see issue #100013 <https://github.com/rust-lang/rust/issues/100013> for more information)
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
 error: aborting due to 2 previous errors

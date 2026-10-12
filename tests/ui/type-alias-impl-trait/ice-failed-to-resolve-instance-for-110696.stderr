@@ -26,6 +26,15 @@ note: this opaque type is supposed to be constrained
 LL | type DummyT<T> = impl F;
    |                  ^^^^^^
 
-error: aborting due to 2 previous errors
+error[E0275]: overflow evaluating the requirement `<Scope<U> as MyIndex<_>>::O == {type error}`
+  --> $DIR/ice-failed-to-resolve-instance-for-110696.rs:47:26
+   |
+LL |     fn my_index(self) -> Self::O {
+   |                          ^^^^^^^
+   |
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`ice_failed_to_resolve_instance_for_110696`)
 
-For more information about this error, try `rustc --explain E0207`.
+error: aborting due to 3 previous errors
+
+Some errors have detailed explanations: E0207, E0275.
+For more information about an error, try `rustc --explain E0207`.

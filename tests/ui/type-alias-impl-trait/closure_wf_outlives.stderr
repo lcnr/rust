@@ -1,8 +1,10 @@
 error[E0478]: lifetime bound not satisfied
-  --> $DIR/closure_wf_outlives.rs:21:9
+  --> $DIR/closure_wf_outlives.rs:17:5
    |
-LL |         || {}
-   |         ^^^^^
+LL | /     fn define<'a, 'b>() -> Opaque<'a, 'b>
+LL | |     where
+LL | |         'a: 'b,
+   | |_______________^
    |
 note: lifetime parameter instantiated with the lifetime `'a` as defined here
   --> $DIR/closure_wf_outlives.rs:14:17
@@ -16,10 +18,13 @@ LL |     type Opaque<'a, 'b> = impl Sized + 'a + 'b;
    |                     ^^
 
 error[E0803]: cannot infer an appropriate lifetime due to conflicting requirements
-  --> $DIR/closure_wf_outlives.rs:36:9
+  --> $DIR/closure_wf_outlives.rs:31:5
    |
-LL |         || {}
-   |         ^^^^^
+LL | /     fn define<'a, 'b, 'x>() -> Opaque<'a, 'b>
+LL | |     where
+LL | |         'a: 'x,
+LL | |         'x: 'b,
+   | |_______________^
    |
 note: first, the lifetime cannot outlive the lifetime `'a` as defined here...
   --> $DIR/closure_wf_outlives.rs:28:17
@@ -27,35 +32,38 @@ note: first, the lifetime cannot outlive the lifetime `'a` as defined here...
 LL |     type Opaque<'a, 'b> = impl Sized + 'a + 'b;
    |                 ^^
 note: ...so that the declared lifetime parameter bounds are satisfied
-  --> $DIR/closure_wf_outlives.rs:36:9
+  --> $DIR/closure_wf_outlives.rs:31:5
    |
-LL |         || {}
-   |         ^^^^^
+LL | /     fn define<'a, 'b, 'x>() -> Opaque<'a, 'b>
+LL | |     where
+LL | |         'a: 'x,
+LL | |         'x: 'b,
+   | |_______________^
 note: but, the lifetime must be valid for the lifetime `'b` as defined here...
   --> $DIR/closure_wf_outlives.rs:28:21
    |
 LL |     type Opaque<'a, 'b> = impl Sized + 'a + 'b;
    |                     ^^
 note: ...so that the declared lifetime parameter bounds are satisfied
-  --> $DIR/closure_wf_outlives.rs:36:9
+  --> $DIR/closure_wf_outlives.rs:31:5
    |
-LL |         || {}
-   |         ^^^^^
+LL | /     fn define<'a, 'b, 'x>() -> Opaque<'a, 'b>
+LL | |     where
+LL | |         'a: 'x,
+LL | |         'x: 'b,
+   | |_______________^
 
 error[E0310]: the parameter type `T` may not live long enough
-  --> $DIR/closure_wf_outlives.rs:64:9
+  --> $DIR/closure_wf_outlives.rs:60:5
    |
-LL |         || {}
-   |         ^^^^^
-   |         |
-   |         the parameter type `T` must be valid for the static lifetime...
-   |         ...so that the type `T` will meet its required lifetime bounds...
+LL | /     fn define<T>() -> Opaque<T>
+LL | |     where
+LL | |         T: 'static,
+   | |                   ^
+   | |                   |
+   | |___________________the parameter type `T` must be valid for the static lifetime...
+   |                     ...so that the type `T` will meet its required lifetime bounds
    |
-note: ...that is required by this bound
-  --> $DIR/closure_wf_outlives.rs:62:12
-   |
-LL |         T: 'static,
-   |            ^^^^^^^
 help: consider adding an explicit lifetime bound
    |
 LL |     type Opaque<T: 'static> = impl Sized;

@@ -1,11 +1,15 @@
-error[E0277]: `{integer}` is not a future
+error[E0271]: type mismatch resolving `<Implementor as Foo>::Fut == {async block@issue-83919.rs:23:9}`
   --> $DIR/issue-83919.rs:21:26
    |
 LL |     fn get_fut(&self) -> Self::Fut {
-   |                          ^^^^^^^^^ `{integer}` is not a future
+   |                          ^^^^^^^^^ type mismatch resolving `<Implementor as Foo>::Fut == {async block@issue-83919.rs:23:9}`
    |
-   = help: the trait `Future` is not implemented for `{integer}`
+note: types differ
+  --> $DIR/issue-83919.rs:19:16
+   |
+LL |     type Fut = impl Future<Output = Self::Fut2>;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0277`.
+For more information about this error, try `rustc --explain E0271`.

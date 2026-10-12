@@ -1,24 +1,24 @@
-error[E0700]: hidden type for `WithoutLt` captures lifetime that does not appear in bounds
-  --> $DIR/nested-tait-hrtb.rs:8:62
+error[E0271]: type mismatch resolving `<() as Trait<'a>>::Assoc == &str`
+  --> $DIR/nested-tait-hrtb.rs:8:20
    |
-LL | type WithoutLt = impl Sized;
-   |                  ---------- opaque type defined here
-LL | #[define_opaque(WithoutLt)]
 LL | fn without_lt() -> impl for<'a> Trait<'a, Assoc = WithoutLt> {}
-   |                             --                               ^^
-   |                             |
-   |                             hidden type `&'a str` captures the lifetime `'a` as defined here
-
-error[E0792]: expected generic lifetime parameter, found `'a`
-  --> $DIR/nested-tait-hrtb.rs:14:60
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<() as Trait<'a>>::Assoc == &str`
    |
-LL | type WithLt<'a> = impl Sized + 'a;
-   |             -- this generic parameter must be used with a generic lifetime parameter
-...
+note: types differ
+  --> $DIR/nested-tait-hrtb.rs:4:42
+   |
+LL | impl<'a> Trait<'a> for () { type Assoc = &'a str; }
+   |                                          ^^^^^^^
+
+error[E0275]: overflow evaluating the requirement `with_lt::{opaque#0} == ()`
+  --> $DIR/nested-tait-hrtb.rs:14:17
+   |
 LL | fn with_lt() -> impl for<'a> Trait<'a, Assoc = WithLt<'a>> {}
-   |                                                            ^^
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`nested_tait_hrtb`)
 
 error: aborting due to 2 previous errors
 
-Some errors have detailed explanations: E0700, E0792.
-For more information about an error, try `rustc --explain E0700`.
+Some errors have detailed explanations: E0271, E0275.
+For more information about an error, try `rustc --explain E0271`.

@@ -177,17 +177,12 @@ LL |     fn foo(..: u8) {}
    |
    = note: only allowed in tuple, tuple struct, and slice patterns
 
-error[E0282]: type annotations needed
-  --> $DIR/rest-pat-semantic-disallowed.rs:28:9
+error[E0284]: type annotations needed: cannot satisfy `_: '_`
+  --> $DIR/rest-pat-semantic-disallowed.rs:24:9
    |
-LL |     let x @ ..;
-   |         ^^^^^^
-   |
-help: consider giving this pattern a type
-   |
-LL |     let x @ ..: /* Type */;
-   |               ++++++++++++
+LL |     let &..;
+   |         ^^^ cannot satisfy `_: '_`
 
 error: aborting due to 22 previous errors
 
-For more information about this error, try `rustc --explain E0282`.
+For more information about this error, try `rustc --explain E0284`.

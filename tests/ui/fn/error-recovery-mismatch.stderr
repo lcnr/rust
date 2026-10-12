@@ -35,7 +35,33 @@ error[E0121]: the placeholder `_` is not allowed within types on item signatures
 LL |     fn fold<T>(&self, _: T, &self._) {}
    |                                   ^ not allowed in type signatures
 
-error: aborting due to 4 previous errors; 1 warning emitted
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+  --> $DIR/error-recovery-mismatch.rs:10:14
+   |
+LL |         self.fold(call(), call());
+   |              ^^^^---------------- argument #3 is missing
+   |
+note: the `fold` call is resolved to the method in `A`, shadowing the method of the same name on trait `std::iter::Iterator`
+  --> $DIR/error-recovery-mismatch.rs:10:14
+   |
+LL |         self.fold(call(), call());
+   |              ^^^^ refers to `A::fold`
+note: method defined here
+  --> $DIR/error-recovery-mismatch.rs:12:8
+   |
+LL |     fn fold<T>(&self, _: T, &self._) {}
+   |        ^^^^                       -
+help: you might have meant to call the other method; you can use the fully-qualified path to call it explicitly
+   |
+LL -         self.fold(call(), call());
+LL +         <_ as std::iter::Iterator>::fold::<_, _>(self, call(), call());
+   |
+help: provide the argument
+   |
+LL |         self.fold(call(), call(), /* value */);
+   |                                 +++++++++++++
 
-Some errors have detailed explanations: E0121, E0415.
-For more information about an error, try `rustc --explain E0121`.
+error: aborting due to 5 previous errors; 1 warning emitted
+
+Some errors have detailed explanations: E0061, E0121, E0415.
+For more information about an error, try `rustc --explain E0061`.

@@ -1,8 +1,8 @@
 error[E0700]: hidden type for `impl Copy` captures lifetime that does not appear in bounds
-  --> $DIR/must_outlive_least_region_or_bound.rs:3:35
+  --> $DIR/must_outlive_least_region_or_bound.rs:3:1
    |
 LL | fn elided(x: &i32) -> impl Copy { x }
-   |              ----     ---------   ^
+   | ^^^^^^^^^^^^^----^^^^^---------
    |              |        |
    |              |        opaque type defined here
    |              hidden type `&i32` captures the anonymous lifetime defined here
@@ -13,10 +13,10 @@ LL | fn elided(x: &i32) -> impl Copy + use<'_> { x }
    |                                 +++++++++
 
 error[E0700]: hidden type for `impl Copy` captures lifetime that does not appear in bounds
-  --> $DIR/must_outlive_least_region_or_bound.rs:6:44
+  --> $DIR/must_outlive_least_region_or_bound.rs:6:1
    |
 LL | fn explicit<'a>(x: &'a i32) -> impl Copy { x }
-   |             --                 ---------   ^
+   | ^^^^^^^^^^^^--^^^^^^^^^^^^^^^^^---------
    |             |                  |
    |             |                  opaque type defined here
    |             hidden type `&'a i32` captures the lifetime `'a` as defined here
@@ -90,10 +90,13 @@ LL | fn elided5(x: &i32) -> (Box<dyn Debug>, impl Debug + '_) { (Box::new(x), x)
    |                                                    ++++
 
 error: lifetime may not live long enough
-  --> $DIR/must_outlive_least_region_or_bound.rs:36:69
+  --> $DIR/must_outlive_least_region_or_bound.rs:36:1
    |
 LL | fn with_bound<'a>(x: &'a i32) -> impl LifetimeTrait<'a> + 'static { x }
-   |               -- lifetime `'a` defined here                         ^ returning this value requires that `'a` must outlive `'static`
+   | ^^^^^^^^^^^^^^--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |             |
+   | |             lifetime `'a` defined here
+   | requires that `'a` must outlive `'static`
    |
 help: consider changing `impl LifetimeTrait<'a> + 'static`'s explicit `'static` bound to the lifetime of argument `x`
    |
@@ -107,14 +110,13 @@ LL + fn with_bound<'a>(x: &'static i32) -> impl LifetimeTrait<'a> + 'static { x 
    |
 
 error[E0700]: hidden type for `impl Fn(&'a u32)` captures lifetime that does not appear in bounds
-  --> $DIR/must_outlive_least_region_or_bound.rs:42:5
+  --> $DIR/must_outlive_least_region_or_bound.rs:41:1
    |
 LL | fn move_lifetime_into_fn<'a, 'b>(x: &'a u32, y: &'b u32) -> impl Fn(&'a u32) {
-   |                              --                             ---------------- opaque type defined here
-   |                              |
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^----------------
+   |                              |                              |
+   |                              |                              opaque type defined here
    |                              hidden type `{closure@$DIR/must_outlive_least_region_or_bound.rs:42:5: 42:13}` captures the lifetime `'b` as defined here
-LL |     move |_| println!("{}", y)
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: add a `use<...>` bound to explicitly capture `'b`
    |
@@ -122,13 +124,13 @@ LL | fn move_lifetime_into_fn<'a, 'b>(x: &'a u32, y: &'b u32) -> impl Fn(&'a u32
    |                                                                              +++++++++++++
 
 error[E0310]: the parameter type `T` may not live long enough
-  --> $DIR/must_outlive_least_region_or_bound.rs:47:5
+  --> $DIR/must_outlive_least_region_or_bound.rs:46:1
    |
-LL |     x
-   |     ^
-   |     |
-   |     the parameter type `T` must be valid for the static lifetime...
-   |     ...so that the type `T` will meet its required lifetime bounds
+LL | fn ty_param_wont_outlive_static<T:Debug>(x: T) -> impl Debug + 'static {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | the parameter type `T` must be valid for the static lifetime...
+   | ...so that the type `T` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |

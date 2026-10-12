@@ -1,8 +1,14 @@
-error[E0271]: type mismatch resolving `<{coroutine@issue-94429.rs:18:9} as Coroutine>::Yield == ()`
+error[E0271]: type mismatch resolving `<Implementor as Runnable>::Coro == {coroutine@issue-94429.rs:18:9}`
   --> $DIR/issue-94429.rs:15:26
    |
 LL |     fn run(&mut self) -> Self::Coro {
-   |                          ^^^^^^^^^^ expected `()`, found integer
+   |                          ^^^^^^^^^^ type mismatch resolving `<Implementor as Runnable>::Coro == {coroutine@issue-94429.rs:18:9}`
+   |
+note: types differ
+  --> $DIR/issue-94429.rs:13:17
+   |
+LL |     type Coro = impl Coroutine<Yield = (), Return = ()>;
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 

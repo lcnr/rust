@@ -12,6 +12,12 @@ error[E0507]: cannot move out of `*self` which is behind a shared reference
    |
 LL |         *self
    |         ^^^^^ move occurs because `*self` has type `S<C>`, which does not implement the `Copy` trait
+   |
+help: consider cloning the value if the performance cost is acceptable
+   |
+LL -         *self
+LL +         self.clone()
+   |
 
 error: aborting due to 2 previous errors
 

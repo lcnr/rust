@@ -1,11 +1,12 @@
-error[E0277]: the trait bound `&u32: Foo` is not satisfied
+error[E0277]: the trait bound `for<'t> <Map<std::slice::Iter<'t, u32>, {closure@$DIR/hrtb-with-assoc-type-projection.rs:17:27: 17:36}> as Iterator>::Item: Foo` is not satisfied
   --> $DIR/hrtb-with-assoc-type-projection.rs:17:19
    |
 LL |     trigger_error(vec![], |x: &u32| x)
-   |     ------------- ^^^^^^ the trait `Foo` is not implemented for `&u32`
+   |     ------------- ^^^^^^ unsatisfied trait bound
    |     |
    |     required by a bound introduced by this call
    |
+   = help: the trait `for<'t> Foo` is not implemented for `<Map<std::slice::Iter<'t, u32>, {closure@$DIR/hrtb-with-assoc-type-projection.rs:17:27: 17:36}> as Iterator>::Item`
 help: this trait has no implementations, consider adding one
   --> $DIR/hrtb-with-assoc-type-projection.rs:6:1
    |

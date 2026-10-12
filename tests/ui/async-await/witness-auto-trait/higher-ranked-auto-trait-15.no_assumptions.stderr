@@ -1,37 +1,19 @@
-error: implementation of `FnOnce` is not general enough
+error: lifetime bound not satisfied
   --> $DIR/higher-ranked-auto-trait-15.rs:20:5
    |
 LL |     require_send(future);
    |     ^^^^^^^^^^^^^^^^^^^^
    |
-note: closure with signature `fn(&'0 _) -> Iter<'_, i32>` must implement `FnOnce<(&'1 Vec<i32>,)>`, for any two lifetimes `'0` and `'1`...
-  --> $DIR/higher-ranked-auto-trait-15.rs:16:20
-   |
-LL | fn require_send<T: Send>(_x: T) {}
-   |                    ^^^^ required by this bound in `require_send`
-   = note: ...but it actually implements `FnOnce<(&Vec<i32>,)>`
-help: consider adding an explicit type annotation to the closure's argument
-   |
-LL |     for _ in things.iter().map(|n: &Vec<i32>| n.iter()).flatten() {
-   |                                  +++++++++++
+   = note: this is a known limitation that will be removed in the future (see issue #100013 <https://github.com/rust-lang/rust/issues/100013> for more information)
 
-error: implementation of `FnOnce` is not general enough
+error: lifetime bound not satisfied
   --> $DIR/higher-ranked-auto-trait-15.rs:20:5
    |
 LL |     require_send(future);
    |     ^^^^^^^^^^^^^^^^^^^^
    |
-note: closure with signature `fn(&'0 _) -> Iter<'_, i32>` must implement `FnOnce<(&'1 Vec<i32>,)>`, for any two lifetimes `'0` and `'1`...
-  --> $DIR/higher-ranked-auto-trait-15.rs:16:20
-   |
-LL | fn require_send<T: Send>(_x: T) {}
-   |                    ^^^^ required by this bound in `require_send`
-   = note: ...but it actually implements `FnOnce<(&Vec<i32>,)>`
+   = note: this is a known limitation that will be removed in the future (see issue #100013 <https://github.com/rust-lang/rust/issues/100013> for more information)
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
-help: consider adding an explicit type annotation to the closure's argument
-   |
-LL |     for _ in things.iter().map(|n: &Vec<i32>| n.iter()).flatten() {
-   |                                  +++++++++++
 
 error: aborting due to 2 previous errors
 

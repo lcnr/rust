@@ -25,11 +25,13 @@ error[E0308]: mismatched types
   --> $DIR/coroutine-desc.rs:11:16
    |
 LL |     fun(one(), two());
-   |     --- -----  ^^^^^ expected future, found a different future
+   |     --- -----  ^^^^^ expected `one::{opaque#0}`, found `two::{opaque#0}`
    |     |   |
    |     |   expected all arguments to be this future type because they need to match the type of this parameter
    |     arguments to this function are incorrect
    |
+   = note: expected opaque type `impl Future<Output = ()>`
+              found opaque type `impl Future<Output = ()>`
    = note: distinct uses of `impl Trait` result in different opaque types
 note: function defined here
   --> $DIR/coroutine-desc.rs:7:4

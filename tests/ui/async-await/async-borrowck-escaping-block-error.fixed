@@ -3,7 +3,7 @@
 
 fn test_boxed() -> Box<impl std::future::Future<Output = u32>> {
     let x = 0u32;
-    Box::new(async move { x } )
+    Box::new(async { x } )
     //~^ ERROR E0373
 }
 

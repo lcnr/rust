@@ -30,6 +30,19 @@ LL |     const N: usize;
    |           ^ ...because it contains associated const `N`
    = help: consider moving `N` to another trait
 
-error: aborting due to 2 previous errors
+error[E0277]: the trait bound `(dyn Trait + 'static): Trait` is not satisfied
+  --> $DIR/associated-const-in-trait.rs:9:29
+   |
+LL |     const fn n() -> usize { Self::N }
+   |                             ^^^^ the trait `Trait` is not implemented for `(dyn Trait + 'static)`
+   |
+help: this trait has no implementations, consider adding one
+  --> $DIR/associated-const-in-trait.rs:3:1
+   |
+LL | trait Trait {
+   | ^^^^^^^^^^^
 
-For more information about this error, try `rustc --explain E0038`.
+error: aborting due to 3 previous errors
+
+Some errors have detailed explanations: E0038, E0277.
+For more information about an error, try `rustc --explain E0038`.

@@ -1,14 +1,17 @@
-error[E0277]: the trait bound `Box<dyn Map<isize, isize>>: Map<usize, isize>` is not satisfied
+error[E0277]: the trait bound `Box<dyn Map<isize, isize>>: Map<usize, isize>` is not satisfied in `Box<dyn Map<isize, isize>>`
   --> $DIR/map-types.rs:17:41
    |
 LL |     let y: Box<dyn Map<usize, isize>> = Box::new(x);
-   |                                         ^^^^^^^^^^^ the trait `Map<usize, isize>` is not implemented for `Box<dyn Map<isize, isize>>`
+   |                                         ^^^^^^^^^^^ within `Box<dyn Map<isize, isize>>`, the trait `Map<usize, isize>` is not implemented for `Box<dyn Map<isize, isize>>`
    |
 help: the trait `Map<K, V>` is implemented for `HashMap<K, V>`
   --> $DIR/map-types.rs:10:1
    |
 LL | impl<K, V> Map<K, V> for HashMap<K, V> {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `Box<dyn Map<isize, isize>>`
+  --> $SRC_DIR/alloc/src/boxed.rs:LL:COL
+   = note: required for `Box<Box<dyn Map<isize, isize>>>` to implement `CoerceUnsized<Box<dyn Map<usize, isize>>>`
    = note: required for the cast from `Box<Box<dyn Map<isize, isize>>>` to `Box<dyn Map<usize, isize>>`
 
 error: aborting due to 1 previous error

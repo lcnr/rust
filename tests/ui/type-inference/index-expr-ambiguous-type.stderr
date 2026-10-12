@@ -15,19 +15,11 @@ LL |     let _foo = 0 + [1, 2, 3][bad_idx.into()];
            - impl Add for i32;
            - impl Add<&i32> for i32;
 
-error[E0283]: type annotations needed
-  --> $DIR/index-expr-ambiguous-type.rs:21:34
+error[E0284]: type annotations needed: cannot satisfy `_: '_`
+  --> $DIR/index-expr-ambiguous-type.rs:21:16
    |
 LL |     let _foo = [1, 2, 3][bad_idx.into()];
-   |                                  ^^^^
-   |
-   = note: the type must implement `From<u8>`
-   = note: required for `u8` to implement `Into<_>`
-help: try using a fully qualified path to specify the expected types
-   |
-LL -     let _foo = [1, 2, 3][bad_idx.into()];
-LL +     let _foo = [1, 2, 3][<u8 as Into<T>>::into(bad_idx)];
-   |
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^ cannot satisfy `_: '_`
 
 error[E0369]: cannot add `_` to `bool`
   --> $DIR/index-expr-ambiguous-type.rs:32:21
@@ -57,14 +49,12 @@ LL |     let _foo = 1u32 << [0u8][bad_idx.into()];
    = note: cannot satisfy `<u32 as Shl<_>>::Output == _`
    = note: cannot satisfy `u32: Shl<_>`
 
-error[E0283]: type annotations needed
+error[E0282]: type annotations needed
   --> $DIR/index-expr-ambiguous-type.rs:50:45
    |
 LL |     let _foo = String::new() + [""][bad_idx.into()];
    |                                             ^^^^
    |
-   = note: the type must implement `From<u8>`
-   = note: required for `u8` to implement `Into<_>`
 help: try using a fully qualified path to specify the expected types
    |
 LL -     let _foo = String::new() + [""][bad_idx.into()];
@@ -73,5 +63,5 @@ LL +     let _foo = String::new() + [""][<u8 as Into<T>>::into(bad_idx)];
 
 error: aborting due to 7 previous errors
 
-Some errors have detailed explanations: E0282, E0283, E0284, E0369.
+Some errors have detailed explanations: E0282, E0284, E0369.
 For more information about an error, try `rustc --explain E0282`.

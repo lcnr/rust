@@ -1,51 +1,102 @@
-error[E0277]: the trait bound `B: Clone` is not satisfied
+error[E0277]: the size for values of type `B` cannot be known at compilation time
+  --> $DIR/issue-79224.rs:30:5
+   |
+LL | impl<B: ?Sized> Display for Cow<'_, B> {
+   |      - this type parameter needs to be `Sized`
+LL |
+LL |     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
+   |
+   = note: required for `B` to implement `ToOwned`
+help: consider removing the `?Sized` bound to make the type parameter `Sized`
+   |
+LL - impl<B: ?Sized> Display for Cow<'_, B> {
+LL + impl<B> Display for Cow<'_, B> {
+   |
+
+error[E0276]: impl has stricter requirements than trait
   --> $DIR/issue-79224.rs:30:5
    |
 LL |     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `B`
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ impl has extra requirement `&Cow<'_, B> well-formed`
+
+error[E0277]: the size for values of type `B` cannot be known at compilation time
+  --> $DIR/issue-79224.rs:28:17
+   |
+LL | impl<B: ?Sized> Display for Cow<'_, B> {
+   |      -          ^^^^^^^ doesn't have a size known at compile-time
+   |      |
+   |      this type parameter needs to be `Sized`
    |
    = note: required for `B` to implement `ToOwned`
-help: consider further restricting type parameter `B` with trait `Clone`
+help: consider removing the `?Sized` bound to make the type parameter `Sized`
    |
-LL | impl<B: ?Sized + std::clone::Clone> Display for Cow<'_, B> {
-   |                +++++++++++++++++++
+LL - impl<B: ?Sized> Display for Cow<'_, B> {
+LL + impl<B> Display for Cow<'_, B> {
+   |
 
-error[E0277]: the trait bound `B: Clone` is not satisfied
+error[E0277]: `Cow<'_, B>` doesn't implement `std::fmt::Display`
   --> $DIR/issue-79224.rs:28:29
    |
 LL | impl<B: ?Sized> Display for Cow<'_, B> {
-   |                             ^^^^^^^^^^ the trait `Clone` is not implemented for `B`
+   |                             ^^^^^^^^^^ unsatisfied trait bound
    |
-   = note: required for `B` to implement `ToOwned`
-help: consider further restricting type parameter `B` with trait `Clone`
+help: the trait `std::fmt::Display` is not implemented for `Cow<'_, B>`
+  --> $DIR/issue-79224.rs:14:1
    |
-LL | impl<B: ?Sized + std::clone::Clone> Display for Cow<'_, B> {
-   |                +++++++++++++++++++
+LL | pub enum Cow<'a, B: ?Sized + 'a, O = <B as ToOwned>::Owned>
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: consider introducing a `where` clause, but there might be an alternative better way to express this requirement
+   |
+LL | impl<B: ?Sized> Display for Cow<'_, B> where Cow<'_, B>: std::fmt::Display {
+   |                                        +++++++++++++++++++++++++++++++++++
 
-error[E0277]: the trait bound `B: Clone` is not satisfied
-  --> $DIR/issue-79224.rs:30:13
+error: the type `Cow<'_, B>` is not well-formed
+  --> $DIR/issue-79224.rs:28:29
    |
+LL | impl<B: ?Sized> Display for Cow<'_, B> {
+   |                             ^^^^^^^^^^
+
+error[E0277]: the size for values of type `B` cannot be known at compilation time
+  --> $DIR/issue-79224.rs:30:12
+   |
+LL | impl<B: ?Sized> Display for Cow<'_, B> {
+   |      - this type parameter needs to be `Sized`
+LL |
 LL |     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-   |             ^^^^ the trait `Clone` is not implemented for `B`
+   |            ^^^^^ doesn't have a size known at compile-time
    |
    = note: required for `B` to implement `ToOwned`
-help: consider further restricting type parameter `B` with trait `Clone`
+help: consider removing the `?Sized` bound to make the type parameter `Sized`
    |
-LL | impl<B: ?Sized + std::clone::Clone> Display for Cow<'_, B> {
-   |                +++++++++++++++++++
+LL - impl<B: ?Sized> Display for Cow<'_, B> {
+LL + impl<B> Display for Cow<'_, B> {
+   |
 
-error[E0277]: the trait bound `B: Clone` is not satisfied
+error: the type `&Cow<'_, B>` is not well-formed
   --> $DIR/issue-79224.rs:30:12
    |
 LL |     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-   |            ^^^^^ the trait `Clone` is not implemented for `B`
+   |            ^^^^^
+
+error[E0277]: the size for values of type `B` cannot be known at compilation time
+  --> $DIR/issue-79224.rs:30:12
+   |
+LL | impl<B: ?Sized> Display for Cow<'_, B> {
+   |      - this type parameter needs to be `Sized`
+LL |
+LL |     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+   |            ^^^^^ doesn't have a size known at compile-time
    |
    = note: required for `B` to implement `ToOwned`
-help: consider further restricting type parameter `B` with trait `Clone`
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+help: consider removing the `?Sized` bound to make the type parameter `Sized`
    |
-LL | impl<B: ?Sized + std::clone::Clone> Display for Cow<'_, B> {
-   |                +++++++++++++++++++
+LL - impl<B: ?Sized> Display for Cow<'_, B> {
+LL + impl<B> Display for Cow<'_, B> {
+   |
 
-error: aborting due to 4 previous errors
+error: aborting due to 8 previous errors
 
-For more information about this error, try `rustc --explain E0277`.
+Some errors have detailed explanations: E0276, E0277.
+For more information about an error, try `rustc --explain E0276`.

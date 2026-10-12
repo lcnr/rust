@@ -1,12 +1,20 @@
-error[E0792]: expected generic type parameter, found `u8`
-  --> $DIR/issue-60564.rs:20:34
+error: item does not constrain `IterBitsIter::{opaque#0}`
+  --> $DIR/issue-60564.rs:20:8
+   |
+LL |     fn iter_bits(self, n: u8) -> Self::BitsIter {
+   |        ^^^^^^^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/issue-60564.rs:8:30
    |
 LL | type IterBitsIter<T, E, I> = impl std::iter::Iterator<Item = I>;
-   |                         - this generic parameter must be used with a generic type parameter
-...
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: this use of `IterBitsIter<T, E, u8>` does not have unique universal generic arguments
+  --> $DIR/issue-60564.rs:20:34
+   |
 LL |     fn iter_bits(self, n: u8) -> Self::BitsIter {
    |                                  ^^^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0792`.

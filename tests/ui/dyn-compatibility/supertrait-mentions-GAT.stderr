@@ -1,10 +1,5 @@
 error[E0311]: the parameter type `Self` may not live long enough
    |
-note: ...that is required by this bound
-  --> $DIR/supertrait-mentions-GAT.rs:6:15
-   |
-LL |         Self: 'a;
-   |               ^^
    = help: consider adding an explicit lifetime bound `Self: 'a`...
 
 error[E0038]: the trait `SuperTrait` is not dyn compatible

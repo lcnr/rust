@@ -1,25 +1,20 @@
-error[E0373]: closure may outlive the current function, but it borrows `b`, which is owned by the current function
-  --> $DIR/structural_identity_dependent_reborrows.rs:16:5
+error[E0597]: `b` does not live long enough
+  --> $DIR/structural_identity_dependent_reborrows.rs:18:28
    |
+LL | fn bar<'a>(b: &'a ()) -> impl Fn() {
+   |            - binding `b` declared here
 LL |     || {
-   |     ^^ may outlive borrowed value `b`
+   |     -- value captured here
 LL |
 LL |         expected::<&'a ()>(b);
-   |                            - `b` is borrowed here
-   |
-note: closure is returned here
-  --> $DIR/structural_identity_dependent_reborrows.rs:16:5
-   |
-LL | /     || {
-LL | |
-LL | |         expected::<&'a ()>(b);
-LL | |     }
-   | |_____^
-help: to force the closure to take ownership of `b` (and any other referenced variables), use the `move` keyword
-   |
-LL |     move || {
-   |     ++++
+   |                            ^ borrowed value does not live long enough
+LL |     }
+LL | }
+   |  -
+   |  |
+   |  `b` dropped here while still borrowed
+   |  borrow later used here
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0373`.
+For more information about this error, try `rustc --explain E0597`.

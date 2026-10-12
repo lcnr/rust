@@ -7,34 +7,17 @@ LL | struct S2<P>();
    = help: consider removing `P`, referring to it in a field, or using a marker such as `PhantomData`
    = help: if you intended `P` to be a const parameter, use `const P: /* Type */` instead
 
-error[E0277]: the trait bound `<A as Foo<B>>::Out: Qux<S>` is not satisfied
+error[E0271]: type mismatch resolving `<S2<A> as Fuzz<S2<B>>>::Out == _`
   --> $DIR/nested-assoc-type-projection-ice-109864.rs:29:16
    |
 LL |       type Out = <<A as Foo<B>>::Out as Bar<
    |  ________________^
 ...  |
 LL | |     >>::Out;
-   | |___________^ the trait `Qux<S>` is not implemented for `<A as Foo<B>>::Out`
-   |
-help: consider further restricting the associated type
-   |
-LL | impl<A: Foo<B>, B> Fuzz<S2<B>> for S2<A> where <A as Foo<B>>::Out: Qux<S> {
-   |                                          ++++++++++++++++++++++++++++++++
-
-error[E0277]: the trait bound `<A as Foo<B>>::Out: Bar<S2<A>, _>` is not satisfied
-  --> $DIR/nested-assoc-type-projection-ice-109864.rs:29:16
-   |
-LL |       type Out = <<A as Foo<B>>::Out as Bar<
-   |  ________________^
-...  |
-LL | |     >>::Out;
-   | |___________^ the trait `Bar<S2<A>, _>` is not implemented for `<A as Foo<B>>::Out`
-   |
-help: this trait has no implementations, consider adding one
-  --> $DIR/nested-assoc-type-projection-ice-109864.rs:16:1
-   |
-LL | trait Bar<A, B> {
-   | ^^^^^^^^^^^^^^^
+   | |           ^
+   | |           |
+   | |___________types differ
+   |             type mismatch resolving `<S2<A> as Fuzz<S2<B>>>::Out == _`
 
 error[E0277]: the trait bound `<A as Foo<B>>::Out: Qux<S>` is not satisfied
   --> $DIR/nested-assoc-type-projection-ice-109864.rs:34:10
@@ -47,19 +30,16 @@ help: consider further restricting the associated type
 LL | impl<A: Foo<B>, B> Fuzz<S2<B>> for S2<A> where <A as Foo<B>>::Out: Qux<S> {
    |                                          ++++++++++++++++++++++++++++++++
 
-error[E0277]: the trait bound `<A as Foo<B>>::Out: Bar<S2<A>, _>` is not satisfied
-  --> $DIR/nested-assoc-type-projection-ice-109864.rs:29:5
+error: the type `<<A as Foo<B>>::Out as Bar<S2<A>, <<<A as Foo<B>>::Out as Qux<S>>::Out as Fuzz<S2<B>>>::Out>>::Out` is not well-formed
+  --> $DIR/nested-assoc-type-projection-ice-109864.rs:29:16
    |
-LL |     type Out = <<A as Foo<B>>::Out as Bar<
-   |     ^^^^^^^^ the trait `Bar<S2<A>, _>` is not implemented for `<A as Foo<B>>::Out`
-   |
-help: this trait has no implementations, consider adding one
-  --> $DIR/nested-assoc-type-projection-ice-109864.rs:16:1
-   |
-LL | trait Bar<A, B> {
-   | ^^^^^^^^^^^^^^^
+LL |       type Out = <<A as Foo<B>>::Out as Bar<
+   |  ________________^
+...  |
+LL | |     >>::Out;
+   | |___________^
 
-error: aborting due to 5 previous errors
+error: aborting due to 4 previous errors
 
-Some errors have detailed explanations: E0277, E0392.
-For more information about an error, try `rustc --explain E0277`.
+Some errors have detailed explanations: E0271, E0277, E0392.
+For more information about an error, try `rustc --explain E0271`.

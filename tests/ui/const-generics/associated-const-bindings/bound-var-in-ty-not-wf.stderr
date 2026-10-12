@@ -1,16 +1,16 @@
-error: higher-ranked subtype error
+error[E0277]: the trait bound `for<'a> fn(&'a str) -> &'a str: Project` is not satisfied
   --> $DIR/bound-var-in-ty-not-wf.rs:21:13
    |
 LL |         K = const { () }
-   |             ^^^^^^^^^^^^
-
-error: higher-ranked subtype error
-  --> $DIR/bound-var-in-ty-not-wf.rs:21:13
+   |             ^^^^^^^^^^^^ the trait `Project` is not implemented for `for<'a> fn(&'a str) -> &'a str`
    |
-LL |         K = const { () }
-   |             ^^^^^^^^^^^^
+help: the trait `Project` is not implemented for `for<'a> fn(&'a _) -> &'a _`
+      but it is implemented for `fn(&_) -> &_`
+  --> $DIR/bound-var-in-ty-not-wf.rs:30:1
    |
-   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+LL | impl<T> Project for fn(T) -> T {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 2 previous errors
+error: aborting due to 1 previous error
 
+For more information about this error, try `rustc --explain E0277`.

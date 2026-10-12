@@ -52,6 +52,24 @@ help: the `Box` type always has a statically known size and allocates its conten
 LL |     enum EnumAllFieldsMetaSized { Qux { x: Box<[u8]>, y: [u8] } }
    |                                            ++++    +
 
+error[E0277]: the size for values of type `[u8]` cannot be known at compilation time
+  --> $DIR/impls.rs:279:53
+   |
+LL |     enum EnumAllFieldsMetaSized { Qux { x: [u8], y: [u8] } }
+   |                                                     ^^^^ doesn't have a size known at compile-time
+   |
+   = help: the trait `Sized` is not implemented for `[u8]`
+   = note: no field of an enum variant may have a dynamically sized type
+   = help: change the field's type to have a statically known size
+help: borrowed types always have a statically known size
+   |
+LL |     enum EnumAllFieldsMetaSized { Qux { x: [u8], y: &[u8] } }
+   |                                                     +
+help: the `Box` type always has a statically known size and allocates its contents in the heap
+   |
+LL |     enum EnumAllFieldsMetaSized { Qux { x: [u8], y: Box<[u8]> } }
+   |                                                     ++++    +
+
 error[E0277]: the size for values of type `main::Foo` cannot be known at compilation time
   --> $DIR/impls.rs:286:42
    |
@@ -69,6 +87,24 @@ help: the `Box` type always has a statically known size and allocates its conten
    |
 LL |     enum EnumAllFieldsUnsized { Qux { x: Box<Foo>, y: Foo } }
    |                                          ++++   +
+
+error[E0277]: the size for values of type `main::Foo` cannot be known at compilation time
+  --> $DIR/impls.rs:286:50
+   |
+LL |     enum EnumAllFieldsUnsized { Qux { x: Foo, y: Foo } }
+   |                                                  ^^^ doesn't have a size known at compile-time
+   |
+   = help: the trait `Sized` is not implemented for `main::Foo`
+   = note: no field of an enum variant may have a dynamically sized type
+   = help: change the field's type to have a statically known size
+help: borrowed types always have a statically known size
+   |
+LL |     enum EnumAllFieldsUnsized { Qux { x: Foo, y: &Foo } }
+   |                                                  +
+help: the `Box` type always has a statically known size and allocates its contents in the heap
+   |
+LL |     enum EnumAllFieldsUnsized { Qux { x: Foo, y: Box<Foo> } }
+   |                                                  ++++   +
 
 error[E0277]: the size for values of type `[u8]` cannot be known at compilation time
   --> $DIR/impls.rs:293:52
@@ -177,8 +213,13 @@ error[E0277]: the size for values of type `[u8]` cannot be known at compilation 
 LL |     needs_sized::<([u8], [u8])>();
    |                   ^^^^^^^^^^^^ doesn't have a size known at compile-time
    |
-   = help: the trait `Sized` is not implemented for `[u8]`
-   = note: only the last element of a tuple may have a dynamically sized type
+   = help: within `([u8], [u8])`, the trait `Sized` is not implemented for `[u8]`
+   = note: required because it appears within the type `([u8], [u8])`
+note: required by a bound in `needs_sized`
+  --> $DIR/impls.rs:13:19
+   |
+LL | fn needs_sized<T: Sized>() { }
+   |                   ^^^^^ required by this bound in `needs_sized`
 
 error[E0277]: the size for values of type `[u8]` cannot be known at compilation time
   --> $DIR/impls.rs:195:23
@@ -204,8 +245,13 @@ error[E0277]: the size for values of type `main::Foo` cannot be known at compila
 LL |     needs_sized::<(Foo, Foo)>();
    |                   ^^^^^^^^^^ doesn't have a size known at compile-time
    |
-   = help: the trait `Sized` is not implemented for `main::Foo`
-   = note: only the last element of a tuple may have a dynamically sized type
+   = help: within `(main::Foo, main::Foo)`, the trait `Sized` is not implemented for `main::Foo`
+   = note: required because it appears within the type `(main::Foo, main::Foo)`
+note: required by a bound in `needs_sized`
+  --> $DIR/impls.rs:13:19
+   |
+LL | fn needs_sized<T: Sized>() { }
+   |                   ^^^^^ required by this bound in `needs_sized`
 
 error[E0277]: the size for values of type `main::Foo` cannot be known at compilation time
   --> $DIR/impls.rs:203:23
@@ -395,6 +441,6 @@ note: required by a bound in `needs_metasized`
 LL | fn needs_metasized<T: MetaSized>() { }
    |                       ^^^^^^^^^ required by this bound in `needs_metasized`
 
-error: aborting due to 27 previous errors
+error: aborting due to 29 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

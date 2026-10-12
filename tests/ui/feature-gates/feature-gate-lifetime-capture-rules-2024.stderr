@@ -1,12 +1,11 @@
 error[E0700]: hidden type for `impl Sized` captures lifetime that does not appear in bounds
-  --> $DIR/feature-gate-lifetime-capture-rules-2024.rs:2:5
+  --> $DIR/feature-gate-lifetime-capture-rules-2024.rs:1:1
    |
 LL | fn foo(x: &Vec<i32>) -> impl Sized {
-   |           ---------     ---------- opaque type defined here
-   |           |
+   | ^^^^^^^^^^---------^^^^^----------
+   |           |             |
+   |           |             opaque type defined here
    |           hidden type `&Vec<i32>` captures the anonymous lifetime defined here
-LL |     x
-   |     ^
    |
 help: add a `use<...>` bound to explicitly capture `'_`
    |

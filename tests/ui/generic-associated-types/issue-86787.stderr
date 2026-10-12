@@ -9,24 +9,34 @@ LL |     type TRef<'a>;
    = note: this bound is currently required to ensure that impls have maximum flexibility
    = note: we are soliciting feedback, see issue #87479 <https://github.com/rust-lang/rust/issues/87479> for more information
 
-error[E0276]: impl has stricter requirements than trait
+error[E0309]: the associated type `<Left as HasChildrenOf>::T` may not live long enough
   --> $DIR/issue-86787.rs:25:37
    |
-LL |     type TRef<'a>;
-   |     ------------- definition of `TRef` from trait
-...
+LL |     type TRef<'a> = Either<&'a Left::T, &'a Right::T>
+   |               -- the associated type `<Left as HasChildrenOf>::T` must be valid for the lifetime `'a` as defined here...
+LL |     where
 LL |         <Left as HasChildrenOf>::T: 'a,
-   |                                     ^^ impl has extra requirement `<Left as HasChildrenOf>::T: 'a`
+   |                                     ^^ ...so that the type `<Left as HasChildrenOf>::T` will meet its required lifetime bounds
+   |
+help: consider adding an explicit lifetime bound
+   |
+LL |         <Right as HasChildrenOf>::T: 'a, <Left as HasChildrenOf>::T: 'a;
+   |                                        ++++++++++++++++++++++++++++++++
 
-error[E0276]: impl has stricter requirements than trait
+error[E0309]: the associated type `<Right as HasChildrenOf>::T` may not live long enough
   --> $DIR/issue-86787.rs:26:38
    |
-LL |     type TRef<'a>;
-   |     ------------- definition of `TRef` from trait
+LL |     type TRef<'a> = Either<&'a Left::T, &'a Right::T>
+   |               -- the associated type `<Right as HasChildrenOf>::T` must be valid for the lifetime `'a` as defined here...
 ...
 LL |         <Right as HasChildrenOf>::T: 'a;
-   |                                      ^^ impl has extra requirement `<Right as HasChildrenOf>::T: 'a`
+   |                                      ^^ ...so that the type `<Right as HasChildrenOf>::T` will meet its required lifetime bounds
+   |
+help: consider adding an explicit lifetime bound
+   |
+LL |         <Right as HasChildrenOf>::T: 'a, <Right as HasChildrenOf>::T: 'a;
+   |                                        +++++++++++++++++++++++++++++++++
 
 error: aborting due to 3 previous errors
 
-For more information about this error, try `rustc --explain E0276`.
+For more information about this error, try `rustc --explain E0309`.

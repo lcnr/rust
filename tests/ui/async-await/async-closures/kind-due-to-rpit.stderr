@@ -8,9 +8,6 @@ LL |     let inner_fn = async move || {
 LL |
 LL |         let _ = foo.into();
    |                 --- closure is `AsyncFnOnce` because it moves the variable `foo` out of its environment
-LL |     };
-LL |     inner_fn
-   |     -------- return type was inferred to be `{async closure@$DIR/kind-due-to-rpit.rs:7:20: 7:33}` here
 
 error: aborting due to 1 previous error
 

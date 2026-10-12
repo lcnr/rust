@@ -46,34 +46,6 @@ LL | impl<T: Super<ActuallySuper, Assoc = T>> Mirror for T {}
    |                              |
    |                              unsatisfied trait bound introduced here
 
-error[E0277]: the size for values of type `RustaceansAreAwesome` cannot be known at compilation time
-  --> $DIR/ice-generics-of-crate-root-152335.rs:23:5
-   |
-LL |     fn transmute(&self, t: T) -> <Self as B>::Assoc;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
-   |
-note: required for `RustaceansAreAwesome` to implement `Mirror`
-  --> $DIR/ice-generics-of-crate-root-152335.rs:36:42
-   |
-LL | impl<T: Super<ActuallySuper, Assoc = T>> Mirror for T {}
-   |      -                                   ^^^^^^     ^
-   |      |
-   |      unsatisfied trait bound implicitly introduced here
-
-error[E0277]: the size for values of type `Self` cannot be known at compilation time
-  --> $DIR/ice-generics-of-crate-root-152335.rs:23:5
-   |
-LL |     fn transmute(&self, t: T) -> <Self as B>::Assoc;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
-   |
-note: required for `Self` to implement `Mirror`
-  --> $DIR/ice-generics-of-crate-root-152335.rs:36:42
-   |
-LL | impl<T: Super<ActuallySuper, Assoc = T>> Mirror for T {}
-   |      -                                   ^^^^^^     ^
-   |      |
-   |      unsatisfied trait bound implicitly introduced here
-
 error[E0038]: the trait `Foo` is not dyn compatible
   --> $DIR/ice-generics-of-crate-root-152335.rs:14:20
    |
@@ -108,24 +80,6 @@ LL | impl<T: Super<ActuallySuper, Assoc = T>> Mirror for T {}
    |                              |
    |                              unsatisfied trait bound introduced here
 
-error[E0277]: the size for values of type `Self` cannot be known at compilation time
-  --> $DIR/ice-generics-of-crate-root-152335.rs:17:1
-   |
-LL | trait Foo<T, U>: Super<ActuallySuper, Assoc = T>
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
-   |
-note: required for `Self` to implement `Mirror`
-  --> $DIR/ice-generics-of-crate-root-152335.rs:36:42
-   |
-LL | impl<T: Super<ActuallySuper, Assoc = T>> Mirror for T {}
-   |      -                                   ^^^^^^     ^
-   |      |
-   |      unsatisfied trait bound implicitly introduced here
-help: consider further restricting `Self`
-   |
-LL | trait Foo<T, U>: Super<ActuallySuper, Assoc = T> + Sized
-   |                                                  +++++++
-
 error[E0046]: not all trait items implemented, missing: `Assoc`
   --> $DIR/ice-generics-of-crate-root-152335.rs:36:1
    |
@@ -159,25 +113,7 @@ LL | impl<T: Super<ActuallySuper, Assoc = T>> Mirror for T {}
    |                              |
    |                              unsatisfied trait bound introduced here
 
-error[E0277]: the size for values of type `Self` cannot be known at compilation time
-  --> $DIR/ice-generics-of-crate-root-152335.rs:23:5
-   |
-LL |     fn transmute(&self, t: T) -> <Self as B>::Assoc;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
-   |
-note: required for `Self` to implement `Mirror`
-  --> $DIR/ice-generics-of-crate-root-152335.rs:36:42
-   |
-LL | impl<T: Super<ActuallySuper, Assoc = T>> Mirror for T {}
-   |      -                                   ^^^^^^     ^
-   |      |
-   |      unsatisfied trait bound implicitly introduced here
-help: consider further restricting `Self`
-   |
-LL |     fn transmute(&self, t: T) -> <Self as B>::Assoc where Self: Sized;
-   |                                                     +++++++++++++++++
+error: aborting due to 8 previous errors
 
-error: aborting due to 12 previous errors
-
-Some errors have detailed explanations: E0038, E0046, E0271, E0277, E0405, E0601.
+Some errors have detailed explanations: E0038, E0046, E0271, E0405, E0601.
 For more information about an error, try `rustc --explain E0038`.

@@ -1,68 +1,48 @@
-error[E0792]: expected generic lifetime parameter, found `'_`
-  --> $DIR/hkl_forbidden.rs:11:5
+error[E0275]: overflow evaluating the requirement `test::{opaque#0} == for<'a> fn(&'a str) -> &'a str {id}`
+  --> $DIR/hkl_forbidden.rs:10:21
    |
-LL | type Opaque<'a> = impl Sized + 'a;
-   |             -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |     (id, id)
-   |     ^^^^^^^^
-
-error[E0792]: expected generic lifetime parameter, found `'_`
-  --> $DIR/hkl_forbidden.rs:11:5
+LL | fn test(s: &str) -> (impl Fn(&str) -> Opaque<'_>, impl Fn(&str) -> Opaque<'_>) {
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-LL | type Opaque<'a> = impl Sized + 'a;
-   |             -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |     (id, id)
-   |     ^^^^^^^^
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`hkl_forbidden`)
+
+error[E0275]: overflow evaluating the requirement `test2::{opaque#0} == for<'a, 'b> fn((&'a str, &'b str)) -> (_, _) {id2}`
+  --> $DIR/hkl_forbidden.rs:23:15
    |
-   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
-
-error[E0792]: expected generic lifetime parameter, found `'a`
-  --> $DIR/hkl_forbidden.rs:24:5
+LL | fn test2() -> impl for<'a, 'b> Fn((&'a str, &'b str)) -> (Opaque2<'a>, Opaque2<'b>) {
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-LL | type Opaque2<'a> = impl Sized + 'a;
-   |              -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |     id2
-   |     ^^^
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`hkl_forbidden`)
 
-error[E0792]: expected generic lifetime parameter, found `'b`
-  --> $DIR/hkl_forbidden.rs:24:5
+error[E0275]: overflow evaluating the requirement `test3::{opaque#0} == for<'a> fn(&'a str) -> &'a str {id}`
+  --> $DIR/hkl_forbidden.rs:32:22
    |
-LL | type Opaque2<'a> = impl Sized + 'a;
-   |              -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |     id2
-   |     ^^^
-
-error[E0792]: expected generic lifetime parameter, found `'_`
-  --> $DIR/hkl_forbidden.rs:33:5
+LL | fn test3(s: &str) -> (impl Fn(&str) -> Opaque3<'_>, Opaque3<'_>) {
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-LL | type Opaque3<'a> = impl Sized + 'a;
-   |              -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |     (id, s)
-   |     ^^^^^^^
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`hkl_forbidden`)
 
-error[E0792]: expected generic lifetime parameter, found `'_`
-  --> $DIR/hkl_forbidden.rs:39:5
+error[E0275]: overflow evaluating the requirement `test4::{opaque#0} == for<'a> fn(&'a str) -> &'a str {id}`
+  --> $DIR/hkl_forbidden.rs:38:22
    |
-LL | type Opaque4<'a> = impl Sized + 'a;
-   |              -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |     (s, id)
-   |     ^^^^^^^
-
-error[E0792]: expected generic lifetime parameter, found `'a`
-  --> $DIR/hkl_forbidden.rs:45:5
+LL | fn test4(s: &str) -> (Opaque4<'_>, impl Fn(&str) -> Opaque4<'_>) {
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-LL | type Inner<'a> = impl Sized;
-   |            -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |     |x| x
-   |     ^^^^^
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`hkl_forbidden`)
 
-error: aborting due to 7 previous errors
+error: item does not constrain `outer_impl::{opaque#0}`
+  --> $DIR/hkl_forbidden.rs:44:4
+   |
+LL | fn outer_impl() -> impl for<'a> Fn(&'a ()) -> Inner<'a> {
+   |    ^^^^^^^^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/hkl_forbidden.rs:44:20
+   |
+LL | fn outer_impl() -> impl for<'a> Fn(&'a ()) -> Inner<'a> {
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For more information about this error, try `rustc --explain E0792`.
+error: aborting due to 5 previous errors
+
+For more information about this error, try `rustc --explain E0275`.

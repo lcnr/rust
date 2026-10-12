@@ -28,9 +28,6 @@ LL | type C<'a, 'b> = <A<'a> as Trait<'lifetime>>::Bar;
 error[E0477]: the type `Impl<'a>` does not fulfill the required lifetime
   --> $DIR/missing-lifetime-in-alias.rs:16:20
    |
-LL |     type Bar<'b>
-   |     ------------ definition of `Bar` from trait
-...
 LL |     type Bar<'b> = &'b ();
    |                    ^^^^^^
    |
@@ -39,10 +36,6 @@ note: type must outlive the lifetime `'b` as defined here
    |
 LL |     type Bar<'b> = &'b ();
    |              ^^
-help: copy the `where` clause predicates from the trait
-   |
-LL |     type Bar<'b> = &'b () where Self: 'b;
-   |                           ++++++++++++++
 
 error[E0107]: missing generics for associated type `Trait::Bar`
   --> $DIR/missing-lifetime-in-alias.rs:27:36

@@ -1,11 +1,15 @@
-error: implementation of `MyTrait` is not general enough
-  --> $DIR/opaque-hrtb.rs:11:5
+error[E0277]: the trait bound `for<'a> impl MyTrait<&str>: MyTrait<&'a str>` is not satisfied
+  --> $DIR/opaque-hrtb.rs:10:13
    |
-LL |     bar()
-   |     ^^^^^ implementation of `MyTrait` is not general enough
+LL | fn foo() -> impl for<'a> MyTrait<&'a str> {
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `for<'a> MyTrait<&'a str>` is not implemented for `impl MyTrait<&str>`
    |
-   = note: `impl MyTrait<&'2 str>` must implement `MyTrait<&'1 str>`, for any lifetime `'1`...
-   = note: ...but it actually implements `MyTrait<&'2 str>`, for some specific lifetime `'2`
+help: the trait `MyTrait<T>` is implemented for `Foo`
+  --> $DIR/opaque-hrtb.rs:4:1
+   |
+LL | impl<T> MyTrait<T> for Foo {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 
+For more information about this error, try `rustc --explain E0277`.

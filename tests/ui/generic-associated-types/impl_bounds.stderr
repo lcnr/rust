@@ -1,26 +1,33 @@
-error[E0276]: impl has stricter requirements than trait
+error[E0310]: the parameter type `T` may not live long enough
   --> $DIR/impl_bounds.rs:14:39
    |
-LL |     type A<'a> where Self: 'a;
-   |     ---------- definition of `A` from trait
-...
 LL |     type A<'a> = (&'a ()) where Self: 'static;
-   |                                       ^^^^^^^ impl has extra requirement `T: 'static`
+   |                                       ^^^^^^^
+   |                                       |
+   |                                       the parameter type `T` must be valid for the static lifetime...
+   |                                       ...so that the type `Fooy<T>` will meet its required lifetime bounds
+   |
+help: consider adding an explicit lifetime bound
+   |
+LL | impl<T: 'static> Foo for Fooy<T> {
+   |       +++++++++
 
-error[E0276]: impl has stricter requirements than trait
+error[E0478]: lifetime bound not satisfied
   --> $DIR/impl_bounds.rs:16:48
    |
-LL |     type B<'a, 'b> where 'a: 'b;
-   |     -------------- definition of `B` from trait
-...
 LL |     type B<'a, 'b> = (&'a(), &'b ()) where 'b: 'a;
-   |                                                ^^ impl has extra requirement `'b: 'a`
+   |                                                ^^
    |
-help: copy the `where` clause predicates from the trait
+note: lifetime parameter instantiated with the lifetime `'b` as defined here
+  --> $DIR/impl_bounds.rs:16:16
    |
-LL -     type B<'a, 'b> = (&'a(), &'b ()) where 'b: 'a;
-LL +     type B<'a, 'b> = (&'a(), &'b ()) where 'a: 'b;
+LL |     type B<'a, 'b> = (&'a(), &'b ()) where 'b: 'a;
+   |                ^^
+note: but lifetime parameter must outlive the lifetime `'a` as defined here
+  --> $DIR/impl_bounds.rs:16:12
    |
+LL |     type B<'a, 'b> = (&'a(), &'b ()) where 'b: 'a;
+   |            ^^
 
 error[E0277]: the trait bound `T: Copy` is not satisfied
   --> $DIR/impl_bounds.rs:18:33
@@ -76,5 +83,5 @@ LL | impl<T: std::marker::Copy> Foo for Fooy<T> {
 
 error: aborting due to 4 previous errors
 
-Some errors have detailed explanations: E0276, E0277.
-For more information about an error, try `rustc --explain E0276`.
+Some errors have detailed explanations: E0277, E0310, E0478.
+For more information about an error, try `rustc --explain E0277`.

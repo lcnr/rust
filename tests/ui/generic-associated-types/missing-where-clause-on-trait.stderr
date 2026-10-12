@@ -1,18 +1,20 @@
-error[E0276]: impl has stricter requirements than trait
+error[E0478]: lifetime bound not satisfied
   --> $DIR/missing-where-clause-on-trait.rs:7:39
    |
-LL |     type Assoc<'a, 'b>;
-   |     ------------------ definition of `Assoc` from trait
-...
 LL |     type Assoc<'a, 'b> = () where 'a: 'b;
-   |                                       ^^ impl has extra requirement `'a: 'b`
+   |                                       ^^
    |
-help: remove the `where` clause
+note: lifetime parameter instantiated with the lifetime `'a` as defined here
+  --> $DIR/missing-where-clause-on-trait.rs:7:16
    |
-LL -     type Assoc<'a, 'b> = () where 'a: 'b;
-LL +     type Assoc<'a, 'b> = () ;
+LL |     type Assoc<'a, 'b> = () where 'a: 'b;
+   |                ^^
+note: but lifetime parameter must outlive the lifetime `'b` as defined here
+  --> $DIR/missing-where-clause-on-trait.rs:7:20
    |
+LL |     type Assoc<'a, 'b> = () where 'a: 'b;
+   |                    ^^
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0276`.
+For more information about this error, try `rustc --explain E0478`.

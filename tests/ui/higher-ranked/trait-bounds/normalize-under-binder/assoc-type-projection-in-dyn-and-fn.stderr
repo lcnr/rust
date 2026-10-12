@@ -10,6 +10,12 @@ help: this trait has no implementations, consider adding one
 LL | trait Trait2<'a> {
    | ^^^^^^^^^^^^^^^^
 
+error: the type `Box<(dyn for<'a> Trait1<<() as Trait2<'a>>::Ty> + 'static)>` is not well-formed
+  --> $DIR/assoc-type-projection-in-dyn-and-fn.rs:12:16
+   |
+LL | fn _ice(param: Box<dyn for <'a> Trait1<<() as Trait2<'a>>::Ty>>) {
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 error[E0277]: the trait bound `for<'a> (): Trait2<'a>` is not satisfied
   --> $DIR/assoc-type-projection-in-dyn-and-fn.rs:12:16
    |
@@ -22,6 +28,60 @@ help: this trait has no implementations, consider adding one
 LL | trait Trait2<'a> {
    | ^^^^^^^^^^^^^^^^
 
-error: aborting due to 2 previous errors
+error[E0277]: the trait bound `for<'a> (): Trait2<'a>` is not satisfied
+  --> $DIR/assoc-type-projection-in-dyn-and-fn.rs:15:52
+   |
+LL |     let _e: (usize, usize) = unsafe{mem::transmute(param)};
+   |                                                    ^^^^^ the trait `for<'a> Trait2<'a>` is not implemented for `()`
+   |
+help: this trait has no implementations, consider adding one
+  --> $DIR/assoc-type-projection-in-dyn-and-fn.rs:8:1
+   |
+LL | trait Trait2<'a> {
+   | ^^^^^^^^^^^^^^^^
+
+error: the type `Box<dyn for<'a> Trait1<<() as Trait2<'a>>::Ty>>` is not well-formed
+  --> $DIR/assoc-type-projection-in-dyn-and-fn.rs:15:37
+   |
+LL |     let _e: (usize, usize) = unsafe{mem::transmute(param)};
+   |                                     ^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `for<'a> (): Trait2<'a>` is not satisfied
+  --> $DIR/assoc-type-projection-in-dyn-and-fn.rs:12:9
+   |
+LL | fn _ice(param: Box<dyn for <'a> Trait1<<() as Trait2<'a>>::Ty>>) {
+   |         ^^^^^ the trait `for<'a> Trait2<'a>` is not implemented for `()`
+   |
+help: this trait has no implementations, consider adding one
+  --> $DIR/assoc-type-projection-in-dyn-and-fn.rs:8:1
+   |
+LL | trait Trait2<'a> {
+   | ^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `for<'a> (): Trait2<'a>` is not satisfied
+  --> $DIR/assoc-type-projection-in-dyn-and-fn.rs:15:37
+   |
+LL |     let _e: (usize, usize) = unsafe{mem::transmute(param)};
+   |                                     ^^^^^^^^^^^^^^ the trait `for<'a> Trait2<'a>` is not implemented for `()`
+   |
+help: this trait has no implementations, consider adding one
+  --> $DIR/assoc-type-projection-in-dyn-and-fn.rs:8:1
+   |
+LL | trait Trait2<'a> {
+   | ^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `for<'a> (): Trait2<'a>` is not satisfied
+  --> $DIR/assoc-type-projection-in-dyn-and-fn.rs:12:1
+   |
+LL | fn _ice(param: Box<dyn for <'a> Trait1<<() as Trait2<'a>>::Ty>>) {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `for<'a> Trait2<'a>` is not implemented for `()`
+   |
+help: this trait has no implementations, consider adding one
+  --> $DIR/assoc-type-projection-in-dyn-and-fn.rs:8:1
+   |
+LL | trait Trait2<'a> {
+   | ^^^^^^^^^^^^^^^^
+
+error: aborting due to 8 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

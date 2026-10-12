@@ -1,12 +1,11 @@
-error[E0792]: expected generic lifetime parameter, found `'x`
-  --> $DIR/higher_kinded_params3.rs:27:9
+error[E0284]: type annotations needed
+  --> $DIR/higher_kinded_params3.rs:26:26
    |
-LL | type Tait<'a> = impl std::fmt::Debug + 'a;
-   |           -- this generic parameter must be used with a generic lifetime parameter
-...
-LL |         f = g;
-   |         ^^^^^
+LL |     fn successors(&self, mut f: for<'x> fn(&'x ()) -> <&'x A as B>::C) -> Successors<'_> {
+   |                          ^^^^^ cannot infer type
+   |
+   = note: cannot satisfy `for<'x> <&'x A as B>::C == _`
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0792`.
+For more information about this error, try `rustc --explain E0284`.

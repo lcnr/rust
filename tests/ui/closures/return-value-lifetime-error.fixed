@@ -10,7 +10,7 @@ fn main() {
         *count += 1;
     }
 
-    let _ = counts.iter().max_by_key(|(_, v)| **v);
+    let _ = counts.iter().max_by_key(|(_, v)| v);
     //~^ ERROR lifetime may not live long enough
     //~| HELP dereference the return value
 }

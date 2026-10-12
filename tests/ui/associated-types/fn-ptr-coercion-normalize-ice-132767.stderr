@@ -3,9 +3,6 @@ error[E0277]: the trait bound `u32: Id` is not satisfied
    |
 LL | fn bar() -> impl Copy + Id {
    |             ^^^^^^^^^^^^^^ the trait `Id` is not implemented for `u32`
-LL |
-LL |     0u32
-   |     ---- return type was inferred to be `u32` here
    |
 help: the trait `Id` is implemented for `i32`
   --> $DIR/fn-ptr-coercion-normalize-ice-132767.rs:16:1

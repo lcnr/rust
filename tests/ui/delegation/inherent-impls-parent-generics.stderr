@@ -74,25 +74,6 @@ error[E0284]: type annotations needed
   --> $DIR/inherent-impls-parent-generics.rs:14:10
    |
 LL | reuse E::foo_static as e;
-   |       -  ^^^^^^^^^^ cannot infer the value of the const parameter `C` declared on the enum `E`
-   |       |
-   |       type must be known at this point
-   |
-note: required by a const generic parameter in `E`
-  --> $DIR/inherent-impls-parent-generics.rs:4:23
-   |
-LL | enum E<'a: 'a, A: 'a, const C: usize> {
-   |                       ^^^^^^^^^^^^^^ required by this const generic parameter in `E`
-help: consider specifying the generic arguments
-   |
-LL - reuse E::foo_static as e;
-LL + reuse E::<A, C> as e;
-   |
-
-error[E0284]: type annotations needed
-  --> $DIR/inherent-impls-parent-generics.rs:14:10
-   |
-LL | reuse E::foo_static as e;
    |          ^^^^^^^^^^ cannot infer the value of the const parameter `C` declared on the enum `E`
    |
 note: required by a const generic parameter in `E::<'a, A, C>::foo_static`
@@ -140,25 +121,6 @@ help: provide the argument
    |
 LL | reuse E::foo_self(/* value */) as e1;
    |                  +++++++++++++
-
-error[E0284]: type annotations needed
-  --> $DIR/inherent-impls-parent-generics.rs:23:10
-   |
-LL | reuse E::foo_static::<'static, (), true> as e2;
-   |       -  ^^^^^^^^^^ cannot infer the value of the const parameter `C` declared on the enum `E`
-   |       |
-   |       type must be known at this point
-   |
-note: required by a const generic parameter in `E`
-  --> $DIR/inherent-impls-parent-generics.rs:4:23
-   |
-LL | enum E<'a: 'a, A: 'a, const C: usize> {
-   |                       ^^^^^^^^^^^^^^ required by this const generic parameter in `E`
-help: consider specifying the generic arguments
-   |
-LL - reuse E::foo_static::<'static, (), true> as e2;
-LL + reuse E::<A, C> as e2;
-   |
 
 error[E0284]: type annotations needed
   --> $DIR/inherent-impls-parent-generics.rs:23:10
@@ -260,24 +222,6 @@ error[E0284]: type annotations needed
   --> $DIR/inherent-impls-parent-generics.rs:55:10
    |
 LL | reuse S::foo_static as s;
-   |       -  ^^^^^^^^^^ cannot infer the value of the const parameter `C` declared on the struct `S`
-   |       |
-   |       type must be known at this point
-   |
-note: required by a const generic parameter in `S`
-  --> $DIR/inherent-impls-parent-generics.rs:46:13
-   |
-LL | struct S<A, const C: usize> {
-   |             ^^^^^^^^^^^^^^ required by this const generic parameter in `S`
-help: consider specifying the generic arguments
-   |
-LL | reuse S::<A, C>::foo_static as s;
-   |        ++++++++
-
-error[E0284]: type annotations needed
-  --> $DIR/inherent-impls-parent-generics.rs:55:10
-   |
-LL | reuse S::foo_static as s;
    |          ^^^^^^^^^^ cannot infer the value of the const parameter `C` declared on the struct `S`
    |
 note: required by a const generic parameter in `S::<A, C>::foo_static`
@@ -324,24 +268,6 @@ help: provide the argument
    |
 LL | reuse S::foo_self(/* value */) as s1;
    |                  +++++++++++++
-
-error[E0284]: type annotations needed
-  --> $DIR/inherent-impls-parent-generics.rs:64:10
-   |
-LL | reuse S::foo_static::<'static, (), true> as s2;
-   |       -  ^^^^^^^^^^ cannot infer the value of the const parameter `C` declared on the struct `S`
-   |       |
-   |       type must be known at this point
-   |
-note: required by a const generic parameter in `S`
-  --> $DIR/inherent-impls-parent-generics.rs:46:13
-   |
-LL | struct S<A, const C: usize> {
-   |             ^^^^^^^^^^^^^^ required by this const generic parameter in `S`
-help: consider specifying the generic arguments
-   |
-LL | reuse S::<A, C>::foo_static::<'static, (), true> as s2;
-   |        ++++++++
 
 error[E0284]: type annotations needed
   --> $DIR/inherent-impls-parent-generics.rs:64:10
@@ -438,7 +364,7 @@ help: provide the argument
 LL | reuse S::<_, 123>::foo_self(/* value */) as s9;
    |                            +++++++++++++
 
-error: aborting due to 34 previous errors
+error: aborting due to 30 previous errors
 
 Some errors have detailed explanations: E0061, E0284.
 For more information about an error, try `rustc --explain E0061`.

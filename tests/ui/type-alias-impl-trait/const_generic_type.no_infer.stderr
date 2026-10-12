@@ -6,18 +6,14 @@ LL | async fn test<const N: Bar>() {
    |
    = note: the only supported types are integers, `bool`, and `char`
 
-error: item does not constrain `Bar::{opaque#0}`
-  --> $DIR/const_generic_type.rs:8:10
+error[E0282]: type annotations needed
+  --> $DIR/const_generic_type.rs:8:30
    |
 LL | async fn test<const N: Bar>() {
-   |          ^^^^
+   |                              ^ cannot infer type
    |
-   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
-note: this opaque type is supposed to be constrained
-  --> $DIR/const_generic_type.rs:5:12
-   |
-LL | type Bar = impl std::fmt::Display;
-   |            ^^^^^^^^^^^^^^^^^^^^^^
+   = note: cannot infer type of hidden type of opaque
 
 error: aborting due to 2 previous errors
 
+For more information about this error, try `rustc --explain E0282`.

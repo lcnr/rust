@@ -1,8 +1,8 @@
 error[E0277]: the trait bound `T: Clone` is not satisfied
-  --> $DIR/bounds-are-checked-2.rs:10:5
+  --> $DIR/bounds-are-checked-2.rs:9:1
    |
-LL |     t
-   |     ^ the trait `Clone` is not implemented for `T`
+LL | fn f<T: Clone>(t: T) -> X<T> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `T`
    |
 note: required by a bound in an opaque type
   --> $DIR/bounds-are-checked-2.rs:6:22

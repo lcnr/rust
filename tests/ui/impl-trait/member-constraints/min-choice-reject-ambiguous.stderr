@@ -27,15 +27,17 @@ LL |     T: 'c + 'a,
    |           ++++
 
 error[E0700]: hidden type for `impl Cap<'b> + Cap<'c>` captures lifetime that does not appear in bounds
-  --> $DIR/min-choice-reject-ambiguous.rs:39:5
+  --> $DIR/min-choice-reject-ambiguous.rs:34:1
    |
-LL | fn test_ambiguous<'a, 'b, 'c>(s: &'a u8) -> impl Cap<'b> + Cap<'c>
-   |                   --                        ---------------------- opaque type defined here
-   |                   |
-   |                   hidden type `&'a u8` captures the lifetime `'a` as defined here
-...
-LL |     s
-   |     ^
+LL |   fn test_ambiguous<'a, 'b, 'c>(s: &'a u8) -> impl Cap<'b> + Cap<'c>
+   |   ^                 --                        ---------------------- opaque type defined here
+   |   |                 |
+   |  _|                 hidden type `&'a u8` captures the lifetime `'a` as defined here
+   | |
+LL | | where
+LL | |     'a: 'b,
+LL | |     'a: 'c,
+   | |___________^
    |
 help: add a `use<...>` bound to explicitly capture `'a`
    |

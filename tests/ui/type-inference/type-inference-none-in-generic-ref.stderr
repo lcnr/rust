@@ -1,14 +1,15 @@
-error[E0282]: type annotations needed
+error[E0284]: type annotations needed: cannot satisfy `_: '_`
   --> $DIR/type-inference-none-in-generic-ref.rs:8:5
    |
 LL |     S { o: &None };
-   |     ^^^^^^^^^^^^^^ cannot infer type of the type parameter `T` declared on the struct `S`
+   |     ^ cannot satisfy `_: '_`
    |
-help: consider specifying a concrete type for the type parameter `T`
+note: required by a bound in `S`
+  --> $DIR/type-inference-none-in-generic-ref.rs:3:17
    |
-LL |     S::</* Type */> { o: &None };
-   |      ++++++++++++++
+LL | struct S<'a, T: 'a> {
+   |                 ^^ required by this bound in `S`
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0282`.
+For more information about this error, try `rustc --explain E0284`.

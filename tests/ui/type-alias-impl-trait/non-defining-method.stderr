@@ -10,11 +10,21 @@ note: for this opaque type
 LL |     type Bar<T> = impl Sized;
    |                   ^^^^^^^^^^
 
-error[E0792]: expected generic type parameter, found `u32`
-  --> $DIR/non-defining-method.rs:16:17
+error: item does not constrain `<() as Foo>::Bar::{opaque#0}`
+  --> $DIR/non-defining-method.rs:16:8
+   |
+LL |     fn foo() -> Self::Bar<u32> {}
+   |        ^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/non-defining-method.rs:15:19
    |
 LL |     type Bar<T> = impl Sized;
-   |              - this generic parameter must be used with a generic type parameter
+   |                   ^^^^^^^^^^
+note: this use of `<() as Foo>::Bar<u32>` does not have unique universal generic arguments
+  --> $DIR/non-defining-method.rs:16:17
+   |
 LL |     fn foo() -> Self::Bar<u32> {}
    |                 ^^^^^^^^^^^^^^
 

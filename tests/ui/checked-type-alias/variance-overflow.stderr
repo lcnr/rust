@@ -7,29 +7,25 @@ LL | struct First<T>(Second);
    = help: consider removing `T`, referring to it in a field, or using a marker such as `PhantomData`
    = help: if you intended `T` to be a const parameter, use `const T: /* Type */` instead
 
-error[E0275]: overflow normalizing the type alias `Second`
+error[E0275]: overflow evaluating the requirement `Second == _`
   --> $DIR/variance-overflow.rs:15:17
    |
 LL | struct First<T>(Second);
    |                 ^^^^^^
-   |
-   = note: in case this is a recursive type alias, consider using a struct, enum, or union instead
 
-error[E0275]: overflow normalizing the type alias `Second`
+error[E0275]: overflow evaluating the requirement `Second == _`
   --> $DIR/variance-overflow.rs:19:1
    |
 LL | type Second = Second; // diverging free alias type
    | ^^^^^^^^^^^
-   |
-   = note: in case this is a recursive type alias, consider using a struct, enum, or union instead
 
-error[E0275]: overflow normalizing the type alias `Diverging<(((((((_,),),),),),),)>`
+error[E0275]: overflow evaluating the requirement `Diverging<(T,)> == _`
   --> $DIR/variance-overflow.rs:26:1
    |
 LL | type Diverging<T> = Diverging<(T,)>;
    | ^^^^^^^^^^^^^^^^^
    |
-   = note: in case this is a recursive type alias, consider using a struct, enum, or union instead
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`variance_overflow`)
 
 error[E0392]: type parameter `T` is never used
   --> $DIR/variance-overflow.rs:29:13
@@ -42,13 +38,13 @@ LL | struct Wrap<T>(Diverging<T>);
    = help: consider removing `T`, referring to it in a field, or using a marker such as `PhantomData`
    = help: if you intended `T` to be a const parameter, use `const T: /* Type */` instead
 
-error[E0275]: overflow normalizing the type alias `Diverging<(((((((_,),),),),),),)>`
+error[E0275]: overflow evaluating the requirement `Diverging<T> == _`
   --> $DIR/variance-overflow.rs:29:16
    |
 LL | struct Wrap<T>(Diverging<T>);
    |                ^^^^^^^^^^^^
    |
-   = note: in case this is a recursive type alias, consider using a struct, enum, or union instead
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`variance_overflow`)
 
 error: aborting due to 6 previous errors
 

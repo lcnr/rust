@@ -4,7 +4,7 @@ error[E0309]: the parameter type `T` may not live long enough
 LL | impl<'a, T> Foo<'a> for T {
    |      -- the parameter type `T` must be valid for the lifetime `'a` as defined here...
 LL |     type Bar = &'a T;
-   |     ^^^^^^^^ ...so that the reference type `&'a T` does not outlive the data it points at
+   |     ^^^^^^^^ ...so that the type `T` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |

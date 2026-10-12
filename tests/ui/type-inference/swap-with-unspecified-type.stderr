@@ -1,9 +1,9 @@
-error[E0282]: type annotations needed
-  --> $DIR/swap-with-unspecified-type.rs:7:13
+error[E0284]: type annotations needed: cannot satisfy `_: '_`
+  --> $DIR/swap-with-unspecified-type.rs:7:20
    |
 LL |     unsafe {swap::<&mut _>(transmute(&a), transmute(&b))};
-   |             ^^^^^^^^^^^^^^ cannot infer type of the type parameter `T` declared on the function `swap`
+   |                    ^^^^^^ cannot satisfy `_: '_`
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0282`.
+For more information about this error, try `rustc --explain E0284`.

@@ -1,38 +1,16 @@
-error: implementation of `Fn` is not general enough
+error[E0277]: the trait bound `&fn(_) -> _ {id::<_>}: CoerceUnsized<&dyn for<'a, 'b> Fn(&'a Foo<'b>) -> &'a Foo<'b>>` is not satisfied in `fn(&Foo<'_>) -> &Foo<'_> {id::<&Foo<'_>>}`
   --> $DIR/rfc1623-2.rs:28:8
    |
 LL |     f: &id,
-   |        ^^^ implementation of `Fn` is not general enough
+   |        ^^^ unsatisfied trait bound
    |
-   = note: `fn(&'2 Foo<'_>) -> &'2 Foo<'_> {id::<&'2 Foo<'_>>}` must implement `Fn<(&'1 Foo<'b>,)>`, for any lifetime `'1`...
-   = note: ...but it actually implements `Fn<(&'2 Foo<'_>,)>`, for some specific lifetime `'2`
+   = help: within `fn(&Foo<'_>) -> &Foo<'_> {id::<&Foo<'_>>}`, the trait `for<'a, 'b> Fn(&'a Foo<'b>)` is not implemented for fn item `fn(&Foo<'_>) -> &Foo<'_> {id::<&Foo<'_>>}`
+   = note: expected a closure with signature `for<'a, 'b> fn(&'a Foo<'b>)`
+              found a closure with signature `fn(&Foo<'_>)`
+   = note: required because it appears within the type `fn(&Foo<'_>) -> &Foo<'_> {id::<&Foo<'_>>}`
+   = note: required for `&fn(&Foo<'_>) -> &Foo<'_> {id::<&Foo<'_>>}` to implement `CoerceUnsized<&dyn for<'a, 'b> Fn(&'a Foo<'b>) -> &'a Foo<'b>>`
+   = note: required for the cast from `&fn(&Foo<'_>) -> &Foo<'_> {id::<&Foo<'_>>}` to `&dyn for<'a, 'b> Fn(&'a Foo<'b>) -> &'a Foo<'b>`
 
-error: implementation of `Fn` is not general enough
-  --> $DIR/rfc1623-2.rs:28:8
-   |
-LL |     f: &id,
-   |        ^^^ implementation of `Fn` is not general enough
-   |
-   = note: `fn(&Foo<'2>) -> &Foo<'2> {id::<&Foo<'2>>}` must implement `Fn<(&'a Foo<'1>,)>`, for any lifetime `'1`...
-   = note: ...but it actually implements `Fn<(&Foo<'2>,)>`, for some specific lifetime `'2`
+error: aborting due to 1 previous error
 
-error: implementation of `FnOnce` is not general enough
-  --> $DIR/rfc1623-2.rs:28:8
-   |
-LL |     f: &id,
-   |        ^^^ implementation of `FnOnce` is not general enough
-   |
-   = note: `fn(&'2 Foo<'_>) -> &'2 Foo<'_> {id::<&'2 Foo<'_>>}` must implement `FnOnce<(&'1 Foo<'b>,)>`, for any lifetime `'1`...
-   = note: ...but it actually implements `FnOnce<(&'2 Foo<'_>,)>`, for some specific lifetime `'2`
-
-error: implementation of `FnOnce` is not general enough
-  --> $DIR/rfc1623-2.rs:28:8
-   |
-LL |     f: &id,
-   |        ^^^ implementation of `FnOnce` is not general enough
-   |
-   = note: `fn(&Foo<'2>) -> &Foo<'2> {id::<&Foo<'2>>}` must implement `FnOnce<(&'a Foo<'1>,)>`, for any lifetime `'1`...
-   = note: ...but it actually implements `FnOnce<(&Foo<'2>,)>`, for some specific lifetime `'2`
-
-error: aborting due to 4 previous errors
-
+For more information about this error, try `rustc --explain E0277`.

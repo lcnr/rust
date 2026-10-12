@@ -1,38 +1,44 @@
-error: non-defining opaque type use in defining scope
+error: item does not constrain `TwoTys::{opaque#0}`
+  --> $DIR/generic_duplicate_param_use.rs:22:4
+   |
+LL | fn one_ty<T: Debug>(t: T) -> TwoTys<T, T> {
+   |    ^^^^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/generic_duplicate_param_use.rs:15:21
+   |
+LL | type TwoTys<T, U> = impl Debug;
+   |                     ^^^^^^^^^^
+note: this use of `TwoTys<T, T>` does not have unique universal generic arguments
   --> $DIR/generic_duplicate_param_use.rs:22:30
    |
 LL | fn one_ty<T: Debug>(t: T) -> TwoTys<T, T> {
    |                              ^^^^^^^^^^^^
-   |
-note: type used multiple times
-  --> $DIR/generic_duplicate_param_use.rs:15:13
-   |
-LL | type TwoTys<T, U> = impl Debug;
-   |             ^  ^
 
-error: non-defining opaque type use in defining scope
-  --> $DIR/generic_duplicate_param_use.rs:29:5
+error: non-defining use of `TwoLifetimes<'_, '_>` in the defining scope
+  --> $DIR/generic_duplicate_param_use.rs:28:1
    |
-LL |     t
-   |     ^
-   |
-note: lifetime used multiple times
-  --> $DIR/generic_duplicate_param_use.rs:17:19
-   |
-LL | type TwoLifetimes<'a, 'b> = impl Debug;
-   |                   ^^  ^^
+LL | fn one_lifetime<'a>(t: &'a u32) -> TwoLifetimes<'a, 'a> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: non-defining opaque type use in defining scope
+error: item does not constrain `TwoConsts::{opaque#0}`
+  --> $DIR/generic_duplicate_param_use.rs:34:4
+   |
+LL | fn one_const<const N: usize>(t: *mut [u8; N]) -> TwoConsts<N, N> {
+   |    ^^^^^^^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/generic_duplicate_param_use.rs:19:50
+   |
+LL | type TwoConsts<const X: usize, const Y: usize> = impl Debug;
+   |                                                  ^^^^^^^^^^
+note: this use of `TwoConsts<N, N>` does not have unique universal generic arguments
   --> $DIR/generic_duplicate_param_use.rs:34:50
    |
 LL | fn one_const<const N: usize>(t: *mut [u8; N]) -> TwoConsts<N, N> {
    |                                                  ^^^^^^^^^^^^^^^
-   |
-note: constant used multiple times
-  --> $DIR/generic_duplicate_param_use.rs:19:16
-   |
-LL | type TwoConsts<const X: usize, const Y: usize> = impl Debug;
-   |                ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
 
 error: aborting due to 3 previous errors
 

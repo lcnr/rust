@@ -12,6 +12,15 @@ note: lifetime declared here
 LL | fn a<'a>() -> impl for<'b> Fn(&'a u8) -> (impl Sized + 'b) {
    |                        ^^
 
-error: aborting due to 1 previous error
+error[E0275]: overflow evaluating the requirement `a<'a>::{opaque#0}<'a> == {closure@$DIR/impl-fn-in-ret-pos-invalid-binder.rs:9:5: 9:8}`
+  --> $DIR/impl-fn-in-ret-pos-invalid-binder.rs:7:15
+   |
+LL | fn a<'a>() -> impl for<'b> Fn(&'a u8) -> (impl Sized + 'b) {
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`impl_fn_in_ret_pos_invalid_binder`)
 
-For more information about this error, try `rustc --explain E0657`.
+error: aborting due to 2 previous errors
+
+Some errors have detailed explanations: E0275, E0657.
+For more information about an error, try `rustc --explain E0275`.

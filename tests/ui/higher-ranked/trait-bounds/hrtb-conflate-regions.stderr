@@ -1,39 +1,22 @@
-error: implementation of `Foo` is not general enough
-  --> $DIR/hrtb-conflate-regions.rs:27:10
+error[E0277]: the trait bound `for<'a, 'b> SomeStruct: Foo<(&'a isize, &'b isize)>` is not satisfied
+  --> $DIR/hrtb-conflate-regions.rs:27:22
    |
 LL | fn b() { want_foo2::<SomeStruct>(); }
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                      ^^^^^^^^^^ unsatisfied trait bound
    |
-note: `SomeStruct` must implement `Foo<(&'0 isize, &'1 isize)>`, for any two lifetimes `'0` and `'1`...
+help: the trait `Foo<(&'a _, &'b _)>` is not implemented for `SomeStruct`
+      but trait `Foo<(&_, &_)>` is implemented for it
+  --> $DIR/hrtb-conflate-regions.rs:22:1
+   |
+LL | impl<'a> Foo<(&'a isize, &'a isize)> for SomeStruct
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `want_foo2`
   --> $DIR/hrtb-conflate-regions.rs:9:15
    |
 LL | fn want_foo2<T>()
 LL |     where T : for<'a,'b> Foo<(&'a isize, &'b isize)>
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `want_foo2`
-note: ...but it actually implements `Foo<(&'2 isize, &'2 isize)>`, for some specific lifetime `'2`
-  --> $DIR/hrtb-conflate-regions.rs:22:1
-   |
-LL | impl<'a> Foo<(&'a isize, &'a isize)> for SomeStruct
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: implementation of `Foo` is not general enough
-  --> $DIR/hrtb-conflate-regions.rs:27:10
-   |
-LL | fn b() { want_foo2::<SomeStruct>(); }
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-note: `SomeStruct` must implement `Foo<(&'0 isize, &'1 isize)>`, for any two lifetimes `'0` and `'1`...
-  --> $DIR/hrtb-conflate-regions.rs:9:15
-   |
-LL | fn want_foo2<T>()
-LL |     where T : for<'a,'b> Foo<(&'a isize, &'b isize)>
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `want_foo2`
-note: ...but it actually implements `Foo<(&'2 isize, &'2 isize)>`, for some specific lifetime `'2`
-  --> $DIR/hrtb-conflate-regions.rs:22:1
-   |
-LL | impl<'a> Foo<(&'a isize, &'a isize)> for SomeStruct
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+error: aborting due to 1 previous error
 
-error: aborting due to 2 previous errors
-
+For more information about this error, try `rustc --explain E0277`.

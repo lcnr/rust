@@ -1,17 +1,15 @@
-error[E0308]: method not compatible with trait
+error[E0478]: lifetime bound not satisfied
   --> $DIR/do-not-imply-from-trait-impl.rs:17:38
    |
 LL |     fn foo<'a: 'static>(&'a self) -> impl MkStatic + 'static {
-   |                                      ^^^^^^^^^^^^^^^^^^^^^^^ lifetime mismatch
+   |                                      ^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: expected signature `fn(&'late _) -> _`
-              found signature `fn(&'a _) -> _`
-note: the lifetime `'late` as defined here...
-  --> $DIR/do-not-imply-from-trait-impl.rs:13:25
+note: lifetime parameter instantiated with the lifetime `'late` as defined here
+  --> $DIR/do-not-imply-from-trait-impl.rs:17:5
    |
-LL |     fn foo<'a: 'static, 'late>(&'late self) -> impl MkStatic;
-   |                         ^^^^^
-note: ...does not necessarily outlive the lifetime `'a` as defined here
+LL |     fn foo<'a: 'static>(&'a self) -> impl MkStatic + 'static {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: but lifetime parameter must outlive the lifetime `'a` as defined here
   --> $DIR/do-not-imply-from-trait-impl.rs:17:12
    |
 LL |     fn foo<'a: 'static>(&'a self) -> impl MkStatic + 'static {
@@ -19,4 +17,4 @@ LL |     fn foo<'a: 'static>(&'a self) -> impl MkStatic + 'static {
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0308`.
+For more information about this error, try `rustc --explain E0478`.

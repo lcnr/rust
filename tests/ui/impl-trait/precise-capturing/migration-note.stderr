@@ -5,13 +5,22 @@ LL |     let x = vec![0];
    |         - binding `x` declared here
 LL |
 LL |     display_len(&x)
-   |     ------------^^-
-   |     |           |
-   |     |           borrowed value does not live long enough
-   |     argument requires that `x` is borrowed for `'static`
+   |                 ^^ borrowed value does not live long enough
 ...
 LL | }
-   | - `x` dropped here while still borrowed
+   | -- borrow later used here
+   | |
+   | `x` dropped here while still borrowed
+   |
+note: this call may capture more lifetimes than intended, because Rust 2024 has adjusted the `impl Trait` lifetime capture rules
+  --> $DIR/migration-note.rs:184:5
+   |
+LL |     display_len(&x)
+   |     ^^^^^^^^^^^^^^^
+help: use the precise capturing `use<...>` syntax to make the captures explicit
+   |
+LL | fn display_len<T>(x: &Vec<T>) -> impl Display + use<T> {
+   |                                               ++++++++
 
 error[E0502]: cannot borrow `x` as mutable because it is also borrowed as immutable
   --> $DIR/migration-note.rs:19:5

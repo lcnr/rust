@@ -12,6 +12,27 @@ note: lifetime declared here
 LL | fn test() -> impl for<'a> MyFn<&'a A, Output = impl Iterator + 'a> {
    |                       ^^
 
-error: aborting due to 1 previous error
+error[E0277]: the trait bound `for<'a> Wrap<{closure@$DIR/issue-67830.rs:22:10: 22:13}>: MyFn<&'a A>` is not satisfied
+  --> $DIR/issue-67830.rs:20:14
+   |
+LL | fn test() -> impl for<'a> MyFn<&'a A, Output = impl Iterator + 'a> {
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `MyFn<&'a A>` is not implemented for `Wrap<{closure@$DIR/issue-67830.rs:22:10: 22:13}>`
+      but trait `MyFn<&A>` is implemented for it
+  --> $DIR/issue-67830.rs:8:1
+   |
+LL | / impl<A, B, F> MyFn<A> for Wrap<F>
+LL | | where
+LL | |     F: Fn(A) -> B,
+   | |__________________^
+note: this is a known limitation of the trait solver that will be lifted in the future
+  --> $DIR/issue-67830.rs:20:14
+   |
+LL | fn test() -> impl for<'a> MyFn<&'a A, Output = impl Iterator + 'a> {
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ try adding turbofish arguments to this expression to specify the types manually, even if it's redundant
 
-For more information about this error, try `rustc --explain E0657`.
+error: aborting due to 2 previous errors
+
+Some errors have detailed explanations: E0277, E0657.
+For more information about an error, try `rustc --explain E0277`.

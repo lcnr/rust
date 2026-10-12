@@ -1,23 +1,52 @@
-error[E0275]: overflow evaluating the requirement `for<'b> u32: X<'b>`
+error[E0275]: overflow evaluating the requirement `for<'b> <u32 as X<'b>>::U == _`
   --> $DIR/hr-associated-type-bound-2.rs:11:1
    |
 LL | / impl X<'_> for u32
 LL | | where
 LL | |     for<'b> <Self as X<'b>>::U: Clone,
    | |______________________________________^
+
+error[E0275]: overflow evaluating the requirement `for<'b> <u32 as X<'b>>::U == _`
+  --> $DIR/hr-associated-type-bound-2.rs:15:5
    |
-   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`hr_associated_type_bound_2`)
-note: required for `u32` to implement `for<'b> X<'b>`
-  --> $DIR/hr-associated-type-bound-2.rs:11:6
+LL |     type U = str;
+   |     ^^^^^^
+
+error[E0275]: overflow evaluating the requirement `<u32 as X<'_>>::U == str`
+  --> $DIR/hr-associated-type-bound-2.rs:19:10
    |
-LL | impl X<'_> for u32
-   |      ^^^^^     ^^^
+LL |     1u32.f("abc");
+   |          ^
+
+error[E0275]: overflow evaluating the requirement `for<'b> <u32 as X<'b>>::U == _`
+  --> $DIR/hr-associated-type-bound-2.rs:19:5
+   |
+LL |     1u32.f("abc");
+   |     ^^^^^^^^^^^^^
+
+error[E0275]: overflow evaluating the requirement `for<'b> <u32 as X<'b>>::U: Clone`
+  --> $DIR/hr-associated-type-bound-2.rs:19:10
+   |
+LL |     1u32.f("abc");
+   |          ^
+   |
+note: required by a bound in `X::f`
+  --> $DIR/hr-associated-type-bound-2.rs:3:33
+   |
+LL | trait X<'a>
 LL | where
 LL |     for<'b> <Self as X<'b>>::U: Clone,
-   |                                 ----- unsatisfied trait bound introduced here
-   = note: 128 redundant requirements hidden
-   = note: required for `u32` to implement `for<'b> X<'b>`
+   |                                 ^^^^^ required by this bound in `X::f`
+...
+LL |     fn f(&self, x: &Self::U) {
+   |
 
-error: aborting due to 1 previous error
+error[E0275]: overflow evaluating the requirement `u32: X<'_>`
+  --> $DIR/hr-associated-type-bound-2.rs:19:10
+   |
+LL |     1u32.f("abc");
+   |          ^
+
+error: aborting due to 6 previous errors
 
 For more information about this error, try `rustc --explain E0275`.

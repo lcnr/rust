@@ -1,90 +1,30 @@
-error[E0275]: overflow evaluating the requirement `J: Send`
+warning: overflow evaluating the requirement `A: Send`
   --> $DIR/recursion_limit.rs:34:5
    |
-LL | macro_rules! link {
-...
 LL |     is_send::<A>();
    |     ^^^^^^^^^^^^^^
    |
+   = note: which requires `B: Send`
+   = note: which requires `C: Send`
+   = note: which requires `D: Send`
+   = note: which requires `E: Send`
+   = note: which requires `F: Send`
+   = note: which requires `G: Send`
+   = note: which requires `H: Send`
+   = note: which requires `I: Send`
+   = note: which requires `J: Send`
+   = note: and so on...
+   = help: consider adding a manual `impl` of auto traits like `Send` for intermediate types, if auto traits are involved
+   = help: or consider increasing the recursion limit by adding a `#![recursion_limit = "20"]` attribute to your crate (`recursion_limit`)
+   = note: this lint is attached to the whole crate and can't be disabled on a per-function basis
+   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+   = note: for more information, see issue #159228 <https://github.com/rust-lang/rust/issues/159228>
+   = note: `#[warn(recursion_depth_exceeding_limit)]` (part of `#[warn(future_incompatible)]`) on by default
+
+error: queries overflow the depth limit!
+   |
    = help: consider increasing the recursion limit by adding a `#![recursion_limit = "20"]` attribute to your crate (`recursion_limit`)
-note: required because it appears within the type `I`
-  --> $DIR/recursion_limit.rs:11:24
-   |
-LL |         enum $id { $id($t) }
-   |                        ^^ required by this field
-...
-LL | link! { I, J }
-   | -------------- in this macro invocation
-note: required because it appears within the type `H`
-  --> $DIR/recursion_limit.rs:11:24
-   |
-LL |         enum $id { $id($t) }
-   |                        ^^ required by this field
-...
-LL | link! { H, I }
-   | -------------- in this macro invocation
-note: required because it appears within the type `G`
-  --> $DIR/recursion_limit.rs:11:24
-   |
-LL |         enum $id { $id($t) }
-   |                        ^^ required by this field
-...
-LL | link! { G, H }
-   | -------------- in this macro invocation
-note: required because it appears within the type `F`
-  --> $DIR/recursion_limit.rs:11:24
-   |
-LL |         enum $id { $id($t) }
-   |                        ^^ required by this field
-...
-LL | link! { F, G }
-   | -------------- in this macro invocation
-note: required because it appears within the type `E`
-  --> $DIR/recursion_limit.rs:11:24
-   |
-LL |         enum $id { $id($t) }
-   |                        ^^ required by this field
-...
-LL | link! { E, F }
-   | -------------- in this macro invocation
-note: required because it appears within the type `D`
-  --> $DIR/recursion_limit.rs:11:24
-   |
-LL |         enum $id { $id($t) }
-   |                        ^^ required by this field
-...
-LL | link! { D, E }
-   | -------------- in this macro invocation
-note: required because it appears within the type `C`
-  --> $DIR/recursion_limit.rs:11:24
-   |
-LL |         enum $id { $id($t) }
-   |                        ^^ required by this field
-...
-LL | link! { C, D }
-   | -------------- in this macro invocation
-note: required because it appears within the type `B`
-  --> $DIR/recursion_limit.rs:11:24
-   |
-LL |         enum $id { $id($t) }
-   |                        ^^ required by this field
-...
-LL | link! { B, C }
-   | -------------- in this macro invocation
-note: required because it appears within the type `A`
-  --> $DIR/recursion_limit.rs:11:24
-   |
-LL |         enum $id { $id($t) }
-   |                        ^^ required by this field
-...
-LL | link! { A, B }
-   | -------------- in this macro invocation
-note: required by a bound in `is_send`
-  --> $DIR/recursion_limit.rs:31:14
-   |
-LL | fn is_send<T:Send>() { }
-   |              ^^^^ required by this bound in `is_send`
+   = note: query depth increased by 12 when computing layout of `A`
 
-error: aborting due to 1 previous error
+error: aborting due to 1 previous error; 1 warning emitted
 
-For more information about this error, try `rustc --explain E0275`.

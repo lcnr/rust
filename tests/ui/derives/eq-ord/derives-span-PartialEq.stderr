@@ -6,17 +6,6 @@ LL | #[derive(PartialEq)]
 ...
 LL |         x: Error,
    |         ^^^^^^^^
-   |
-note: an implementation of `PartialEq` might be missing for `Error`
-  --> $DIR/derives-span-PartialEq.rs:4:1
-   |
-LL | struct Error;
-   | ^^^^^^^^^^^^ must implement `PartialEq`
-help: consider annotating `Error` with `#[derive(PartialEq)]`
-   |
-LL + #[derive(PartialEq)]
-LL | struct Error;
-   |
 
 error[E0369]: binary operation `==` cannot be applied to type `&Error`
   --> $DIR/derives-span-PartialEq.rs:16:9
@@ -26,17 +15,6 @@ LL | #[derive(PartialEq)]
 ...
 LL |         Error,
    |         ^^^^^
-   |
-note: an implementation of `PartialEq` might be missing for `Error`
-  --> $DIR/derives-span-PartialEq.rs:4:1
-   |
-LL | struct Error;
-   | ^^^^^^^^^^^^ must implement `PartialEq`
-help: consider annotating `Error` with `#[derive(PartialEq)]`
-   |
-LL + #[derive(PartialEq)]
-LL | struct Error;
-   |
 
 error[E0369]: binary operation `==` cannot be applied to type `Error`
   --> $DIR/derives-span-PartialEq.rs:21:5

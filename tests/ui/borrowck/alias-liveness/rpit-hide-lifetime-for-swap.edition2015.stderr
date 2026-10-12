@@ -1,12 +1,11 @@
 error[E0700]: hidden type for `impl Swap + 'a` captures lifetime that does not appear in bounds
-  --> $DIR/rpit-hide-lifetime-for-swap.rs:38:5
+  --> $DIR/rpit-hide-lifetime-for-swap.rs:37:1
    |
 LL | fn hide_ref<'a, 'b, T: 'static>(x: &'a mut &'b T) -> impl Swap + 'a {
-   |                 --                                   -------------- opaque type defined here
-   |                 |
+   | ^^^^^^^^^^^^^^^^--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^--------------
+   |                 |                                    |
+   |                 |                                    opaque type defined here
    |                 hidden type `&'a mut &'b T` captures the lifetime `'b` as defined here
-LL |     x
-   |     ^
    |
 help: add a `use<...>` bound to explicitly capture `'b`
    |
@@ -14,14 +13,13 @@ LL | fn hide_ref<'a, 'b, T: 'static>(x: &'a mut &'b T) -> impl Swap + 'a + use<'
    |                                                                     ++++++++++++++++
 
 error[E0700]: hidden type for `impl Swap + 'a` captures lifetime that does not appear in bounds
-  --> $DIR/rpit-hide-lifetime-for-swap.rs:55:5
+  --> $DIR/rpit-hide-lifetime-for-swap.rs:54:1
    |
 LL | fn hide_rc_refcell<'a, 'b: 'a, T: 'static>(x: Rc<RefCell<&'b T>>) -> impl Swap + 'a {
-   |                        --                                            -------------- opaque type defined here
-   |                        |
+   | ^^^^^^^^^^^^^^^^^^^^^^^--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^--------------
+   |                        |                                             |
+   |                        |                                             opaque type defined here
    |                        hidden type `Rc<RefCell<&'b T>>` captures the lifetime `'b` as defined here
-LL |     x
-   |     ^
    |
 help: add a `use<...>` bound to explicitly capture `'b`
    |

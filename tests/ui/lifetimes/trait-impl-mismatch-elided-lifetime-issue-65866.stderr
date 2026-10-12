@@ -1,44 +1,57 @@
-error: `impl` item signature doesn't match `trait` item signature
+error[E0803]: cannot infer an appropriate lifetime for lifetime parameter 'a in generic type due to conflicting requirements
   --> $DIR/trait-impl-mismatch-elided-lifetime-issue-65866.rs:17:9
    |
-LL |     trait Bar {
-LL |         fn bar(&self, r: &mut Re);
-   |         -------------------------- expected `fn(&'1 Foo, &'2 mut Re<'3>)`
-...
-LL |     impl Bar for Foo {
 LL |         fn bar<'a, 'b>(&'a self, _r: &'b mut Re<'a>) {}
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ found `fn(&'1 Foo, &'2 mut Re<'1>)`
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: expected signature `fn(&'1 plain::Foo, &'2 mut plain::Re<'3>)`
-              found signature `fn(&'1 plain::Foo, &'2 mut plain::Re<'1>)`
-   = help: the lifetime requirements from the `impl` do not correspond to the requirements in the `trait`
-   = help: verify the lifetime relationships in the `trait` and `impl` between the `self` argument, the other inputs and its output
-note: `Re` here is elided as `Re<'_>`
+note: first, the lifetime cannot outlive the anonymous lifetime defined here...
+  --> $DIR/trait-impl-mismatch-elided-lifetime-issue-65866.rs:11:16
+   |
+LL |         fn bar(&self, r: &mut Re);
+   |                ^^^^^
+note: ...so that the declared lifetime parameter bounds are satisfied
+  --> $DIR/trait-impl-mismatch-elided-lifetime-issue-65866.rs:17:9
+   |
+LL |         fn bar<'a, 'b>(&'a self, _r: &'b mut Re<'a>) {}
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: but, the lifetime must be valid for the anonymous lifetime defined here...
   --> $DIR/trait-impl-mismatch-elided-lifetime-issue-65866.rs:11:31
    |
 LL |         fn bar(&self, r: &mut Re);
    |                               ^^
+note: ...so that the declared lifetime parameter bounds are satisfied
+  --> $DIR/trait-impl-mismatch-elided-lifetime-issue-65866.rs:17:9
+   |
+LL |         fn bar<'a, 'b>(&'a self, _r: &'b mut Re<'a>) {}
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: `impl` item signature doesn't match `trait` item signature
+error[E0803]: cannot infer an appropriate lifetime for lifetime parameter 'a in generic type due to conflicting requirements
   --> $DIR/trait-impl-mismatch-elided-lifetime-issue-65866.rs:40:9
    |
-LL |     trait Bar {
-LL |         fn bar(&self, r: &mut Re<u8>);
-   |         ------------------------------ expected `fn(&'1 Foo, &'2 mut Re<'3, u8>)`
-...
-LL |     impl Bar for Foo {
 LL |         fn bar<'a, 'b>(&'a self, _r: &'b mut Re<'a, u8>) {}
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ found `fn(&'1 Foo, &'2 mut Re<'1, u8>)`
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: expected signature `fn(&'1 with_type_args::Foo, &'2 mut with_type_args::Re<'3, u8>)`
-              found signature `fn(&'1 with_type_args::Foo, &'2 mut with_type_args::Re<'1, u8>)`
-   = help: the lifetime requirements from the `impl` do not correspond to the requirements in the `trait`
-   = help: verify the lifetime relationships in the `trait` and `impl` between the `self` argument, the other inputs and its output
-note: `Re` here is elided as `Re<'_, u8>`
+note: first, the lifetime cannot outlive the anonymous lifetime defined here...
+  --> $DIR/trait-impl-mismatch-elided-lifetime-issue-65866.rs:34:16
+   |
+LL |         fn bar(&self, r: &mut Re<u8>);
+   |                ^^^^^
+note: ...so that the declared lifetime parameter bounds are satisfied
+  --> $DIR/trait-impl-mismatch-elided-lifetime-issue-65866.rs:40:9
+   |
+LL |         fn bar<'a, 'b>(&'a self, _r: &'b mut Re<'a, u8>) {}
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: but, the lifetime must be valid for the anonymous lifetime defined here...
   --> $DIR/trait-impl-mismatch-elided-lifetime-issue-65866.rs:34:31
    |
 LL |         fn bar(&self, r: &mut Re<u8>);
-   |                               ^^
+   |                               ^^^^^^
+note: ...so that the declared lifetime parameter bounds are satisfied
+  --> $DIR/trait-impl-mismatch-elided-lifetime-issue-65866.rs:40:9
+   |
+LL |         fn bar<'a, 'b>(&'a self, _r: &'b mut Re<'a, u8>) {}
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 2 previous errors
 
+For more information about this error, try `rustc --explain E0803`.

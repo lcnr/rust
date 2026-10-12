@@ -1,11 +1,16 @@
-error: implementation of `Foo` is not general enough
-  --> $DIR/issue-97997.rs:13:5
+error[E0277]: the trait bound `for<'a> fn(&'a u8): Foo` is not satisfied
+  --> $DIR/issue-97997.rs:13:6
    |
 LL |     <fn(&u8) as Foo>::ASSOC;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^ implementation of `Foo` is not general enough
+   |      ^^^^^^^ the trait `Foo` is not implemented for `for<'a> fn(&'a u8)`
    |
-   = note: `Foo` would have to be implemented for the type `for<'a> fn(&'a u8)`
-   = note: ...but `Foo` is actually implemented for the type `fn(&'0 u8)`, for some specific lifetime `'0`
+help: the trait `Foo` is not implemented for `for<'a> fn(&'a _)`
+      but it is implemented for `fn(&_)`
+  --> $DIR/issue-97997.rs:4:1
+   |
+LL | impl<T> Foo for fn(T) {}
+   | ^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 
+For more information about this error, try `rustc --explain E0277`.

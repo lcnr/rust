@@ -13,7 +13,18 @@ LL |     type MyA: TraitA;
 LL | impl TraitB for B {
    | ^^^^^^^^^^^^^^^^^ missing `MyA` in implementation
 
-error: aborting due to 2 previous errors
+error[E0282]: type annotations needed for `[{integer}; _]`
+  --> $DIR/trait-implementation-ambiguity-69602.rs:22:9
+   |
+LL |     let _ = [0; B::VALUE];
+   |         ^    - type must be known at this point
+   |
+help: consider giving this pattern a type, where the placeholders `_` are specified
+   |
+LL |     let _: [{integer}; _] = [0; B::VALUE];
+   |          ++++++++++++++++
 
-Some errors have detailed explanations: E0046, E0437.
+error: aborting due to 3 previous errors
+
+Some errors have detailed explanations: E0046, E0282, E0437.
 For more information about an error, try `rustc --explain E0046`.

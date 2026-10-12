@@ -22,17 +22,21 @@ LL - fn ambig_tup(#[rustc_splat] t: Trait::Tup) {}
 LL + fn ambig_tup(#[rustc_splat] t: <Example as Trait>::Tup) {}
    |
 
-error[E0720]: cannot resolve opaque type
+error[E0282]: type annotations needed
   --> $DIR/splat-cannot-resolve.rs:8:43
    |
 LL | fn tuple(#[rustc_splat] t: impl Sized) -> impl Sized {
-   |                                           ^^^^^^^^^^
+   |                                           ^^^^^^^^^^ cannot infer type
+   |
+   = note: cannot infer type of hidden type of opaque
 
-error[E0720]: cannot resolve opaque type
+error[E0282]: type annotations needed
   --> $DIR/splat-cannot-resolve.rs:13:62
    |
 LL | fn tuple_trait(#[rustc_splat] t: impl std::marker::Tuple) -> impl std::marker::Tuple {
-   |                                                              ^^^^^^^^^^^^^^^^^^^^^^^
+   |                                                              ^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type
+   |
+   = note: cannot infer type of hidden type of opaque
 
 error[E0277]: cannot use `rustc_splat` attribute; the splatted argument type must be a tuple or unit, not a {type error} ({type error})
   --> $DIR/splat-cannot-resolve.rs:23:28
@@ -90,5 +94,5 @@ LL |     ambig_tup(1, 2.0);
 
 error: aborting due to 10 previous errors
 
-Some errors have detailed explanations: E0223, E0277, E0720.
+Some errors have detailed explanations: E0223, E0277, E0282.
 For more information about an error, try `rustc --explain E0223`.

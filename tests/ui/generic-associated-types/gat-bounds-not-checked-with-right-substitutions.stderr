@@ -1,16 +1,22 @@
-error: implementation of `Lengthen` is not general enough
+error[E0277]: the trait bound `for<'b> &'a str: Lengthen<&'b str>` is not satisfied
   --> $DIR/gat-bounds-not-checked-with-right-substitutions.rs:20:20
    |
 LL |     type Gat<'a> = &'a str;
-   |                    ^^^^^^^
+   |                    ^^^^^^^ the trait `for<'b> Lengthen<&'b str>` is not implemented for `&'a str`
    |
-note: `Lengthen<&'0 str>` would have to be implemented for the type `&'a str`, for any lifetime `'0`...
+help: the trait `Lengthen<&'b _>` is not implemented for `&'a _`
+      but trait `Lengthen<&_>` is implemented for `&_`
+  --> $DIR/gat-bounds-not-checked-with-right-substitutions.rs:7:1
+   |
+LL | impl<'a> Lengthen<&'a str> for &'a str {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `Gat::Gat`
   --> $DIR/gat-bounds-not-checked-with-right-substitutions.rs:12:19
    |
 LL | trait Gat {
 LL |     type Gat<'a>: for<'b> Lengthen<Self::Gat<'b>>;
    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Gat::Gat`
-   = note: ...but `Lengthen<&'1 str>` is actually implemented for the type `&'1 str`, for some specific lifetime `'1`
 
 error: aborting due to 1 previous error
 
+For more information about this error, try `rustc --explain E0277`.

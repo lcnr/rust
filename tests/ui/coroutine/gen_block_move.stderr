@@ -1,27 +1,19 @@
-error[E0373]: gen block may outlive the current function, but it borrows `x`, which is owned by the current function
-  --> $DIR/gen_block_move.rs:7:5
+error[E0597]: `x` does not live long enough
+  --> $DIR/gen_block_move.rs:10:9
    |
+LL |     let mut x = "foo".to_string();
+   |         ----- binding `x` declared here
 LL |     gen {
-   |     ^^^ may outlive borrowed value `x`
+   |     --- value captured here by coroutine
 ...
 LL |         x.clear();
-   |         - `x` is borrowed here
-   |
-note: gen block is returned here
-  --> $DIR/gen_block_move.rs:7:5
-   |
-LL | /     gen {
-LL | |         yield 42;
-LL | |         if x == "foo" { return }
-LL | |         x.clear();
-LL | |         for x in 3..6 { yield x }
-LL | |     }
-   | |_____^
-help: to force the gen block to take ownership of `x` (and any other referenced variables), use the `move` keyword
-   |
-LL |     gen move {
-   |         ++++
+   |         ^ borrowed value does not live long enough
+...
+LL | }
+   | -- borrow later used here
+   | |
+   | `x` dropped here while still borrowed
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0373`.
+For more information about this error, try `rustc --explain E0597`.

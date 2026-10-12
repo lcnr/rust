@@ -33,6 +33,14 @@ LL |     map[index] = 23;
    = note: required for `HashMap<&B, u32>` to implement `Index<&&&&&B>`
 
 error[E0277]: the trait bound `&B: Borrow<&&&&B>` is not satisfied
+  --> $DIR/index-mut-help2.rs:95:9
+   |
+LL |     map[index] = 23;
+   |         ^^^^^ the trait `Borrow<&&&&B>` is not implemented for `&B`
+   |
+   = note: required for `HashMap<&B, u32>` to implement `Index<&&&&&B>`
+
+error[E0277]: the trait bound `&B: Borrow<&&&&B>` is not satisfied
   --> $DIR/index-mut-help2.rs:98:36
    |
 LL |     if let Some(val) = map.get_mut(index) {
@@ -48,6 +56,21 @@ error[E0277]: the trait bound `D: Borrow<&&&&D>` is not satisfied
    |
 LL |     map[index] = 23;
    |     ^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `Borrow<&&&&D>` is not implemented for `D`
+      but trait `Borrow<C>` is implemented for it
+  --> $DIR/index-mut-help2.rs:18:1
+   |
+LL | impl Borrow<C> for D {
+   | ^^^^^^^^^^^^^^^^^^^^
+   = help: for that trait implementation, expected `C`, found `&&&&D`
+   = note: required for `HashMap<D, u32>` to implement `Index<&&&&&D>`
+
+error[E0277]: the trait bound `D: Borrow<&&&&D>` is not satisfied
+  --> $DIR/index-mut-help2.rs:131:9
+   |
+LL |     map[index] = 23;
+   |         ^^^^^ unsatisfied trait bound
    |
 help: the trait `Borrow<&&&&D>` is not implemented for `D`
       but trait `Borrow<C>` is implemented for it
@@ -238,7 +261,7 @@ LL ~     let binding = &index;
 LL ~     let val = map.entry(&binding).insert_entry(12);
    |
 
-error: aborting due to 14 previous errors
+error: aborting due to 16 previous errors
 
 Some errors have detailed explanations: E0277, E0308, E0507, E0594, E0716.
 For more information about an error, try `rustc --explain E0277`.

@@ -1,11 +1,16 @@
-error[E0792]: expected generic type parameter, found `&F`
+error[E0308]: mismatched types
   --> $DIR/issue-99073.rs:6:13
    |
 LL | fn fix<F: Fn(G), G: Fn()>(f: F) -> impl Fn() {
-   |        - this generic parameter must be used with a generic type parameter
+   |                  - found this type parameter
 LL |   move || f(fix(&f))
-   |             ^^^^^^^
+   |   -------   ^^^^^^^ expected closure, found type parameter `G`
+   |   |
+   |   the expected closure
+   |
+   = note:     expected closure `{closure@$DIR/issue-99073.rs:6:3: 6:10}`
+           found type parameter `G`
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0792`.
+For more information about this error, try `rustc --explain E0308`.

@@ -2,14 +2,14 @@ error[E0716]: temporary value dropped while borrowed
   --> $DIR/return_from_external_macro.rs:10:5
    |
 LL |     ret_from_ext::foo!()
-   |     ^^^^^^^^^^^^^^^^^^^^
-   |     |
-   |     creates a temporary value which is freed while still in use
-   |     opaque type requires that borrow lasts for `'static`
+   |     ^^^^^^^^^^^^^^^^^^^^ creates a temporary value which is freed while still in use
 LL |
 LL | }
-   | - temporary value is freed at the end of this statement
+   | -- borrow later used here
+   | |
+   | temporary value is freed at the end of this statement
    |
+   = note: consider using a `let` binding to create a longer lived value
    = note: this error originates in the macro `ret_from_ext::foo` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0515]: cannot return reference to temporary value

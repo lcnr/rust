@@ -1,13 +1,9 @@
-error[E0700]: hidden type for `impl Sized` captures lifetime that does not appear in bounds
-  --> $DIR/higher-ranked-regions-diag.rs:19:5
+error[E0271]: type mismatch resolving `<impl Trait<&()> as Trait<&()>>::Assoc == <impl Trait<&()> as Trait<&()>>::Assoc`
+  --> $DIR/higher-ranked-regions-diag.rs:18:13
    |
 LL | fn bar() -> impl for<'a> Trait<&'a (), Assoc = impl Sized> {
-   |                      --                        ---------- opaque type defined here
-   |                      |
-   |                      hidden type `<impl for<'a> Trait<&'a ()> as Trait<&'a ()>>::Assoc` captures the lifetime `'a` as defined here
-LL |     foo()
-   |     ^^^^^
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ types differ
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0700`.
+For more information about this error, try `rustc --explain E0271`.

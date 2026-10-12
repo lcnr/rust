@@ -26,16 +26,6 @@ error[E0582]: binding for associated type `Assoc` references lifetime `'b`, whic
 LL | impl<F: for<'b> Fun<Assoc = &'b ()>> MyTrait for F {}
    |                     ^^^^^^^^^^^^^^
 
-error[E0308]: mismatched types
-  --> $DIR/ice-wf-missing-span-in-error-130012.rs:14:50
-   |
-LL | impl<F: for<'b> Fun<Assoc = &'b ()>> MyTrait for F {}
-   |                                                  ^ lifetime mismatch
-   |
-   = note: expected reference `&()`
-              found reference `&'b ()`
+error: aborting due to 4 previous errors
 
-error: aborting due to 5 previous errors
-
-Some errors have detailed explanations: E0308, E0582.
-For more information about an error, try `rustc --explain E0308`.
+For more information about this error, try `rustc --explain E0582`.

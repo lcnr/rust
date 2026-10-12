@@ -14,6 +14,31 @@ LL |     impl<const WHITE: (fn(),)> Color<WHITE> {
    |
    = note: `fn()` must implement `ConstParamTy_`, but it does not
 
-error: aborting due to 2 previous errors
+error[E0284]: type annotations needed
+  --> $DIR/issue-99641.rs:17:5
+   |
+LL |     Color::<D65>::new();
+   |     ^^^^^^^^^^^^ cannot infer the value of the constant `_`
+   |
+   = note: cannot satisfy `main::{constant#0} == _`
 
-For more information about this error, try `rustc --explain E0741`.
+error[E0284]: type annotations needed
+  --> $DIR/issue-99641.rs:17:5
+   |
+LL |     Color::<D65>::new();
+   |     ^^^^^^^^^^^^^^^^^ cannot infer the value of the const parameter `WHITE` declared on the struct `Color`
+   |
+   = note: cannot satisfy `main::{constant#0} == _`
+note: required by a const generic parameter in `Color::<WHITE>::new`
+  --> $DIR/issue-99641.rs:8:10
+   |
+LL |     impl<const WHITE: (fn(),)> Color<WHITE> {
+   |          ^^^^^^^^^^^^^^^^^^^^ required by this const generic parameter in `Color::<WHITE>::new`
+LL |
+LL |         pub fn new() -> Self {
+   |
+
+error: aborting due to 4 previous errors
+
+Some errors have detailed explanations: E0284, E0741.
+For more information about an error, try `rustc --explain E0284`.

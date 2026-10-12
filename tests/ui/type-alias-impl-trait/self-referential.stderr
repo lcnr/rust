@@ -1,54 +1,48 @@
-error[E0277]: can't compare `&i32` with `Bar<'b, 'a>`
-  --> $DIR/self-referential.rs:6:31
+error: item does not constrain `Bar::{opaque#0}`
+  --> $DIR/self-referential.rs:6:4
    |
 LL | fn bar<'a, 'b>(i: &'a i32) -> Bar<'a, 'b> {
-   |                               ^^^^^^^^^^^ no implementation for `&i32 == Bar<'b, 'a>`
-LL |
-LL |     i
-   |     - return type was inferred to be `&i32` here
+   |    ^^^
    |
-   = help: the trait `PartialEq<Bar<'b, 'a>>` is not implemented for `&i32`
-help: the trait `PartialEq` is implemented for `i32`
-  --> $SRC_DIR/core/src/cmp.rs:LL:COL
-  ::: $SRC_DIR/core/src/cmp.rs:LL:COL
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/self-referential.rs:3:20
    |
-   = note: in this macro invocation
-   = note: this error originates in the macro `impl_partial_eq_for_primitive` (in Nightly builds, run with -Z macro-backtrace for more info)
+LL | type Bar<'a, 'b> = impl PartialEq<Bar<'b, 'a>> + std::fmt::Debug;
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error[E0277]: can't compare `&i32` with `(i32, Foo<'a, 'b>::{opaque#0}<'a, 'b>)`
-  --> $DIR/self-referential.rs:14:31
+error[E0275]: overflow evaluating the requirement `Bar<'_, '_> == _`
+
+error: item does not constrain `Foo::{opaque#0}`
+  --> $DIR/self-referential.rs:14:4
    |
 LL | fn foo<'a, 'b>(i: &'a i32) -> Foo<'a, 'b> {
-   |                               ^^^^^^^^^^^ no implementation for `&i32 == (i32, Foo<'a, 'b>::{opaque#0}<'a, 'b>)`
-LL |
-LL |     (42, i)
-   |     ------- return type was inferred to be `(i32, &i32)` here
+   |    ^^^
    |
-   = help: the trait `PartialEq<(i32, Foo<'a, 'b>::{opaque#0}<'a, 'b>)>` is not implemented for `&i32`
-help: the trait `PartialEq` is implemented for `i32`
-  --> $SRC_DIR/core/src/cmp.rs:LL:COL
-  ::: $SRC_DIR/core/src/cmp.rs:LL:COL
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/self-referential.rs:11:26
    |
-   = note: in this macro invocation
-   = note: this error originates in the macro `impl_partial_eq_for_primitive` (in Nightly builds, run with -Z macro-backtrace for more info)
+LL | type Foo<'a, 'b> = (i32, impl PartialEq<Foo<'a, 'b>> + std::fmt::Debug);
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error[E0277]: can't compare `&i32` with `(i32, Moo<'b, 'a>::{opaque#0}<'b, 'a>)`
-  --> $DIR/self-referential.rs:22:31
+error[E0275]: overflow evaluating the requirement `Foo<'_, '_> == _`
+
+error: item does not constrain `Moo::{opaque#0}`
+  --> $DIR/self-referential.rs:22:4
    |
 LL | fn moo<'a, 'b>(i: &'a i32) -> Moo<'a, 'b> {
-   |                               ^^^^^^^^^^^ no implementation for `&i32 == (i32, Moo<'b, 'a>::{opaque#0}<'b, 'a>)`
-LL |
-LL |     (42, i)
-   |     ------- return type was inferred to be `(i32, &i32)` here
+   |    ^^^
    |
-   = help: the trait `PartialEq<(i32, Moo<'b, 'a>::{opaque#0}<'b, 'a>)>` is not implemented for `&i32`
-help: the trait `PartialEq` is implemented for `i32`
-  --> $SRC_DIR/core/src/cmp.rs:LL:COL
-  ::: $SRC_DIR/core/src/cmp.rs:LL:COL
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/self-referential.rs:19:26
    |
-   = note: in this macro invocation
-   = note: this error originates in the macro `impl_partial_eq_for_primitive` (in Nightly builds, run with -Z macro-backtrace for more info)
+LL | type Moo<'a, 'b> = (i32, impl PartialEq<Moo<'b, 'a>> + std::fmt::Debug);
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 3 previous errors
+error[E0275]: overflow evaluating the requirement `Moo<'_, '_> == _`
 
-For more information about this error, try `rustc --explain E0277`.
+error: aborting due to 6 previous errors
+
+For more information about this error, try `rustc --explain E0275`.

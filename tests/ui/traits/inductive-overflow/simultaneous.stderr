@@ -1,16 +1,11 @@
-error[E0275]: overflow evaluating the requirement `{integer}: Tweedledum`
-  --> $DIR/simultaneous.rs:18:5
+error[E0275]: overflow evaluating the requirement `i32: Combo`
+  --> $DIR/simultaneous.rs:18:11
    |
 LL |     is_ee(4);
-   |     ^^^^^^^^
+   |     ----- ^
+   |     |
+   |     required by a bound introduced by this call
    |
-note: required for `{integer}` to implement `Combo`
-  --> $DIR/simultaneous.rs:11:34
-   |
-LL | impl<T: Tweedledee + Tweedledum> Combo for T {}
-   |                      ----------  ^^^^^     ^
-   |                      |
-   |                      unsatisfied trait bound introduced here
 note: required by a bound in `is_ee`
   --> $DIR/simultaneous.rs:13:13
    |

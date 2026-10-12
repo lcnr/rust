@@ -1,15 +1,11 @@
-error: item does not constrain `Opaque::{opaque#0}`
-  --> $DIR/different_args_considered_equal.rs:11:4
+error[E0282]: type annotations needed
+  --> $DIR/different_args_considered_equal.rs:13:5
    |
-LL | fn get_iter<'a>() -> impl IntoIterator<Item = Opaque<'a>> {
-   |    ^^^^^^^^
+LL |     None::<Opaque<'static>>
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type of the type parameter `T` declared on the enum `Option`
    |
-   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
-note: this opaque type is supposed to be constrained
-  --> $DIR/different_args_considered_equal.rs:3:23
-   |
-LL | pub type Opaque<'a> = impl Sized;
-   |                       ^^^^^^^^^^
+   = note: cannot infer type of hidden type of opaque
 
 error: aborting due to 1 previous error
 
+For more information about this error, try `rustc --explain E0282`.

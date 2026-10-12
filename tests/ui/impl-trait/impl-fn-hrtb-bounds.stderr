@@ -53,7 +53,31 @@ note: lifetime declared here
 LL | fn c() -> impl for<'a> Fn(&'a u8) -> (impl Debug + '_) {
    |                    ^^
 
-error: aborting due to 4 previous errors
+error[E0275]: overflow evaluating the requirement `a::{opaque#0} == {closure@$DIR/impl-fn-hrtb-bounds.rs:6:5: 6:8}`
+  --> $DIR/impl-fn-hrtb-bounds.rs:4:11
+   |
+LL | fn a() -> impl Fn(&u8) -> (impl Debug + '_) {
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`impl_fn_hrtb_bounds`)
 
-Some errors have detailed explanations: E0106, E0657.
+error[E0275]: overflow evaluating the requirement `b::{opaque#0} == {closure@$DIR/impl-fn-hrtb-bounds.rs:11:5: 11:8}`
+  --> $DIR/impl-fn-hrtb-bounds.rs:9:11
+   |
+LL | fn b() -> impl for<'a> Fn(&'a u8) -> (impl Debug + 'a) {
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`impl_fn_hrtb_bounds`)
+
+error[E0275]: overflow evaluating the requirement `c::{opaque#0} == {closure@$DIR/impl-fn-hrtb-bounds.rs:16:5: 16:8}`
+  --> $DIR/impl-fn-hrtb-bounds.rs:14:11
+   |
+LL | fn c() -> impl for<'a> Fn(&'a u8) -> (impl Debug + '_) {
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`impl_fn_hrtb_bounds`)
+
+error: aborting due to 7 previous errors
+
+Some errors have detailed explanations: E0106, E0275, E0657.
 For more information about an error, try `rustc --explain E0106`.

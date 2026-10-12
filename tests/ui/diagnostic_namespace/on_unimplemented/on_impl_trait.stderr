@@ -11,16 +11,10 @@ error[E0277]: the trait bound `{integer}: Alias` is not satisfied
   --> $DIR/on_impl_trait.rs:16:9
    |
 LL |     foo(&1);
-   |     --- ^^ the trait `Test` is not implemented for `{integer}`
+   |     --- ^^ the trait `Alias` is not implemented for `{integer}`
    |     |
    |     required by a bound introduced by this call
    |
-help: this trait has no implementations, consider adding one
-  --> $DIR/on_impl_trait.rs:6:1
-   |
-LL | trait Test {}
-   | ^^^^^^^^^^
-   = note: required for `{integer}` to implement `Alias`
 note: required by a bound in `foo`
   --> $DIR/on_impl_trait.rs:13:11
    |

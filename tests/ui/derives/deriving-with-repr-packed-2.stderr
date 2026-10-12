@@ -5,7 +5,7 @@ LL | pub struct Foo<T>(T, T, T);
    | ----------------- method `clone` not found for this struct because it doesn't satisfy `Foo<NonCopy>: Clone`
 LL |
 LL | struct NonCopy;
-   | -------------- doesn't satisfy `NonCopy: Clone` or `NonCopy: Copy`
+   | -------------- doesn't satisfy `NonCopy: Clone`
 ...
 LL |     _ = x.clone();
    |           ^^^^^ method cannot be called on `Foo<NonCopy>` due to unsatisfied trait bounds
@@ -18,9 +18,7 @@ LL |     let x: Foo<u32> = Foo(1, 2, 3);
 ...
 LL |     let x: Foo<NonCopy> = Foo(NonCopy, NonCopy, NonCopy);
    |         - earlier `x` shadowed here with type `Foo<NonCopy>`
-note: the following trait bounds were not satisfied:
-      `NonCopy: Clone`
-      `NonCopy: Copy`
+note: trait bound `NonCopy: Clone` was not satisfied
   --> $DIR/deriving-with-repr-packed-2.rs:7:16
    |
 LL | #[derive(Copy, Clone, Default, PartialEq, Eq)]
@@ -29,9 +27,9 @@ LL | #[repr(packed)]
 LL | pub struct Foo<T>(T, T, T);
    |                ^ type parameter would need to implement `Clone`
    = help: consider manually implementing the trait to avoid undesired bounds
-help: consider annotating `NonCopy` with `#[derive(Clone, Copy)]`
+help: consider annotating `NonCopy` with `#[derive(Clone)]`
    |
-LL + #[derive(Clone, Copy)]
+LL + #[derive(Clone)]
 LL | struct NonCopy;
    |
 

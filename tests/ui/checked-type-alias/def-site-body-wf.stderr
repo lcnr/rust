@@ -19,18 +19,13 @@ LL | type _B = Vec<str>;
 note: required by an implicit `Sized` bound in `Vec`
   --> $SRC_DIR/alloc/src/vec/mod.rs:LL:COL
 
-error[E0491]: in type `&'static &'a ()`, reference has a longer lifetime than the data it references
+error[E0477]: the type `&'a ()` does not fulfill the required lifetime
   --> $DIR/def-site-body-wf.rs:11:1
    |
 LL | type _C<'a> = &'static &'a ();
    | ^^^^^^^^^^^
    |
-   = note: the pointer is valid for the static lifetime
-note: but the referenced data is only valid for the lifetime `'a` as defined here
-  --> $DIR/def-site-body-wf.rs:11:9
-   |
-LL | type _C<'a> = &'static &'a ();
-   |         ^^
+   = note: type must satisfy the static lifetime
 
 error[E0080]: evaluation panicked: explicit panic
   --> $DIR/def-site-body-wf.rs:14:16
@@ -50,5 +45,5 @@ LL | type _E = dyn Sized;
 
 error: aborting due to 5 previous errors
 
-Some errors have detailed explanations: E0038, E0080, E0277, E0491.
+Some errors have detailed explanations: E0038, E0080, E0277, E0477.
 For more information about an error, try `rustc --explain E0038`.

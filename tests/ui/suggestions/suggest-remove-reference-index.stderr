@@ -13,6 +13,8 @@ help: `usize` implements trait `SliceIndex<T>`
    |
    = note: `SliceIndex<ByteStr>`
    = note: required for `[bool]` to implement `Index<&usize>`
+   = note: 1 redundant requirement hidden
+   = note: required for `[bool; 1]` to implement `Index<&usize>`
 help: remove this reference
    |
 LL -     println!("{}", arr[&i]);
@@ -34,6 +36,8 @@ help: `usize` implements trait `SliceIndex<T>`
    |
    = note: `SliceIndex<ByteStr>`
    = note: required for `[bool]` to implement `Index<&usize>`
+   = note: 1 redundant requirement hidden
+   = note: required for `[bool; 1]` to implement `Index<&usize>`
 help: remove this reference
    |
 LL -     println!("{}", arr[&(i + 0)]);
@@ -55,6 +59,8 @@ help: `usize` implements trait `SliceIndex<T>`
    |
    = note: `SliceIndex<ByteStr>`
    = note: required for `[bool]` to implement `Index<&usize>`
+   = note: 1 redundant requirement hidden
+   = note: required for `[bool; 1]` to implement `Index<&usize>`
 help: remove this reference
    |
 LL -     println!("{}", arr[& i]);

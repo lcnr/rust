@@ -1,9 +1,18 @@
-error[E0275]: overflow evaluating the requirement `<Foo as Bar<Foo>>::Item == Foo`
-  --> $DIR/type-alias-impl-trait-with-cycle-error-2.rs:9:21
+error: item does not constrain `Foo::{opaque#0}`
+  --> $DIR/type-alias-impl-trait-with-cycle-error-2.rs:9:4
    |
 LL | fn crash(x: Foo) -> Foo {
-   |                     ^^^
+   |    ^^^^^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/type-alias-impl-trait-with-cycle-error-2.rs:7:12
+   |
+LL | type Foo = impl Bar<Foo, Item = Foo>;
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 1 previous error
+error[E0275]: overflow evaluating the requirement `Foo == _`
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0275`.

@@ -106,6 +106,24 @@ LL |     type Foo = impl Debug;
    |
    = note: `Foo` must be used in combination with a concrete type within the same crate
 
-error: aborting due to 11 previous errors
+error: item does not constrain `Foo5::{constant#0}::Foo::{opaque#0}`
+  --> $DIR/feature-gate-type_alias_impl_trait.rs:36:18
+   |
+LL |   type Foo5 = [(); {
+   |  __________________^
+LL | |     type Foo = impl Debug;
+LL | |
+LL | |     0
+LL | | }];
+   | |_^
+   |
+   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
+note: this opaque type is supposed to be constrained
+  --> $DIR/feature-gate-type_alias_impl_trait.rs:37:16
+   |
+LL |     type Foo = impl Debug;
+   |                ^^^^^^^^^^
+
+error: aborting due to 12 previous errors
 
 For more information about this error, try `rustc --explain E0658`.

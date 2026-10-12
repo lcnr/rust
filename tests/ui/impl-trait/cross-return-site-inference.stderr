@@ -4,34 +4,36 @@ error[E0282]: type annotations needed
 LL |     Ok(())
    |     ^^ cannot infer type of the type parameter `E` declared on the enum `Result`
    |
+   = note: cannot infer type of hidden type of opaque
 help: consider specifying the generic arguments
    |
 LL |     Ok::<(), E>(())
    |       +++++++++
 
-error[E0790]: cannot call associated function on trait without specifying the corresponding `impl` type
-  --> $DIR/cross-return-site-inference.rs:38:16
+error[E0282]: type annotations needed
+  --> $DIR/cross-return-site-inference.rs:38:12
    |
 LL |     return Err(From::from("foo"));
-   |                ^^^^^^^^^^^^^^^^^ cannot call associated function of trait
+   |            ^^^ cannot infer type of the type parameter `E` declared on the enum `Result`
    |
-help: use a fully-qualified path to a specific available implementation
+   = note: cannot infer type of hidden type of opaque
+help: consider specifying the generic arguments
    |
-LL |     return Err(</* self type */ as From>::from("foo"));
-   |                +++++++++++++++++++     +
+LL |     return Err::<(), E>(From::from("foo"));
+   |               +++++++++
 
-error[E0790]: cannot call associated function on trait without specifying the corresponding `impl` type
-  --> $DIR/cross-return-site-inference.rs:44:9
+error[E0282]: type annotations needed
+  --> $DIR/cross-return-site-inference.rs:44:5
    |
 LL |     Err(From::from("foo"))
-   |         ^^^^^^^^^^^^^^^^^ cannot call associated function of trait
+   |     ^^^ cannot infer type of the type parameter `E` declared on the enum `Result`
    |
-help: use a fully-qualified path to a specific available implementation
+   = note: cannot infer type of hidden type of opaque
+help: consider specifying the generic arguments
    |
-LL |     Err(</* self type */ as From>::from("foo"))
-   |         +++++++++++++++++++     +
+LL |     Err::<(), E>(From::from("foo"))
+   |        +++++++++
 
 error: aborting due to 3 previous errors
 
-Some errors have detailed explanations: E0282, E0790.
-For more information about an error, try `rustc --explain E0282`.
+For more information about this error, try `rustc --explain E0282`.

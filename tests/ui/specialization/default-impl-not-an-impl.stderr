@@ -34,12 +34,14 @@ note: `Foo` defines an item `f`, perhaps you need to implement it
 LL | trait Foo {
    | ^^^^^^^^^
 
-error[E0277]: the trait bound `u32: Foo` is not satisfied
+error[E0277]: the trait bound `&u32: CoerceUnsized<&dyn Foo>` is not satisfied in `u32`
   --> $DIR/default-impl-not-an-impl.rs:65:23
    |
 LL |     let _: &dyn Foo = &0u32;
-   |                       ^^^^^ the trait `Foo` is not implemented for `u32`
+   |                       ^^^^^ within `u32`, the trait `Foo` is not implemented for `u32`
    |
+   = note: required because it appears within the type `u32`
+   = note: required for `&u32` to implement `CoerceUnsized<&dyn Foo>`
    = note: required for the cast from `&u32` to `&dyn Foo`
 
 error[E0277]: the trait bound `i64: Bar` is not satisfied

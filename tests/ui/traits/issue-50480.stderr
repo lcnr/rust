@@ -102,6 +102,14 @@ LL | struct Foo(N, NotDefined, <i32 as Iterator>::Item, Vec<i32>, String);
    |
    = help: the trait `Iterator` is not implemented for `i32`
 
+error: the type `std::clone::AssertParamIsClone<<i32 as Iterator>::Item>` is not well-formed
+  --> $DIR/issue-50480.rs:2:27
+   |
+LL | #[derive(Clone, Copy)]
+   |          ----- in this derive macro expansion
+LL | struct Foo(N, NotDefined, <i32 as Iterator>::Item, Vec<i32>, String);
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^
+
 error[E0277]: `i32` is not an iterator
   --> $DIR/issue-50480.rs:11:10
    |
@@ -120,7 +128,7 @@ LL | struct Bar<T>(T, N, NotDefined, <i32 as Iterator>::Item, Vec<i32>, String);
    |
    = help: the trait `Iterator` is not implemented for `i32`
 
-error: aborting due to 13 previous errors
+error: aborting due to 14 previous errors
 
 Some errors have detailed explanations: E0204, E0277, E0425.
 For more information about an error, try `rustc --explain E0204`.

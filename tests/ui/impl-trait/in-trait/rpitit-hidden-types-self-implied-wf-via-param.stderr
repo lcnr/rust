@@ -1,19 +1,16 @@
-error[E0276]: impl has stricter requirements than trait
+error[E0478]: lifetime bound not satisfied
   --> $DIR/rpitit-hidden-types-self-implied-wf-via-param.rs:8:13
    |
-LL |     fn extend<'a: 'a>(_: &'a str) -> (impl Sized + 'a, &'static str);
-   |     ----------------------------------------------------------------- definition of `extend` from trait
-...
 LL |         'a: 'static,
-   |             ^^^^^^^ impl has extra requirement `'a: 'static`
+   |             ^^^^^^^
    |
-help: copy the `where` clause predicates from the trait
+note: lifetime parameter instantiated with the lifetime `'a` as defined here
+  --> $DIR/rpitit-hidden-types-self-implied-wf-via-param.rs:6:15
    |
-LL -     where
-LL -         'a: 'static,
-LL +     where 'a: 'a
-   |
+LL |     fn extend<'a: 'a>(s: &'a str) -> (Option<&'static &'a ()>, &'static str)
+   |               ^^
+   = note: but lifetime parameter must outlive the static lifetime
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0276`.
+For more information about this error, try `rustc --explain E0478`.

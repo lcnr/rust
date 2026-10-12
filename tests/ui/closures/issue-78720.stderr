@@ -26,6 +26,8 @@ error[E0282]: type annotations needed
    |
 LL | fn server() -> impl {
    |                ^^^^ cannot infer type
+   |
+   = note: cannot infer type of hidden type of opaque
 
 error[E0308]: mismatched types
   --> $DIR/issue-78720.rs:8:39

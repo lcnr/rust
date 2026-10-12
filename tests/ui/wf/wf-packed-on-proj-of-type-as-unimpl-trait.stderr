@@ -15,6 +15,12 @@ help: this trait has no implementations, consider adding one
 LL | pub trait Allocator { type Buffer; }
    | ^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 1 previous error
+error: the type `Matrix<<DefaultAllocator as Allocator>::Buffer>` is not well-formed
+  --> $DIR/wf-packed-on-proj-of-type-as-unimpl-trait.rs:28:12
+   |
+LL | struct Foo(Matrix<<DefaultAllocator as Allocator>::Buffer>);
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

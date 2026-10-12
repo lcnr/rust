@@ -1,11 +1,11 @@
 error[E0277]: the size for values of type `A` cannot be known at compilation time
-  --> $DIR/issue-88287.rs:35:9
+  --> $DIR/issue-88287.rs:34:5
    |
 LL | type SearchFutureTy<'f, A, B: 'f>
    |                         - this type parameter needs to be `Sized`
 ...
-LL |         async move { todo!() }
-   |         ^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
+LL |     fn search<'c>(&'c self, _client: &'c ()) -> Self::Future<'c, Self, Criteria> {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
    |
 note: required by an implicit `Sized` bound in `<T as SearchableResourceExt<Criteria>>`
   --> $DIR/issue-88287.rs:24:6

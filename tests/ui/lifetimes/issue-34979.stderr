@@ -1,10 +1,10 @@
-error[E0283]: type annotations needed: cannot satisfy `&'a (): Foo`
-  --> $DIR/issue-34979.rs:6:13
+error[E0283]: type annotations needed: cannot satisfy `&'static (): Foo`
+  --> $DIR/issue-34979.rs:7:18
    |
-LL |     &'a (): Foo,
-   |             ^^^
+LL |     &'static (): Foo;
+   |                  ^^^
    |
-note: multiple `impl`s or `where` clauses satisfying `&'a (): Foo` found
+note: multiple `impl`s or `where` clauses satisfying `&'static (): Foo` found
   --> $DIR/issue-34979.rs:2:1
    |
 LL | impl<'a, T> Foo for &'a T {}

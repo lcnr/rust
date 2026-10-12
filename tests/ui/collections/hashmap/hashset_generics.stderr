@@ -7,11 +7,11 @@ LL | #[derive(PartialEq)]
 LL |     pub parameters: HashSet<String, String>,
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-note: `String` does not implement `BuildHasher`
-  --> $SRC_DIR/alloc/src/string.rs:LL:COL
+note: `HashSet<String, String>` does not implement `PartialEq`
+  --> $SRC_DIR/std/src/collections/hash/set.rs:LL:COL
+  ::: $SRC_DIR/std/src/collections/hash/set.rs:LL:COL
    |
-   = note: `String` is defined in another crate
-   = help: you might have intended to use a HashMap instead
+   = note: `HashSet<String, String>` is defined in another crate
 
 error[E0599]: the method `insert` exists for struct `HashSet<usize, usize>`, but its trait bounds were not satisfied
   --> $DIR/hashset_generics.rs:16:8

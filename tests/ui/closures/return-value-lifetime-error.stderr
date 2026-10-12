@@ -6,11 +6,6 @@ LL |     let _ = counts.iter().max_by_key(|(_, v)| v);
    |                                       |     |
    |                                       |     return type of closure is &'2 &i32
    |                                       has type `&'1 (&i32, &i32)`
-   |
-help: dereference the return value
-   |
-LL |     let _ = counts.iter().max_by_key(|(_, v)| **v);
-   |                                               ++
 
 error: aborting due to 1 previous error
 

@@ -11,6 +11,19 @@ LL | trait D {
 LL |     type P<T: Copy>;
    |               ^^^^ required by this bound in `D::P`
 
-error: aborting due to 1 previous error
+error[E0271]: type mismatch resolving `<S as D>::P<String> == _`
+  --> $DIR/own-bound-span.rs:14:12
+   |
+LL |     let _: <S as D>::P<String>;
+   |            ^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<S as D>::P<String> == _`
+   |
+note: types differ
+  --> $DIR/own-bound-span.rs:10:23
+   |
+LL |     type P<T: Copy> = ();
+   |                       ^^
 
-For more information about this error, try `rustc --explain E0277`.
+error: aborting due to 2 previous errors
+
+Some errors have detailed explanations: E0271, E0277.
+For more information about an error, try `rustc --explain E0271`.

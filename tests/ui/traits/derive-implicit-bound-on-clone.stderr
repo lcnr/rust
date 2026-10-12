@@ -13,15 +13,13 @@ note: `ContainsRc<T, K>` does not implement `Clone`, so `&ContainsRc<T, K>` was 
    |
 LL |     x.clone()
    |     ^
-help: `Clone` is not implemented because the some trait bounds could not be satisfied
+help: `Clone` is not implemented because a trait bound is not satisfied
   --> $DIR/derive-implicit-bound-on-clone.rs:5:19
    |
 LL | #[derive(Clone)]
    |          ----- in this derive macro expansion
 LL | struct ContainsRc<T, K> {
-   |                   ^  ^ derive introduces an implicit unsatisfied trait bound `K: Clone`
-   |                   |
-   |                   derive introduces an implicit unsatisfied trait bound `T: Clone`
+   |                   ^ derive introduces an implicit `T: Clone` bound
    = help: consider manually implementing `Clone` to avoid the implicit type parameter bounds
 
 error[E0308]: mismatched types

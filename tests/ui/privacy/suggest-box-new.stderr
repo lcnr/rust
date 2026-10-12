@@ -125,7 +125,7 @@ LL +     let _ = Box::new_zeroed();
 LL -     let _ = Box {};
 LL +     let _ = Box::new_in(_, _);
    |
-   = and 16 other candidates
+   = and 17 other candidates
 help: consider using the `Default` trait
    |
 LL -     let _ = Box {};
@@ -152,7 +152,7 @@ LL +     let _ = Box::<i32>::into_inner(_);
 LL -     let _ = Box::<i32> {};
 LL +     let _ = Box::<i32>::map(_, _);
    |
-   = and 7 other candidates
+   = and 8 other candidates
 help: consider using the `Default` trait
    |
 LL -     let _ = Box::<i32> {};

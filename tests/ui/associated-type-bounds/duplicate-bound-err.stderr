@@ -4,6 +4,7 @@ error[E0282]: type annotations needed
 LL |     iter::empty()
    |     ^^^^^^^^^^^ cannot infer type of the type parameter `T` declared on the function `empty`
    |
+   = note: cannot infer type of hidden type of opaque
 help: consider specifying a concrete type for the type parameter `T`
    |
 LL |     iter::empty::</* Type */>()
@@ -15,6 +16,7 @@ error[E0282]: type annotations needed
 LL |     iter::empty()
    |     ^^^^^^^^^^^ cannot infer type of the type parameter `T` declared on the function `empty`
    |
+   = note: cannot infer type of hidden type of opaque
 help: consider specifying a concrete type for the type parameter `T`
    |
 LL |     iter::empty::</* Type */>()
@@ -26,6 +28,7 @@ error[E0282]: type annotations needed
 LL |     iter::empty()
    |     ^^^^^^^^^^^ cannot infer type of the type parameter `T` declared on the function `empty`
    |
+   = note: cannot infer type of hidden type of opaque
 help: consider specifying a concrete type for the type parameter `T`
    |
 LL |     iter::empty::</* Type */>()
@@ -84,9 +87,6 @@ error[E0277]: `*const ()` cannot be sent between threads safely
    |
 LL | fn mismatch() -> impl Iterator<Item: Copy, Item: Send> {
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `*const ()` cannot be sent between threads safely
-LL |
-LL |     iter::empty::<*const ()>()
-   |     -------------------------- return type was inferred to be `std::iter::Empty<*const ()>` here
    |
    = help: the trait `Send` is not implemented for `*const ()`
 
@@ -95,32 +95,18 @@ error[E0277]: the trait bound `String: Copy` is not satisfied
    |
 LL | fn mismatch_2() -> impl Iterator<Item: Copy, Item: Send> {
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Copy` is not implemented for `String`
-LL |
-LL |     iter::empty::<String>()
-   |     ----------------------- return type was inferred to be `std::iter::Empty<String>` here
 
 error[E0271]: expected `IntoIter<u32, 1>` to be an iterator that yields `i32`, but it yields `u32`
   --> $DIR/duplicate-bound-err.rs:103:17
    |
 LL |     fn foo() -> impl Iterator<Item = i32, Item = u32> {
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i32`, found `u32`
-...
-LL |         [2u32].into_iter()
-   |         ------------------ return type was inferred to be `std::array::IntoIter<u32, 1>` here
-   |
-note: the method call chain might not have had the expected associated types
-  --> $DIR/duplicate-bound-err.rs:106:16
-   |
-LL |         [2u32].into_iter()
-   |         ------ ^^^^^^^^^^^ `Iterator::Item` is `u32` here
-   |         |
-   |         this expression has type `[u32; 1]`
 
-error[E0271]: expected `impl Iterator<Item = u32>` to be an iterator that yields `i32`, but it yields `u32`
+error[E0284]: type annotations needed: cannot satisfy `<impl Iterator<Item = u32> as Iterator>::Item == i32`
   --> $DIR/duplicate-bound-err.rs:103:17
    |
 LL |     fn foo() -> impl Iterator<Item = i32, Item = u32> {
-   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i32`, found `u32`
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot satisfy `<impl Iterator<Item = u32> as Iterator>::Item == i32`
    |
 note: required by a bound in `Trait3::foo::{anon_assoc#0}`
   --> $DIR/duplicate-bound-err.rs:99:31
@@ -273,5 +259,5 @@ LL | fn uncallable_rtn(_: impl Trait<foo(..): Trait<ASSOC = 3>, foo(..): Trait<A
 
 error: aborting due to 25 previous errors
 
-Some errors have detailed explanations: E0271, E0277, E0282, E0719.
+Some errors have detailed explanations: E0271, E0277, E0282, E0284, E0719.
 For more information about an error, try `rustc --explain E0271`.

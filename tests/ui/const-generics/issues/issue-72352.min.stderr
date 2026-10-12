@@ -6,5 +6,24 @@ LL | unsafe fn unsafely_do_the_thing<const F: fn(&CStr) -> usize>(ptr: *const c_
    |
    = note: the only supported types are integers, `bool`, and `char`
 
-error: aborting due to 1 previous error
+error[E0284]: type annotations needed: cannot satisfy `the constant `safely_do_the_thing` can be evaluated`
+  --> $DIR/issue-72352.rs:20:53
+   |
+LL |     println!("{}", unsafe { unsafely_do_the_thing::<safely_do_the_thing>(ptr) });
+   |                                                     ^^^^^^^^^^^^^^^^^^^ cannot satisfy `the constant `safely_do_the_thing` can be evaluated`
 
+error[E0284]: type annotations needed
+  --> $DIR/issue-72352.rs:20:29
+   |
+LL |     println!("{}", unsafe { unsafely_do_the_thing::<safely_do_the_thing>(ptr) });
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot infer the value of the const parameter `F` declared on the function `unsafely_do_the_thing`
+   |
+note: required by a const generic parameter in `unsafely_do_the_thing`
+  --> $DIR/issue-72352.rs:8:33
+   |
+LL | unsafe fn unsafely_do_the_thing<const F: fn(&CStr) -> usize>(ptr: *const c_char) -> usize {
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this const generic parameter in `unsafely_do_the_thing`
+
+error: aborting due to 3 previous errors
+
+For more information about this error, try `rustc --explain E0284`.

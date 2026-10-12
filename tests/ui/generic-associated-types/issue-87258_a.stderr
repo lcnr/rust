@@ -1,15 +1,36 @@
-error: item does not constrain `<&'c mut S as Trait2>::FooFuture::{opaque#0}`
-  --> $DIR/issue-87258_a.rs:18:8
+warning: trait `Trait1` is more private than the item `Trait2::FooFuture`
+  --> $DIR/issue-87258_a.rs:12:5
    |
-LL |     fn foo<'a>() -> Self::FooFuture<'a> {
-   |        ^^^
+LL |     type FooFuture<'a>: Trait1;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ associated type `Trait2::FooFuture` is reachable at visibility `pub`
    |
-   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
-note: this opaque type is supposed to be constrained
-  --> $DIR/issue-87258_a.rs:17:26
+note: but trait `Trait1` is only usable at visibility `pub(crate)`
+  --> $DIR/issue-87258_a.rs:5:1
    |
+LL | trait Trait1 {}
+   | ^^^^^^^^^^^^
+   = note: `#[warn(private_bounds)]` on by default
+
+error[E0446]: private trait `Trait1` in public interface
+  --> $DIR/issue-87258_a.rs:17:5
+   |
+LL | trait Trait1 {}
+   | ------------ `Trait1` declared as private
+...
 LL |     type FooFuture<'a> = impl Trait1;
-   |                          ^^^^^^^^^^^
+   |     ^^^^^^^^^^^^^^^^^^ can't leak private trait
 
-error: aborting due to 1 previous error
+error[E0446]: private trait `Trait1` in public interface
+  --> $DIR/issue-87258_a.rs:17:5
+   |
+LL | trait Trait1 {}
+   | ------------ `Trait1` declared as private
+...
+LL |     type FooFuture<'a> = impl Trait1;
+   |     ^^^^^^^^^^^^^^^^^^ can't leak private trait
+   |
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
+error: aborting due to 2 previous errors; 1 warning emitted
+
+For more information about this error, try `rustc --explain E0446`.

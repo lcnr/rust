@@ -10,6 +10,18 @@ help: consider `await`ing on the `Future`
 LL |     foo().await?;
    |          ++++++
 
+error[E0277]: the `?` operator can only be used in an async function that returns `Result` or `Option` (or another type that implements `FromResidual`)
+  --> $DIR/issue-61076.rs:42:5
+   |
+LL |   async fn bar() -> Result<(), ()> {
+   |  __________________________________-
+LL | |     foo()?;
+   | |     ^^^^^^ cannot use the `?` operator in an async function that returns `impl Future<Output = Result<(), ()>>`
+...  |
+LL | |     Ok(())
+LL | | }
+   | |_- this function should return `Result` or `Option` to accept `?`
+
 error[E0277]: the `?` operator can only be applied to values that implement `Try`
   --> $DIR/issue-61076.rs:62:5
    |
@@ -25,6 +37,19 @@ help: consider `await`ing on the `Future`
    |
 LL |     t.await?;
    |      ++++++
+
+error[E0277]: the `?` operator can only be used in an async function that returns `Result` or `Option` (or another type that implements `FromResidual`)
+  --> $DIR/issue-61076.rs:62:5
+   |
+LL |   async fn baz() -> Result<(), ()> {
+   |  __________________________________-
+LL | |     let t = T;
+LL | |     t?;
+   | |     ^^ cannot use the `?` operator in an async function that returns `T`
+...  |
+LL | |     Ok(())
+LL | | }
+   | |_- this function should return `Result` or `Option` to accept `?`
 
 error[E0609]: no field `0` on type `impl Future<Output = Tuple>`
   --> $DIR/issue-61076.rs:69:26
@@ -75,7 +100,7 @@ help: consider `await`ing on the `Future`
 LL |     match tuple().await {
    |                  ++++++
 
-error: aborting due to 6 previous errors
+error: aborting due to 8 previous errors
 
 Some errors have detailed explanations: E0277, E0308, E0599, E0609.
 For more information about an error, try `rustc --explain E0277`.

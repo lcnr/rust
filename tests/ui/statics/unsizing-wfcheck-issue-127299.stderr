@@ -38,6 +38,15 @@ LL |     pub desc: &'static dyn Qux,
    = note: required because it appears within the type `&'static Lint`
    = note: shared static variables must have a type that implements `Sync`
 
+error[E0308]: mismatched types
+  --> $DIR/unsizing-wfcheck-issue-127299.rs:12:35
+   |
+LL | static FOO: &Lint = &Lint { desc: "desc" };
+   |                                   ^^^^^^ expected `&dyn Qux`, found `&str`
+   |
+   = note: expected reference `&'static (dyn Qux + 'static)`
+              found reference `&'static str`
+
 error[E0038]: the trait `Qux` is not dyn compatible
   --> $DIR/unsizing-wfcheck-issue-127299.rs:12:35
    |
@@ -61,7 +70,7 @@ help: alternatively, consider constraining `bar` so it is explicitly marked as n
 LL |     fn bar() -> i32 where Self: Sized;
    |                     +++++++++++++++++
 
-error: aborting due to 3 previous errors
+error: aborting due to 4 previous errors
 
-Some errors have detailed explanations: E0038, E0277.
+Some errors have detailed explanations: E0038, E0277, E0308.
 For more information about an error, try `rustc --explain E0038`.

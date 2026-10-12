@@ -52,33 +52,23 @@ LL |     type BadTraitRef = dyn Fn(Ty<&str>) -> &str;
    = note: lifetimes appearing in an associated or opaque type are not considered constrained
    = note: consider introducing a named lifetime parameter
 
-error: item does not constrain `lifetime_params::Ty::{opaque#0}`
-  --> $DIR/constrain_inputs.rs:8:8
+error[E0282]: type annotations needed
+  --> $DIR/constrain_inputs.rs:8:20
    |
 LL |     fn execute(ty: Ty<'_>) -> &str { todo!() }
-   |        ^^^^^^^
+   |                    ^^^^^^ cannot infer type
    |
-   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
-note: this opaque type is supposed to be constrained
-  --> $DIR/constrain_inputs.rs:4:19
-   |
-LL |     type Ty<'a> = impl Sized;
-   |                   ^^^^^^^^^^
+   = note: cannot infer type of hidden type of opaque
 
-error: item does not constrain `lifetime_params_2::Ty::{opaque#0}`
-  --> $DIR/constrain_inputs.rs:23:8
+error[E0282]: type annotations needed
+  --> $DIR/constrain_inputs.rs:23:20
    |
 LL |     fn execute(ty: Ty<'_>) -> &str { ty() }
-   |        ^^^^^^^
+   |                    ^^^^^^ cannot infer type
    |
-   = note: consider removing `#[define_opaque]` or adding an empty `#[define_opaque()]`
-note: this opaque type is supposed to be constrained
-  --> $DIR/constrain_inputs.rs:19:19
-   |
-LL |     type Ty<'a> = impl FnOnce() -> &'a str;
-   |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: cannot infer type of hidden type of opaque
 
 error: aborting due to 8 previous errors
 
-Some errors have detailed explanations: E0581, E0582.
-For more information about an error, try `rustc --explain E0581`.
+Some errors have detailed explanations: E0282, E0581, E0582.
+For more information about an error, try `rustc --explain E0282`.

@@ -6,6 +6,12 @@ LL | #[derive(PartialEq)]
 LL | pub struct Function {
 LL |     callback: Rc<dyn Fn()>,
    |     ^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: `Rc<dyn Fn()>` does not implement `PartialEq<Rc<dyn Fn()>>`
+  --> $SRC_DIR/alloc/src/rcs/rc.rs:LL:COL
+  ::: $SRC_DIR/alloc/src/rcs/rc.rs:LL:COL
+   |
+   = note: `Rc<dyn Fn()>` is defined in another crate
 
 error: aborting due to 1 previous error
 

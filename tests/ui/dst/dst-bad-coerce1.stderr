@@ -9,13 +9,13 @@ LL |     let f3: &Fat<[usize]> = f2;
    = note: expected reference `&Fat<[usize]>`
               found reference `&Fat<[isize; 3]>`
 
-error[E0277]: the trait bound `Foo: Bar` is not satisfied
+error[E0277]: the trait bound `Foo: Bar` is not satisfied in `Fat<Foo>`
   --> $DIR/dst-bad-coerce1.rs:20:29
    |
 LL |     let f3: &Fat<dyn Bar> = f2;
    |                             ^^ unsatisfied trait bound
    |
-help: the trait `Bar` is not implemented for `Foo`
+help: within `Fat<Foo>`, the trait `Bar` is not implemented for `Foo`
   --> $DIR/dst-bad-coerce1.rs:7:1
    |
 LL | struct Foo;
@@ -25,6 +25,18 @@ help: this trait has no implementations, consider adding one
    |
 LL | trait Bar { fn bar(&self) {} }
    | ^^^^^^^^^
+note: required because it appears within the type `Foo`
+  --> $DIR/dst-bad-coerce1.rs:7:8
+   |
+LL | struct Foo;
+   |        ^^^
+note: required because it appears within the type `Fat<Foo>`
+  --> $DIR/dst-bad-coerce1.rs:4:5
+   |
+LL | struct Fat<T: ?Sized> {
+LL |     ptr: T
+   |     ^^^^^^ required by this field
+   = note: required for `&Fat<Foo>` to implement `CoerceUnsized<&Fat<dyn Bar>>`
    = note: required for the cast from `&Fat<Foo>` to `&Fat<dyn Bar>`
 
 error: aborting due to 2 previous errors

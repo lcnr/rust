@@ -1,14 +1,8 @@
-error: non-defining opaque type use in defining scope
-  --> $DIR/generic_duplicate_lifetime_param.rs:9:5
+error: non-defining use of `Two<'_, '_>` in the defining scope
+  --> $DIR/generic_duplicate_lifetime_param.rs:8:1
    |
-LL |     t
-   |     ^
-   |
-note: lifetime used multiple times
-  --> $DIR/generic_duplicate_lifetime_param.rs:5:10
-   |
-LL | type Two<'a, 'b> = impl std::fmt::Debug;
-   |          ^^  ^^
+LL | fn one<'a>(t: &'a ()) -> Two<'a, 'a> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 

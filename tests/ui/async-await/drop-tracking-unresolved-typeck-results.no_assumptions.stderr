@@ -1,4 +1,4 @@
-error: implementation of `FnOnce` is not general enough
+error: lifetime bound not satisfied
   --> $DIR/drop-tracking-unresolved-typeck-results.rs:102:5
    |
 LL | /     send(async {
@@ -6,14 +6,9 @@ LL | |         Next(&Buffered(Map(Empty(PhantomData), ready::<&()>), FuturesOrde
 LL | |     });
    | |______^
    |
-note: `fn(&'0 ()) -> Ready<&'0 ()> {std::future::ready::<&'0 ()>}` must implement `FnOnce<(&'1 (),)>`, for any two lifetimes `'0` and `'1`...
-  --> $DIR/drop-tracking-unresolved-typeck-results.rs:13:12
-   |
-LL | fn send<T: Send>(_: T) {}
-   |            ^^^^ required by this bound in `send`
-   = note: ...but it actually implements `FnOnce<(&(),)>`
+   = note: this is a known limitation that will be removed in the future (see issue #100013 <https://github.com/rust-lang/rust/issues/100013> for more information)
 
-error: implementation of `FnOnce` is not general enough
+error: lifetime bound not satisfied
   --> $DIR/drop-tracking-unresolved-typeck-results.rs:102:5
    |
 LL | /     send(async {
@@ -21,12 +16,7 @@ LL | |         Next(&Buffered(Map(Empty(PhantomData), ready::<&()>), FuturesOrde
 LL | |     });
    | |______^
    |
-note: `fn(&'0 ()) -> Ready<&'0 ()> {std::future::ready::<&'0 ()>}` must implement `FnOnce<(&'1 (),)>`, for any two lifetimes `'0` and `'1`...
-  --> $DIR/drop-tracking-unresolved-typeck-results.rs:13:12
-   |
-LL | fn send<T: Send>(_: T) {}
-   |            ^^^^ required by this bound in `send`
-   = note: ...but it actually implements `FnOnce<(&(),)>`
+   = note: this is a known limitation that will be removed in the future (see issue #100013 <https://github.com/rust-lang/rust/issues/100013> for more information)
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
 error: aborting due to 2 previous errors

@@ -31,6 +31,43 @@ LL |     fn bar<T>(&self, t: T);
    = help: consider moving `bar` to another trait
 
 error[E0038]: the trait `Bar` is not dyn compatible
+  --> $DIR/generics.rs:15:35
+   |
+LL | fn make_bar<T:Bar>(t: &T) -> &dyn Bar {
+   |                                   ^^^ `Bar` is not dyn compatible
+   |
+note: for a trait to be dyn compatible it needs to allow building a vtable
+      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
+  --> $DIR/generics.rs:7:8
+   |
+LL | trait Bar {
+   |       --- this trait is not dyn compatible...
+LL |     fn bar<T>(&self, t: T);
+   |        ^^^ ...because method `bar` has generic type parameters
+   = help: consider moving `bar` to another trait
+help: consider using an opaque type instead
+   |
+LL - fn make_bar<T:Bar>(t: &T) -> &dyn Bar {
+LL + fn make_bar<T:Bar>(t: &T) -> &impl Bar {
+   |
+
+error[E0308]: mismatched types
+  --> $DIR/generics.rs:17:5
+   |
+LL | fn make_bar<T:Bar>(t: &T) -> &dyn Bar {
+   |             -                -------- expected `&dyn Bar` because of return type
+   |             |
+   |             found this type parameter
+LL |
+LL |     t
+   |     ^ expected `&dyn Bar`, found `&T`
+   |
+   = note: expected reference `&dyn Bar`
+              found reference `&T`
+   = help: type parameters must be constrained to match other types
+   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
+
+error[E0038]: the trait `Bar` is not dyn compatible
   --> $DIR/generics.rs:22:15
    |
 LL |     t as &dyn Bar
@@ -46,6 +83,7 @@ LL |     fn bar<T>(&self, t: T);
    |        ^^^ ...because method `bar` has generic type parameters
    = help: consider moving `bar` to another trait
 
-error: aborting due to 3 previous errors
+error: aborting due to 5 previous errors
 
-For more information about this error, try `rustc --explain E0038`.
+Some errors have detailed explanations: E0038, E0308.
+For more information about an error, try `rustc --explain E0038`.

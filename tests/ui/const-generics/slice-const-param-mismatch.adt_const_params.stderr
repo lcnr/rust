@@ -6,6 +6,8 @@ LL | struct ConstString<const T: &'static str>;
    |
    = help: add `#![feature(unsized_const_params)]` to the crate attributes to enable
    = note: this compiler was built on YYYY-MM-DD; consider upgrading it if it is out of date
+   = note: required for `str` to implement `ConstParamTy_`
+   = note: 1 redundant requirement hidden
    = note: required for `&'static str` to implement `ConstParamTy_`
 
 error[E0658]: use of unstable library feature `unsized_const_params`
@@ -16,6 +18,8 @@ LL | struct ConstBytes<const T: &'static [u8]>;
    |
    = help: add `#![feature(unsized_const_params)]` to the crate attributes to enable
    = note: this compiler was built on YYYY-MM-DD; consider upgrading it if it is out of date
+   = note: required for `[u8]` to implement `ConstParamTy_`
+   = note: 1 redundant requirement hidden
    = note: required for `&'static [u8]` to implement `ConstParamTy_`
 
 error[E0308]: mismatched types

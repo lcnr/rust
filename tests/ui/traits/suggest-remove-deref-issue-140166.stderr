@@ -1,23 +1,24 @@
-error[E0277]: the trait bound `&Chars: Trait` is not satisfied
+error[E0277]: `FlatMap<&Chars>` doesn't implement `Debug`
   --> $DIR/suggest-remove-deref-issue-140166.rs:14:26
    |
 LL |     format_args!("{:?}", FlatMap(&Chars));
-   |                   ----   ^^^^^^^^^^^^^^^ the trait `Trait` is not implemented for `&Chars`
+   |                   ----   ^^^^^^^^^^^^^^^ `FlatMap<&Chars>` cannot be formatted using `{:?}` because it doesn't implement `Debug`
    |                   |
    |                   required by this formatting parameter
    |
-help: the trait `Trait` is implemented for `Chars`
-  --> $DIR/suggest-remove-deref-issue-140166.rs:4:1
+help: the trait `Debug` is not implemented for `FlatMap<&Chars>`
+  --> $DIR/suggest-remove-deref-issue-140166.rs:6:1
    |
-LL | impl Trait for Chars {}
-   | ^^^^^^^^^^^^^^^^^^^^
-note: required for `FlatMap<&Chars>` to implement `Debug`
-  --> $DIR/suggest-remove-deref-issue-140166.rs:7:16
+LL | struct FlatMap<T>(T);
+   | ^^^^^^^^^^^^^^^^^
+   = note: add `#[derive(Debug)]` to `FlatMap<&Chars>` or manually `impl Debug for FlatMap<&Chars>`
+help: the trait `Debug` is conditionally implemented for `FlatMap<T>`
+  --> $DIR/suggest-remove-deref-issue-140166.rs:7:1
    |
 LL | impl<T: Trait> std::fmt::Debug for FlatMap<T> {
-   |         -----  ^^^^^^^^^^^^^^^     ^^^^^^^^^^
+   | ^^^^^^^^-----^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |         |
-   |         unsatisfied trait bound introduced here
+   |         unsatisfied requirement introduced here: `_: Trait`
 
 error: aborting due to 1 previous error
 

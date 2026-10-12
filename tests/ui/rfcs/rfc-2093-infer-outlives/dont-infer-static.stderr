@@ -5,13 +5,8 @@ LL |     bar: Bar<U>
    |          ^^^^^^
    |          |
    |          the parameter type `U` must be valid for the static lifetime...
-   |          ...so that the type `U` will meet its required lifetime bounds...
+   |          ...so that the type `U` will meet its required lifetime bounds
    |
-note: ...that is required by this bound
-  --> $DIR/dont-infer-static.rs:8:15
-   |
-LL | struct Bar<T: 'static> {
-   |               ^^^^^^^
 help: consider adding an explicit lifetime bound
    |
 LL | struct Foo<U: 'static> {

@@ -106,7 +106,7 @@ error[E0599]: the method `get` exists for struct `Rc<Bar<_>>`, but its trait bou
   --> $DIR/arbitrary-self-from-method-substs.rs:100:7
    |
 LL | struct Bar<R>(std::marker::PhantomData<R>);
-   | ------------- doesn't satisfy `Bar<_>: Deref`
+   | ------------- doesn't satisfy `<Bar<_> as Deref>::Target = Bar<Bar<_>>` or `Bar<_>: Deref`
 ...
 LL |     t.get();
    |       ^^^ method cannot be called on `Rc<Bar<_>>` due to unsatisfied trait bounds
@@ -135,7 +135,7 @@ error[E0599]: the method `get` exists for reference `&Rc<Bar<_>>`, but its trait
   --> $DIR/arbitrary-self-from-method-substs.rs:108:7
    |
 LL | struct Bar<R>(std::marker::PhantomData<R>);
-   | ------------- doesn't satisfy `Bar<_>: Deref`
+   | ------------- doesn't satisfy `<Bar<_> as Deref>::Target = Bar<Bar<_>>` or `Bar<_>: Deref`
 ...
 LL |     t.get();
    |       ^^^ method cannot be called on `&Rc<Bar<_>>` due to unsatisfied trait bounds
